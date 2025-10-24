@@ -26,6 +26,8 @@ export function ProfitCalculator() {
   const [salePrice, setSalePrice] = useState("");
   const [boardingFee, setBoardingFee] = useState("");
   const [passengers, setPassengers] = useState("1");
+  const [pricePerPassenger, setPricePerPassenger] = useState("");
+  const [pricingMode, setPricingMode] = useState<"total" | "per_passenger">("total");
   const [selectedAccount, setSelectedAccount] = useState<string>("");
   const [accounts, setAccounts] = useState<MileageAccount[]>([]);
   const [showResults, setShowResults] = useState(false);
@@ -59,9 +61,14 @@ export function ProfitCalculator() {
 
   const miles = parseFloat(milesUsed) || 0;
   const costPerThousand = parseFloat(costPerMile) || 0;
-  const price = parseFloat(salePrice) || 0;
   const boardingFeeNum = parseFloat(boardingFee) || 0;
   const passengersNum = parseInt(passengers) || 1;
+  const pricePerPass = parseFloat(pricePerPassenger) || 0;
+
+  // Cálculo do preço total baseado no modo selecionado
+  const price = pricingMode === "per_passenger" 
+    ? pricePerPass * passengersNum 
+    : parseFloat(salePrice) || 0;
 
   // Cálculo: ((milhas/1000) * custo do milheiro + taxa de embarque) * passageiros
   const costPerPassenger = (miles / 1000) * costPerThousand + boardingFeeNum;
@@ -71,14 +78,33 @@ export function ProfitCalculator() {
   const effectiveCostPerMile = miles > 0 ? totalCost / miles : 0;
 
   const handleCalculate = () => {
-    if (!milesUsed || !costPerMile || !salePrice) {
+    if (!milesUsed || !costPerMile) {
       toast({
         title: "Campos obrigatórios",
-        description: "Preencha milhas, custo e preço de venda para calcular.",
+        description: "Preencha milhas e custo para calcular.",
         variant: "destructive",
       });
       return;
     }
+    
+    if (pricingMode === "per_passenger" && !pricePerPassenger) {
+      toast({
+        title: "Preço necessário",
+        description: "Informe o preço por passageiro.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (pricingMode === "total" && !salePrice) {
+      toast({
+        title: "Preço necessário",
+        description: "Informe o preço total de venda.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     if (passengersNum <= 0) {
       toast({
         title: "Número de passageiros inválido",
@@ -168,17 +194,58 @@ export function ProfitCalculator() {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="manual-price">Preço de Venda (R$)</Label>
-              <Input
-                id="manual-price"
-                type="number"
-                step="0.01"
-                placeholder="1450.00"
-                value={salePrice}
-                onChange={(e) => setSalePrice(e.target.value)}
-              />
+            <div className="space-y-2 md:col-span-2">
+              <Label>Modo de Precificação</Label>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={pricingMode === "total"}
+                    onChange={() => setPricingMode("total")}
+                    className="w-4 h-4"
+                  />
+                  <span>Preço Total</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={pricingMode === "per_passenger"}
+                    onChange={() => setPricingMode("per_passenger")}
+                    className="w-4 h-4"
+                  />
+                  <span>Preço por Passageiro</span>
+                </label>
+              </div>
             </div>
+
+            {pricingMode === "total" ? (
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="manual-price">Preço Total de Venda (R$)</Label>
+                <Input
+                  id="manual-price"
+                  type="number"
+                  step="0.01"
+                  placeholder="1450.00"
+                  value={salePrice}
+                  onChange={(e) => setSalePrice(e.target.value)}
+                />
+              </div>
+            ) : (
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="price-per-passenger">Preço por Passageiro (R$)</Label>
+                <Input
+                  id="price-per-passenger"
+                  type="number"
+                  step="0.01"
+                  placeholder="725.00"
+                  value={pricePerPassenger}
+                  onChange={(e) => setPricePerPassenger(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Preço total: R$ {(pricePerPass * passengersNum).toFixed(2)}
+                </p>
+              </div>
+            )}
 
             <Button 
               onClick={handleCalculate}
@@ -253,17 +320,58 @@ export function ProfitCalculator() {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="account-price">Preço de Venda (R$)</Label>
-              <Input
-                id="account-price"
-                type="number"
-                step="0.01"
-                placeholder="1450.00"
-                value={salePrice}
-                onChange={(e) => setSalePrice(e.target.value)}
-              />
+            <div className="space-y-2 md:col-span-2">
+              <Label>Modo de Precificação</Label>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={pricingMode === "total"}
+                    onChange={() => setPricingMode("total")}
+                    className="w-4 h-4"
+                  />
+                  <span>Preço Total</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={pricingMode === "per_passenger"}
+                    onChange={() => setPricingMode("per_passenger")}
+                    className="w-4 h-4"
+                  />
+                  <span>Preço por Passageiro</span>
+                </label>
+              </div>
             </div>
+
+            {pricingMode === "total" ? (
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="account-price">Preço Total de Venda (R$)</Label>
+                <Input
+                  id="account-price"
+                  type="number"
+                  step="0.01"
+                  placeholder="1450.00"
+                  value={salePrice}
+                  onChange={(e) => setSalePrice(e.target.value)}
+                />
+              </div>
+            ) : (
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="account-price-per-passenger">Preço por Passageiro (R$)</Label>
+                <Input
+                  id="account-price-per-passenger"
+                  type="number"
+                  step="0.01"
+                  placeholder="725.00"
+                  value={pricePerPassenger}
+                  onChange={(e) => setPricePerPassenger(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Preço total: R$ {(pricePerPass * passengersNum).toFixed(2)}
+                </p>
+              </div>
+            )}
 
             <Button 
               onClick={handleCalculate}
