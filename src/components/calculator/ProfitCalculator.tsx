@@ -53,12 +53,14 @@ export function ProfitCalculator() {
   }, [selectedAccount, accounts]);
 
   const miles = parseFloat(milesUsed) || 0;
-  const cost = parseFloat(costPerMile) || 0;
+  const costPerThousand = parseFloat(costPerMile) || 0;
   const price = parseFloat(salePrice) || 0;
 
-  const totalCost = miles * cost;
+  // Cálculo correto: dividir milhas por 1.000 e multiplicar pelo custo do milheiro
+  const totalCost = (miles / 1000) * costPerThousand;
   const profit = price - totalCost;
   const profitMargin = price > 0 ? (profit / price) * 100 : 0;
+  const effectiveCostPerMile = miles > 0 ? totalCost / miles : 0;
 
   const selectedAccountData = accounts.find(a => a.id === selectedAccount);
   const insufficientBalance = selectedAccountData && miles > selectedAccountData.balance;
@@ -94,15 +96,18 @@ export function ProfitCalculator() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="manual-cost">Custo por Milha (R$)</Label>
+              <Label htmlFor="manual-cost">Custo por Milheiro (R$)</Label>
               <Input
                 id="manual-cost"
                 type="number"
-                step="0.0001"
-                placeholder="0.029"
+                step="0.01"
+                placeholder="29.00"
                 value={costPerMile}
                 onChange={(e) => setCostPerMile(e.target.value)}
               />
+              <p className="text-xs text-muted-foreground">
+                💡 Valor por cada 1.000 milhas
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -165,38 +170,79 @@ export function ProfitCalculator() {
           </TabsContent>
         </Tabs>
 
-        {(miles > 0 && cost > 0 && price > 0) && (
-          <div className="mt-6 space-y-4 p-4 bg-muted/50 rounded-lg">
-            <h4 className="font-semibold text-sm">Resultados:</h4>
+        {(miles > 0 && costPerThousand > 0 && price > 0) && (
+          <div className="mt-6 space-y-4">
+            <h4 className="font-semibold text-lg mb-4">💰 Resultados do Cálculo</h4>
             
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Custo Total</p>
-                <p className="text-lg font-bold">
-                  R$ {totalCost.toFixed(2)}
-                </p>
-              </div>
+            <div className="grid md:grid-cols-4 gap-4">
+              <Card className="border-2 border-border/50">
+                <CardContent className="p-4 space-y-2">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Custo Total</p>
+                  <p className="text-2xl font-bold text-foreground">
+                    R$ {totalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {(miles / 1000).toFixed(1)} milheiros × R$ {costPerThousand.toFixed(2)}
+                  </p>
+                </CardContent>
+              </Card>
 
-              <div className="space-y-1">
-                <div className="flex items-center gap-1">
-                  <DollarSign className="h-3 w-3 text-primary" />
-                  <p className="text-xs text-muted-foreground">Lucro</p>
-                </div>
-                <p className={`text-lg font-bold ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  R$ {profit.toFixed(2)}
-                </p>
-              </div>
+              <Card className={`border-2 ${profit >= 0 ? 'border-green-500/50 bg-green-500/5' : 'border-red-500/50 bg-red-500/5'}`}>
+                <CardContent className="p-4 space-y-2">
+                  <div className="flex items-center gap-1">
+                    <DollarSign className="h-4 w-4 text-primary" />
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Lucro</p>
+                  </div>
+                  <p className={`text-2xl font-bold ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    R$ {profit.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {profit >= 0 ? '✅ Operação rentável' : '⚠️ Operação com prejuízo'}
+                  </p>
+                </CardContent>
+              </Card>
 
-              <div className="space-y-1">
-                <div className="flex items-center gap-1">
-                  <TrendingUp className="h-3 w-3 text-primary" />
-                  <p className="text-xs text-muted-foreground">Margem</p>
-                </div>
-                <p className={`text-lg font-bold ${profitMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {profitMargin.toFixed(2)}%
-                </p>
-              </div>
+              <Card className={`border-2 ${profitMargin >= 0 ? 'border-green-500/50 bg-green-500/5' : 'border-red-500/50 bg-red-500/5'}`}>
+                <CardContent className="p-4 space-y-2">
+                  <div className="flex items-center gap-1">
+                    <TrendingUp className="h-4 w-4 text-primary" />
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Margem</p>
+                  </div>
+                  <p className={`text-2xl font-bold ${profitMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {profitMargin.toFixed(1)}%
+                  </p>
+                  <div className="w-full bg-muted rounded-full h-2 mt-2">
+                    <div 
+                      className={`h-2 rounded-full transition-all ${profitMargin >= 0 ? 'bg-green-500' : 'bg-red-500'}`}
+                      style={{ width: `${Math.min(Math.abs(profitMargin), 100)}%` }}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-2 border-border/50">
+                <CardContent className="p-4 space-y-2">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Custo/Milha</p>
+                  <p className="text-2xl font-bold text-foreground">
+                    R$ {effectiveCostPerMile.toFixed(4)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Custo efetivo por milha
+                  </p>
+                </CardContent>
+              </Card>
             </div>
+
+            <Card className="bg-primary/5 border-primary/20">
+              <CardContent className="p-4">
+                <h5 className="font-semibold text-sm mb-2">📊 Como funciona o cálculo?</h5>
+                <p className="text-xs text-muted-foreground">
+                  1. Divide-se as milhas por 1.000 para obter o número de milheiros<br/>
+                  2. Multiplica-se pelos custos do milheiro: <strong>{(miles / 1000).toFixed(1)} milheiros × R$ {costPerThousand.toFixed(2)} = R$ {totalCost.toFixed(2)}</strong><br/>
+                  3. Subtrai-se o custo total do preço de venda: <strong>R$ {price.toFixed(2)} - R$ {totalCost.toFixed(2)} = R$ {profit.toFixed(2)}</strong>
+                </p>
+              </CardContent>
+            </Card>
           </div>
         )}
       </CardContent>

@@ -193,6 +193,57 @@ export type Database = {
         }
         Relationships: []
       }
+      quotes: {
+        Row: {
+          client_name: string
+          client_phone: string | null
+          cost_per_thousand: number
+          created_at: string
+          departure_date: string | null
+          id: string
+          miles_needed: number
+          route: string | null
+          sent_at: string | null
+          status: Database["public"]["Enums"]["quote_status"]
+          total_price: number
+          updated_at: string
+          user_id: string
+          valid_until: string | null
+        }
+        Insert: {
+          client_name: string
+          client_phone?: string | null
+          cost_per_thousand: number
+          created_at?: string
+          departure_date?: string | null
+          id?: string
+          miles_needed: number
+          route?: string | null
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["quote_status"]
+          total_price: number
+          updated_at?: string
+          user_id: string
+          valid_until?: string | null
+        }
+        Update: {
+          client_name?: string
+          client_phone?: string | null
+          cost_per_thousand?: number
+          created_at?: string
+          departure_date?: string | null
+          id?: string
+          miles_needed?: number
+          route?: string | null
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["quote_status"]
+          total_price?: number
+          updated_at?: string
+          user_id?: string
+          valid_until?: string | null
+        }
+        Relationships: []
+      }
       sales: {
         Row: {
           client_contact: string | null
@@ -342,6 +393,7 @@ export type Database = {
     Enums: {
       account_status: "active" | "inactive"
       cpf_status: "available" | "blocked" | "expired"
+      quote_status: "pending" | "sent" | "accepted" | "rejected" | "expired"
       renewal_type: "annual" | "rolling"
       sale_status: "pending" | "completed" | "cancelled"
       ticket_status: "confirmed" | "pending" | "cancelled"
@@ -474,6 +526,7 @@ export const Constants = {
     Enums: {
       account_status: ["active", "inactive"],
       cpf_status: ["available", "blocked", "expired"],
+      quote_status: ["pending", "sent", "accepted", "rejected", "expired"],
       renewal_type: ["annual", "rolling"],
       sale_status: ["pending", "completed", "cancelled"],
       ticket_status: ["confirmed", "pending", "cancelled"],

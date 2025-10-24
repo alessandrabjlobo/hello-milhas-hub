@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Send, Mail } from "lucide-react";
+import { Send, Mail, MessageCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export const MessagesPanel = () => {
@@ -32,6 +32,32 @@ export const MessagesPanel = () => {
     setRecipient("");
     setSubject("");
     setMessage("");
+  };
+
+  const handleSendWhatsApp = () => {
+    if (!recipient || !message) {
+      toast({
+        title: "Campos obrigatórios",
+        description: "Por favor, preencha o destinatário e a mensagem.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Remove caracteres não numéricos do telefone
+    const phoneNumber = recipient.replace(/\D/g, '');
+    
+    // Formatar mensagem para WhatsApp
+    const formattedMessage = `*${subject}*\n\n${message}`;
+    const whatsappUrl = `https://wa.me/55${phoneNumber}?text=${encodeURIComponent(formattedMessage)}`;
+    
+    // Abrir WhatsApp
+    window.open(whatsappUrl, '_blank');
+    
+    toast({
+      title: "WhatsApp aberto!",
+      description: "A mensagem foi preparada no WhatsApp.",
+    });
   };
 
   const messageTemplates = [
@@ -66,10 +92,13 @@ export const MessagesPanel = () => {
             <Label htmlFor="recipient">Destinatário</Label>
             <Input
               id="recipient"
-              placeholder="email@cliente.com"
+              placeholder="email@cliente.com ou (11) 99999-9999"
               value={recipient}
               onChange={(e) => setRecipient(e.target.value)}
             />
+            <p className="text-xs text-muted-foreground">
+              💡 Use e-mail para enviar por e-mail ou telefone para WhatsApp
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -93,14 +122,25 @@ export const MessagesPanel = () => {
             />
           </div>
 
-          <Button 
-            onClick={handleSendMessage}
-            className="w-full"
-            variant="hero"
-          >
-            <Send className="h-4 w-4 mr-2" />
-            Enviar Mensagem
-          </Button>
+          <div className="grid grid-cols-2 gap-3">
+            <Button 
+              onClick={handleSendMessage}
+              className="w-full"
+              variant="hero"
+            >
+              <Send className="h-4 w-4 mr-2" />
+              Enviar E-mail
+            </Button>
+
+            <Button 
+              onClick={handleSendWhatsApp}
+              className="w-full"
+              variant="outline"
+            >
+              <MessageCircle className="h-4 w-4 mr-2" />
+              Enviar WhatsApp
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

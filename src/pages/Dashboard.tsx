@@ -12,7 +12,8 @@ import {
   Plus,
   MessageSquare,
   LogOut,
-  Calculator
+  Calculator,
+  FileText
 } from "lucide-react";
 import { MetricsCard } from "@/components/dashboard/MetricsCard";
 import { SalesTable } from "@/components/dashboard/SalesTable";
@@ -20,6 +21,7 @@ import { AccountsTable } from "@/components/dashboard/AccountsTable";
 import { TicketsTable } from "@/components/dashboard/TicketsTable";
 import { MessagesPanel } from "@/components/dashboard/MessagesPanel";
 import { ProfitCalculator } from "@/components/calculator/ProfitCalculator";
+import { QuoteGenerator } from "@/components/calculator/QuoteGenerator";
 import { useAuth } from "@/hooks/useAuth";
 
 const Dashboard = () => {
@@ -131,6 +133,10 @@ const Dashboard = () => {
               <Calculator className="h-4 w-4 mr-2" />
               Calculadora
             </TabsTrigger>
+            <TabsTrigger value="quote">
+              <FileText className="h-4 w-4 mr-2" />
+              Orçamento
+            </TabsTrigger>
             <TabsTrigger value="sales">Vendas</TabsTrigger>
             <TabsTrigger value="accounts">Contas</TabsTrigger>
             <TabsTrigger value="tickets">Passagens</TabsTrigger>
@@ -142,6 +148,10 @@ const Dashboard = () => {
 
           <TabsContent value="calculator" className="space-y-4">
             <ProfitCalculator />
+          </TabsContent>
+
+          <TabsContent value="quote" className="space-y-4">
+            <QuoteGenerator />
           </TabsContent>
 
           <TabsContent value="sales" className="space-y-4">
