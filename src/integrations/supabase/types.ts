@@ -14,16 +14,337 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      airline_companies: {
+        Row: {
+          code: string
+          cost_per_mile: number
+          cpf_limit: number
+          created_at: string
+          id: string
+          name: string
+          renewal_config: Json | null
+          renewal_type: Database["public"]["Enums"]["renewal_type"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          code: string
+          cost_per_mile?: number
+          cpf_limit?: number
+          created_at?: string
+          id?: string
+          name: string
+          renewal_config?: Json | null
+          renewal_type?: Database["public"]["Enums"]["renewal_type"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          code?: string
+          cost_per_mile?: number
+          cpf_limit?: number
+          created_at?: string
+          id?: string
+          name?: string
+          renewal_config?: Json | null
+          renewal_type?: Database["public"]["Enums"]["renewal_type"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "airline_companies_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cpf_registry: {
+        Row: {
+          airline_company_id: string
+          blocked_until: string | null
+          cpf_encrypted: string
+          created_at: string
+          full_name: string
+          id: string
+          last_used_at: string | null
+          status: Database["public"]["Enums"]["cpf_status"]
+          updated_at: string
+          usage_count: number
+          user_id: string
+        }
+        Insert: {
+          airline_company_id: string
+          blocked_until?: string | null
+          cpf_encrypted: string
+          created_at?: string
+          full_name: string
+          id?: string
+          last_used_at?: string | null
+          status?: Database["public"]["Enums"]["cpf_status"]
+          updated_at?: string
+          usage_count?: number
+          user_id: string
+        }
+        Update: {
+          airline_company_id?: string
+          blocked_until?: string | null
+          cpf_encrypted?: string
+          created_at?: string
+          full_name?: string
+          id?: string
+          last_used_at?: string | null
+          status?: Database["public"]["Enums"]["cpf_status"]
+          updated_at?: string
+          usage_count?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cpf_registry_airline_company_id_fkey"
+            columns: ["airline_company_id"]
+            isOneToOne: false
+            referencedRelation: "airline_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cpf_registry_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mileage_accounts: {
+        Row: {
+          account_number: string
+          airline_company_id: string
+          balance: number
+          cost_per_mile: number
+          created_at: string
+          id: string
+          status: Database["public"]["Enums"]["account_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_number: string
+          airline_company_id: string
+          balance?: number
+          cost_per_mile: number
+          created_at?: string
+          id?: string
+          status?: Database["public"]["Enums"]["account_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_number?: string
+          airline_company_id?: string
+          balance?: number
+          cost_per_mile?: number
+          created_at?: string
+          id?: string
+          status?: Database["public"]["Enums"]["account_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mileage_accounts_airline_company_id_fkey"
+            columns: ["airline_company_id"]
+            isOneToOne: false
+            referencedRelation: "airline_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mileage_accounts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      sales: {
+        Row: {
+          client_contact: string | null
+          client_cpf_encrypted: string
+          client_name: string
+          cost_per_mile: number
+          cpf_used_id: string | null
+          created_at: string
+          id: string
+          mileage_account_id: string | null
+          miles_used: number
+          notes: string | null
+          profit: number
+          profit_margin: number
+          sale_price: number
+          status: Database["public"]["Enums"]["sale_status"]
+          total_cost: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_contact?: string | null
+          client_cpf_encrypted: string
+          client_name: string
+          cost_per_mile: number
+          cpf_used_id?: string | null
+          created_at?: string
+          id?: string
+          mileage_account_id?: string | null
+          miles_used: number
+          notes?: string | null
+          profit: number
+          profit_margin: number
+          sale_price: number
+          status?: Database["public"]["Enums"]["sale_status"]
+          total_cost: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_contact?: string | null
+          client_cpf_encrypted?: string
+          client_name?: string
+          cost_per_mile?: number
+          cpf_used_id?: string | null
+          created_at?: string
+          id?: string
+          mileage_account_id?: string | null
+          miles_used?: number
+          notes?: string | null
+          profit?: number
+          profit_margin?: number
+          sale_price?: number
+          status?: Database["public"]["Enums"]["sale_status"]
+          total_cost?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_cpf_used_id_fkey"
+            columns: ["cpf_used_id"]
+            isOneToOne: false
+            referencedRelation: "cpf_registry"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_mileage_account_id_fkey"
+            columns: ["mileage_account_id"]
+            isOneToOne: false
+            referencedRelation: "mileage_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tickets: {
+        Row: {
+          airline: string
+          created_at: string
+          departure_date: string
+          id: string
+          issued_at: string | null
+          passenger_cpf_encrypted: string
+          passenger_name: string
+          return_date: string | null
+          route: string
+          sale_id: string
+          status: Database["public"]["Enums"]["ticket_status"]
+          ticket_code: string
+          updated_at: string
+        }
+        Insert: {
+          airline: string
+          created_at?: string
+          departure_date: string
+          id?: string
+          issued_at?: string | null
+          passenger_cpf_encrypted: string
+          passenger_name: string
+          return_date?: string | null
+          route: string
+          sale_id: string
+          status?: Database["public"]["Enums"]["ticket_status"]
+          ticket_code: string
+          updated_at?: string
+        }
+        Update: {
+          airline?: string
+          created_at?: string
+          departure_date?: string
+          id?: string
+          issued_at?: string | null
+          passenger_cpf_encrypted?: string
+          passenger_name?: string
+          return_date?: string | null
+          route?: string
+          sale_id?: string
+          status?: Database["public"]["Enums"]["ticket_status"]
+          ticket_code?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tickets_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      decrypt_cpf: { Args: { cpf_encrypted: string }; Returns: string }
+      encrypt_cpf: { Args: { cpf_text: string }; Returns: string }
     }
     Enums: {
-      [_ in never]: never
+      account_status: "active" | "inactive"
+      cpf_status: "available" | "blocked" | "expired"
+      renewal_type: "annual" | "rolling"
+      sale_status: "pending" | "completed" | "cancelled"
+      ticket_status: "confirmed" | "pending" | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +471,12 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      account_status: ["active", "inactive"],
+      cpf_status: ["available", "blocked", "expired"],
+      renewal_type: ["annual", "rolling"],
+      sale_status: ["pending", "completed", "cancelled"],
+      ticket_status: ["confirmed", "pending", "cancelled"],
+    },
   },
 } as const
