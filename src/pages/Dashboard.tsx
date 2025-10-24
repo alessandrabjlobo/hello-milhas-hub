@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,16 +10,48 @@ import {
   TrendingUp,
   Search,
   Plus,
-  MessageSquare
+  MessageSquare,
+  LogOut,
+  Calculator
 } from "lucide-react";
 import { MetricsCard } from "@/components/dashboard/MetricsCard";
 import { SalesTable } from "@/components/dashboard/SalesTable";
 import { AccountsTable } from "@/components/dashboard/AccountsTable";
 import { TicketsTable } from "@/components/dashboard/TicketsTable";
 import { MessagesPanel } from "@/components/dashboard/MessagesPanel";
+import { ProfitCalculator } from "@/components/calculator/ProfitCalculator";
+import { useAuth } from "@/hooks/useAuth";
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState("sales");
+  const { user, loading, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!user && !loading) {
+      navigate("/auth");
+    }
+  }, [user, loading, navigate]);
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/");
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Plane className="h-12 w-12 text-primary animate-bounce mx-auto mb-4" />
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
 
   const metrics = [
     {
@@ -72,8 +105,11 @@ const Dashboard = () => {
                 <Search className="h-4 w-4" />
               </Button>
               <Button variant="hero">
-                <Plus className="h-4 w-4" />
+                <Plus className="h-4 w-4 mr-2" />
                 Nova Venda
+              </Button>
+              <Button variant="outline" size="icon" onClick={handleSignOut}>
+                <LogOut className="h-4 w-4" />
               </Button>
             </div>
           </div>
@@ -91,6 +127,10 @@ const Dashboard = () => {
         {/* Main Content Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="bg-card shadow-card">
+            <TabsTrigger value="calculator">
+              <Calculator className="h-4 w-4 mr-2" />
+              Calculadora
+            </TabsTrigger>
             <TabsTrigger value="sales">Vendas</TabsTrigger>
             <TabsTrigger value="accounts">Contas</TabsTrigger>
             <TabsTrigger value="tickets">Passagens</TabsTrigger>
@@ -99,6 +139,10 @@ const Dashboard = () => {
               Mensagens
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="calculator" className="space-y-4">
+            <ProfitCalculator />
+          </TabsContent>
 
           <TabsContent value="sales" className="space-y-4">
             <Card className="shadow-card">

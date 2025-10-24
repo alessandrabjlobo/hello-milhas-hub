@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
@@ -10,10 +11,18 @@ import {
   ArrowRight
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 import heroBackground from "@/assets/hero-background.jpg";
 
 const Index = () => {
   const navigate = useNavigate();
+  const { user, loading } = useAuth();
+
+  useEffect(() => {
+    if (user && !loading) {
+      navigate("/dashboard");
+    }
+  }, [user, loading, navigate]);
 
   const features = [
     {
@@ -83,7 +92,7 @@ const Index = () => {
               <Button 
                 variant="hero" 
                 size="lg"
-                onClick={() => navigate("/dashboard")}
+                onClick={() => navigate("/auth")}
                 className="text-lg px-8"
               >
                 Começar Agora
@@ -152,10 +161,10 @@ const Index = () => {
               <Button 
                 variant="hero" 
                 size="lg"
-                onClick={() => navigate("/dashboard")}
+                onClick={() => navigate("/auth")}
                 className="text-lg px-10"
               >
-                Acessar Dashboard
+                Entrar / Cadastrar
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </CardContent>
