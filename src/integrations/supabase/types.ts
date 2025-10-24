@@ -171,6 +171,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          company_name: string | null
           created_at: string
           email: string | null
           full_name: string | null
@@ -178,6 +179,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          company_name?: string | null
           created_at?: string
           email?: string | null
           full_name?: string | null
@@ -185,6 +187,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          company_name?: string | null
           created_at?: string
           email?: string | null
           full_name?: string | null
@@ -195,49 +198,61 @@ export type Database = {
       }
       quotes: {
         Row: {
+          boarding_fee: number | null
           client_name: string
           client_phone: string | null
+          company_name: string | null
           cost_per_thousand: number
           created_at: string
           departure_date: string | null
           id: string
           miles_needed: number
+          passengers: number | null
           route: string | null
           sent_at: string | null
           status: Database["public"]["Enums"]["quote_status"]
           total_price: number
+          trip_type: string | null
           updated_at: string
           user_id: string
           valid_until: string | null
         }
         Insert: {
+          boarding_fee?: number | null
           client_name: string
           client_phone?: string | null
+          company_name?: string | null
           cost_per_thousand: number
           created_at?: string
           departure_date?: string | null
           id?: string
           miles_needed: number
+          passengers?: number | null
           route?: string | null
           sent_at?: string | null
           status?: Database["public"]["Enums"]["quote_status"]
           total_price: number
+          trip_type?: string | null
           updated_at?: string
           user_id: string
           valid_until?: string | null
         }
         Update: {
+          boarding_fee?: number | null
           client_name?: string
           client_phone?: string | null
+          company_name?: string | null
           cost_per_thousand?: number
           created_at?: string
           departure_date?: string | null
           id?: string
           miles_needed?: number
+          passengers?: number | null
           route?: string | null
           sent_at?: string | null
           status?: Database["public"]["Enums"]["quote_status"]
           total_price?: number
+          trip_type?: string | null
           updated_at?: string
           user_id?: string
           valid_until?: string | null

@@ -5,8 +5,10 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Calculator, TrendingUp, DollarSign } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Calculator, TrendingUp, DollarSign, Plane, Users, Percent } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 
 type MileageAccount = {
   id: string;
@@ -22,8 +24,11 @@ export function ProfitCalculator() {
   const [milesUsed, setMilesUsed] = useState("");
   const [costPerMile, setCostPerMile] = useState("");
   const [salePrice, setSalePrice] = useState("");
+  const [boardingFee, setBoardingFee] = useState("");
+  const [passengers, setPassengers] = useState("1");
   const [selectedAccount, setSelectedAccount] = useState<string>("");
   const [accounts, setAccounts] = useState<MileageAccount[]>([]);
+  const [showResults, setShowResults] = useState(false);
 
   useEffect(() => {
     loadAccounts();
@@ -55,12 +60,35 @@ export function ProfitCalculator() {
   const miles = parseFloat(milesUsed) || 0;
   const costPerThousand = parseFloat(costPerMile) || 0;
   const price = parseFloat(salePrice) || 0;
+  const boardingFeeNum = parseFloat(boardingFee) || 0;
+  const passengersNum = parseInt(passengers) || 1;
 
-  // Cálculo correto: dividir milhas por 1.000 e multiplicar pelo custo do milheiro
-  const totalCost = (miles / 1000) * costPerThousand;
+  // Cálculo: ((milhas/1000) * custo do milheiro + taxa de embarque) * passageiros
+  const costPerPassenger = (miles / 1000) * costPerThousand + boardingFeeNum;
+  const totalCost = costPerPassenger * passengersNum;
   const profit = price - totalCost;
   const profitMargin = price > 0 ? (profit / price) * 100 : 0;
   const effectiveCostPerMile = miles > 0 ? totalCost / miles : 0;
+
+  const handleCalculate = () => {
+    if (!milesUsed || !costPerMile || !salePrice) {
+      toast({
+        title: "Campos obrigatórios",
+        description: "Preencha milhas, custo e preço de venda para calcular.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (passengersNum <= 0) {
+      toast({
+        title: "Número de passageiros inválido",
+        description: "O número de passageiros deve ser maior que zero.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setShowResults(true);
+  };
 
   const selectedAccountData = accounts.find(a => a.id === selectedAccount);
   const insufficientBalance = selectedAccountData && miles > selectedAccountData.balance;
@@ -111,6 +139,36 @@ export function ProfitCalculator() {
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="boarding-fee">
+                <Plane className="inline mr-2 h-4 w-4" />
+                Taxa de Embarque (R$)
+              </Label>
+              <Input
+                id="boarding-fee"
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                value={boardingFee}
+                onChange={(e) => setBoardingFee(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="passengers">
+                <Users className="inline mr-2 h-4 w-4" />
+                Número de Passageiros
+              </Label>
+              <Input
+                id="passengers"
+                type="number"
+                min="1"
+                placeholder="1"
+                value={passengers}
+                onChange={(e) => setPassengers(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="manual-price">Preço de Venda (R$)</Label>
               <Input
                 id="manual-price"
@@ -121,6 +179,15 @@ export function ProfitCalculator() {
                 onChange={(e) => setSalePrice(e.target.value)}
               />
             </div>
+
+            <Button 
+              onClick={handleCalculate}
+              className="w-full mt-4"
+              size="lg"
+            >
+              <Calculator className="mr-2 h-4 w-4" />
+              Calcular
+            </Button>
           </TabsContent>
 
           <TabsContent value="account" className="space-y-4">
@@ -157,6 +224,36 @@ export function ProfitCalculator() {
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="account-boarding-fee">
+                <Plane className="inline mr-2 h-4 w-4" />
+                Taxa de Embarque (R$)
+              </Label>
+              <Input
+                id="account-boarding-fee"
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                value={boardingFee}
+                onChange={(e) => setBoardingFee(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="account-passengers">
+                <Users className="inline mr-2 h-4 w-4" />
+                Número de Passageiros
+              </Label>
+              <Input
+                id="account-passengers"
+                type="number"
+                min="1"
+                placeholder="1"
+                value={passengers}
+                onChange={(e) => setPassengers(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="account-price">Preço de Venda (R$)</Label>
               <Input
                 id="account-price"
@@ -167,12 +264,33 @@ export function ProfitCalculator() {
                 onChange={(e) => setSalePrice(e.target.value)}
               />
             </div>
+
+            <Button 
+              onClick={handleCalculate}
+              className="w-full mt-4"
+              size="lg"
+            >
+              <Calculator className="mr-2 h-4 w-4" />
+              Calcular
+            </Button>
           </TabsContent>
         </Tabs>
 
-        {(miles > 0 && costPerThousand > 0 && price > 0) && (
+        {showResults && (miles > 0 && costPerThousand > 0 && price > 0) && (
           <div className="mt-6 space-y-4">
             <h4 className="font-semibold text-lg mb-4">💰 Resultados do Cálculo</h4>
+            
+            <div className="bg-muted/50 p-4 rounded-lg space-y-2 mb-4">
+              <h5 className="font-semibold text-sm mb-2">📊 Breakdown do Cálculo:</h5>
+              <div className="text-sm space-y-1 text-muted-foreground">
+                <p>• Milhas: {miles.toLocaleString()} → {(miles / 1000).toFixed(1)} milheiros</p>
+                <p>• Custo por milheiro: R$ {costPerThousand.toFixed(2)}</p>
+                <p>• Taxa de embarque: R$ {boardingFeeNum.toFixed(2)}</p>
+                <p>• Subtotal por passageiro: R$ {costPerPassenger.toFixed(2)}</p>
+                <p>• × Número de passageiros: {passengersNum}</p>
+                <p className="font-semibold text-foreground pt-1 border-t">= Custo Total: R$ {totalCost.toFixed(2)}</p>
+              </div>
+            </div>
             
             <div className="grid md:grid-cols-4 gap-4">
               <Card className="border-2 border-border/50">
