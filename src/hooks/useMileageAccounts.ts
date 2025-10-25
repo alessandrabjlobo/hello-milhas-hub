@@ -1,0 +1,155 @@
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+
+export interface MileageAccount {
+  id: string;
+  user_id: string;
+  airline_company_id: string;
+  account_number: string;
+  balance: number;
+  cost_per_mile: number;
+  status: "active" | "inactive";
+  created_at: string;
+  updated_at: string;
+  airline_companies?: {
+    name: string;
+    code: string;
+  };
+}
+
+export const useMileageAccounts = () => {
+  const [accounts, setAccounts] = useState<MileageAccount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  const fetchAccounts = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("mileage_accounts")
+        .select(`
+          *,
+          airline_companies (
+            name,
+            code
+          )
+        `)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setAccounts(data || []);
+    } catch (error: any) {
+      toast({
+        title: "Erro ao carregar contas",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createAccount = async (accountData: {
+    airline_company_id: string;
+    account_number: string;
+    balance: number;
+    cost_per_mile: number;
+    status: "active" | "inactive";
+  }) => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error("Usuário não autenticado");
+
+      const { error } = await supabase.from("mileage_accounts").insert({
+        ...accountData,
+        user_id: userData.user.id,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Conta criada!",
+        description: "A conta de milhagem foi cadastrada com sucesso.",
+      });
+
+      await fetchAccounts();
+      return true;
+    } catch (error: any) {
+      toast({
+        title: "Erro ao criar conta",
+        description: error.message,
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
+  const updateAccount = async (
+    id: string,
+    updates: Partial<MileageAccount>
+  ) => {
+    try {
+      const { error } = await supabase
+        .from("mileage_accounts")
+        .update(updates)
+        .eq("id", id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Conta atualizada!",
+        description: "As alterações foram salvas com sucesso.",
+      });
+
+      await fetchAccounts();
+      return true;
+    } catch (error: any) {
+      toast({
+        title: "Erro ao atualizar conta",
+        description: error.message,
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
+  const deleteAccount = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from("mileage_accounts")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Conta removida",
+        description: "A conta foi excluída com sucesso.",
+      });
+
+      await fetchAccounts();
+      return true;
+    } catch (error: any) {
+      toast({
+        title: "Erro ao remover conta",
+        description: error.message,
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
+  useEffect(() => {
+    fetchAccounts();
+  }, []);
+
+  return {
+    accounts,
+    loading,
+    fetchAccounts,
+    createAccount,
+    updateAccount,
+    deleteAccount,
+  };
+};

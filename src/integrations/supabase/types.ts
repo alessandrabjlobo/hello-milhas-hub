@@ -202,12 +202,13 @@ export type Database = {
           client_name: string
           client_phone: string | null
           company_name: string | null
-          cost_per_thousand: number
           created_at: string
           departure_date: string | null
+          flight_details: Json | null
           id: string
           miles_needed: number
           passengers: number | null
+          payment_methods: string[] | null
           route: string | null
           sent_at: string | null
           status: Database["public"]["Enums"]["quote_status"]
@@ -215,19 +216,19 @@ export type Database = {
           trip_type: string | null
           updated_at: string
           user_id: string
-          valid_until: string | null
         }
         Insert: {
           boarding_fee?: number | null
           client_name: string
           client_phone?: string | null
           company_name?: string | null
-          cost_per_thousand: number
           created_at?: string
           departure_date?: string | null
+          flight_details?: Json | null
           id?: string
           miles_needed: number
           passengers?: number | null
+          payment_methods?: string[] | null
           route?: string | null
           sent_at?: string | null
           status?: Database["public"]["Enums"]["quote_status"]
@@ -235,19 +236,19 @@ export type Database = {
           trip_type?: string | null
           updated_at?: string
           user_id: string
-          valid_until?: string | null
         }
         Update: {
           boarding_fee?: number | null
           client_name?: string
           client_phone?: string | null
           company_name?: string | null
-          cost_per_thousand?: number
           created_at?: string
           departure_date?: string | null
+          flight_details?: Json | null
           id?: string
           miles_needed?: number
           passengers?: number | null
+          payment_methods?: string[] | null
           route?: string | null
           sent_at?: string | null
           status?: Database["public"]["Enums"]["quote_status"]
@@ -255,7 +256,6 @@ export type Database = {
           trip_type?: string | null
           updated_at?: string
           user_id?: string
-          valid_until?: string | null
         }
         Relationships: []
       }
