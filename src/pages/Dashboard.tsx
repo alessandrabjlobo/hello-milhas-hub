@@ -13,7 +13,8 @@ import {
   MessageSquare,
   LogOut,
   Calculator,
-  FileText
+  FileText,
+  UserCheck
 } from "lucide-react";
 import { MetricsCard } from "@/components/dashboard/MetricsCard";
 import { SalesTable } from "@/components/dashboard/SalesTable";
@@ -22,6 +23,7 @@ import { TicketsTable } from "@/components/dashboard/TicketsTable";
 import { MessagesPanel } from "@/components/dashboard/MessagesPanel";
 import { ProfitCalculator } from "@/components/calculator/ProfitCalculator";
 import { QuoteGenerator } from "@/components/calculator/QuoteGenerator";
+import { SuppliersTable } from "@/components/suppliers/SuppliersTable";
 import { useAuth } from "@/hooks/useAuth";
 
 const Dashboard = () => {
@@ -138,6 +140,10 @@ const Dashboard = () => {
               Orçamento
             </TabsTrigger>
             <TabsTrigger value="sales">Vendas</TabsTrigger>
+            <TabsTrigger value="suppliers">
+              <UserCheck className="h-4 w-4 mr-2" />
+              Fornecedores
+            </TabsTrigger>
             <TabsTrigger value="accounts">Contas</TabsTrigger>
             <TabsTrigger value="tickets">Passagens</TabsTrigger>
             <TabsTrigger value="messages">
@@ -166,6 +172,10 @@ const Dashboard = () => {
                 <SalesTable />
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="suppliers" className="space-y-4">
+            <SuppliersTable />
           </TabsContent>
 
           <TabsContent value="accounts" className="space-y-4">

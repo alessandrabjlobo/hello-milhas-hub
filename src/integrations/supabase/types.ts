@@ -120,35 +120,56 @@ export type Database = {
       }
       mileage_accounts: {
         Row: {
+          account_holder_cpf: string | null
+          account_holder_name: string | null
           account_number: string
           airline_company_id: string
           balance: number
           cost_per_mile: number
+          cpf_count: number
+          cpf_limit: number
           created_at: string
           id: string
+          last_cpf_renewal_at: string | null
+          password_encrypted: string | null
           status: Database["public"]["Enums"]["account_status"]
+          supplier_id: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          account_holder_cpf?: string | null
+          account_holder_name?: string | null
           account_number: string
           airline_company_id: string
           balance?: number
           cost_per_mile: number
+          cpf_count?: number
+          cpf_limit?: number
           created_at?: string
           id?: string
+          last_cpf_renewal_at?: string | null
+          password_encrypted?: string | null
           status?: Database["public"]["Enums"]["account_status"]
+          supplier_id?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          account_holder_cpf?: string | null
+          account_holder_name?: string | null
           account_number?: string
           airline_company_id?: string
           balance?: number
           cost_per_mile?: number
+          cpf_count?: number
+          cpf_limit?: number
           created_at?: string
           id?: string
+          last_cpf_renewal_at?: string | null
+          password_encrypted?: string | null
           status?: Database["public"]["Enums"]["account_status"]
+          supplier_id?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -158,6 +179,13 @@ export type Database = {
             columns: ["airline_company_id"]
             isOneToOne: false
             referencedRelation: "airline_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mileage_accounts_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
           {
@@ -341,6 +369,103 @@ export type Database = {
           },
         ]
       }
+      supplier_transactions: {
+        Row: {
+          account_id: string | null
+          amount: number
+          created_at: string
+          id: string
+          miles_quantity: number | null
+          notes: string | null
+          sale_id: string | null
+          supplier_id: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          amount: number
+          created_at?: string
+          id?: string
+          miles_quantity?: number | null
+          notes?: string | null
+          sale_id?: string | null
+          supplier_id: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string | null
+          amount?: number
+          created_at?: string
+          id?: string
+          miles_quantity?: number | null
+          notes?: string | null
+          sale_id?: string | null
+          supplier_id?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_transactions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "mileage_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_transactions_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_transactions_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      suppliers: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          notes: string | null
+          payment_type: string
+          phone: string
+          pix_key: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          notes?: string | null
+          payment_type?: string
+          phone: string
+          pix_key?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          payment_type?: string
+          phone?: string
+          pix_key?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       tickets: {
         Row: {
           airline: string
@@ -397,13 +522,73 @@ export type Database = {
           },
         ]
       }
+      verification_code_requests: {
+        Row: {
+          account_id: string
+          id: string
+          received_at: string | null
+          requested_at: string
+          sale_id: string
+          status: string
+          supplier_id: string
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          id?: string
+          received_at?: string | null
+          requested_at?: string
+          sale_id: string
+          status?: string
+          supplier_id: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          id?: string
+          received_at?: string | null
+          requested_at?: string
+          sale_id?: string
+          status?: string
+          supplier_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "verification_code_requests_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "mileage_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "verification_code_requests_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "verification_code_requests_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
       decrypt_cpf: { Args: { cpf_encrypted: string }; Returns: string }
+      decrypt_password: {
+        Args: { password_encrypted: string }
+        Returns: string
+      }
       encrypt_cpf: { Args: { cpf_text: string }; Returns: string }
+      encrypt_password: { Args: { password_text: string }; Returns: string }
     }
     Enums: {
       account_status: "active" | "inactive"
