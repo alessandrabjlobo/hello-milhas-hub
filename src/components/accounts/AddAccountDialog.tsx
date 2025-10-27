@@ -1,3 +1,4 @@
+// src/components/accounts/AddAccountDialog.tsx
 import { useState, useEffect } from "react";
 import {
   Dialog,
@@ -17,18 +18,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Plus, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
-interface AirlineCompany {
+type AirlineCompany = {
   id: string;
   name: string;
   code: string;
-}
+};
 
-interface Supplier {
+type Supplier = {
   id: string;
   name: string;
 }
@@ -43,8 +43,8 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
-    airline_company_id: "",
-    supplier_id: "",
+    airline_company_id: null,
+    supplier_id: null,
     account_holder_name: "",
     account_holder_cpf: "",
     password: "",
@@ -89,72 +89,52 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
     ) {
       toast({
         title: "Campos obrigatórios",
-        description: "Preencha todos os campos obrigatórios.",
+        description: "Preencha os campos marcados com *",
         variant: "destructive",
       });
       return;
     }
 
-    try {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) throw new Error("Usuário não autenticado");
+    const { error } = await supabase.from("mileage_accounts").insert({
+      airline_company_id: formData.airline_company_id,
+      supplier_id: formData.supplier_id,
+      account_holder_name: formData.account_holder_name,
+      account_holder_cpf: formData.account_holder_cpf.replace(/\D/g, ""),
+      password: formData.password || null,
+      account_number: formData.account_number,
+      balance: Number(formData.balance || 0),
+      cost_per_mile: Number(formData.cost_per_mile || 0),
+      cpf_limit: Number(formData.cpf_limit || 0),
+      status: formData.status,
+    });
 
-      // Encrypt password if provided
-      let passwordEncrypted = null;
-      if (formData.password) {
-        const { data: encryptedData, error: encryptError } = await supabase.rpc(
-          "encrypt_password",
-          { password_text: formData.password }
-        );
-        
-        if (encryptError) throw encryptError;
-        passwordEncrypted = encryptedData;
-      }
-
-      const { error } = await supabase.from("mileage_accounts").insert({
-        user_id: userData.user.id,
-        airline_company_id: formData.airline_company_id,
-        supplier_id: formData.supplier_id || null,
-        account_holder_name: formData.account_holder_name,
-        account_holder_cpf: formData.account_holder_cpf,
-        password_encrypted: passwordEncrypted,
-        account_number: formData.account_number,
-        balance: parseInt(formData.balance) || 0,
-        cost_per_mile: parseFloat(formData.cost_per_mile),
-        cpf_limit: parseInt(formData.cpf_limit),
-        cpf_count: 0,
-        status: formData.status,
-      });
-
-      if (error) throw error;
-
+    if (error) {
       toast({
-        title: "Conta criada!",
-        description: "A conta de milhagem foi cadastrada com sucesso.",
-      });
-
-      setFormData({
-        airline_company_id: "",
-        supplier_id: "",
-        account_holder_name: "",
-        account_holder_cpf: "",
-        password: "",
-        account_number: "",
-        balance: "",
-        cost_per_mile: "0.029",
-        cpf_limit: "25",
-        status: "active",
-      });
-      setShowPassword(false);
-      setOpen(false);
-      onAccountAdded();
-    } catch (error: any) {
-      toast({
-        title: "Erro ao criar conta",
+        title: "Erro ao salvar",
         description: error.message,
         variant: "destructive",
       });
+      return;
     }
+
+    toast({
+      title: "Conta adicionada",
+      description: "A conta de milhagem foi cadastrada com sucesso.",
+    });
+    setOpen(false);
+    setFormData({
+      airline_company_id: null,
+      supplier_id: null,
+      account_holder_name: "",
+      account_holder_cpf: "",
+      password: "",
+      account_number: "",
+      balance: "",
+      cost_per_mile: "0.029",
+      cpf_limit: "25",
+      status: "active",
+    });
+    onAccountAdded();
   };
 
   return (
@@ -176,7 +156,7 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
           <div className="space-y-2">
             <Label htmlFor="supplier">Fornecedor</Label>
             <Select
-              value={formData.supplier_id}
+              value={formData.supplier_id ?? undefined}
               onValueChange={(value) =>
                 setFormData({ ...formData, supplier_id: value })
               }
@@ -185,7 +165,6 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
                 <SelectValue placeholder="Selecione o fornecedor (opcional)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Nenhum fornecedor</SelectItem>
                 {suppliers.map((supplier) => (
                   <SelectItem key={supplier.id} value={supplier.id}>
                     {supplier.name}
@@ -198,7 +177,7 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
           <div className="space-y-2">
             <Label htmlFor="airline">Programa de Milhagem *</Label>
             <Select
-              value={formData.airline_company_id}
+              value={formData.airline_company_id ?? undefined}
               onValueChange={(value) =>
                 setFormData({ ...formData, airline_company_id: value })
               }
@@ -216,50 +195,48 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
             </Select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="holder_name">Titular da Conta *</Label>
+              <Label htmlFor="account_holder_name">Titular *</Label>
               <Input
-                id="holder_name"
+                id="account_holder_name"
                 value={formData.account_holder_name}
                 onChange={(e) =>
                   setFormData({ ...formData, account_holder_name: e.target.value })
                 }
-                placeholder="Ex: João Silva"
-                required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="holder_cpf">CPF do Titular *</Label>
+              <Label htmlFor="account_holder_cpf">CPF *</Label>
               <Input
-                id="holder_cpf"
+                id="account_holder_cpf"
                 value={formData.account_holder_cpf}
                 onChange={(e) =>
-                  setFormData({ ...formData, account_holder_cpf: formatCPF(e.target.value) })
+                  setFormData({
+                    ...formData,
+                    account_holder_cpf: formatCPF(e.target.value),
+                  })
                 }
+                maxLength={14}
                 placeholder="000.000.000-00"
-                required
               />
             </div>
-          </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="account_number">Número da Conta *</Label>
-            <Input
-              id="account_number"
-              value={formData.account_number}
-              onChange={(e) =>
-                setFormData({ ...formData, account_number: e.target.value })
-              }
-              placeholder="Ex: 123456789"
-              required
-            />
-          </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="account_number">Número da conta *</Label>
+              <Input
+                id="account_number"
+                value={formData.account_number}
+                onChange={(e) =>
+                  setFormData({ ...formData, account_number: e.target.value })
+                }
+                placeholder="Ex: 123456789"
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="password">Senha da Conta</Label>
-            <div className="relative">
+            <div className="space-y-2 sm:col-span-2 relative">
+              <Label htmlFor="password">Senha (opcional)</Label>
               <Input
                 id="password"
                 type={showPassword ? "text" : "password"}
@@ -284,78 +261,81 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
                 )}
               </Button>
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="balance">Saldo Inicial (milhas)</Label>
+              <Label htmlFor="balance">Saldo (milhas)</Label>
               <Input
                 id="balance"
                 type="number"
+                inputMode="numeric"
                 value={formData.balance}
                 onChange={(e) =>
                   setFormData({ ...formData, balance: e.target.value })
                 }
-                placeholder="Ex: 50000"
+                placeholder="Ex: 100000"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="cpf_limit">Limite de CPFs *</Label>
+              <Label htmlFor="cost_per_mile">Custo por milha (R$)</Label>
+              <Input
+                id="cost_per_mile"
+                type="number"
+                step="0.001"
+                inputMode="decimal"
+                value={formData.cost_per_mile}
+                onChange={(e) =>
+                  setFormData({ ...formData, cost_per_mile: e.target.value })
+                }
+                placeholder="Ex: 0.029"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="cpf_limit">Limite por CPF (milhas)</Label>
               <Input
                 id="cpf_limit"
                 type="number"
+                inputMode="numeric"
                 value={formData.cpf_limit}
                 onChange={(e) =>
                   setFormData({ ...formData, cpf_limit: e.target.value })
                 }
                 placeholder="Ex: 25"
-                required
               />
-              <Badge variant="outline" className="mt-1">
-                CPFs usados: 0/{formData.cpf_limit || 0}
-              </Badge>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="status">Status</Label>
+              <Select
+                value={formData.status}
+                onValueChange={(value: "active" | "inactive") =>
+                  setFormData({ ...formData, status: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Ativa</SelectItem>
+                  <SelectItem value="inactive">Inativa</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="cost_per_mile">Custo por Milha (R$) *</Label>
-            <Input
-              id="cost_per_mile"
-              type="number"
-              step="0.001"
-              value={formData.cost_per_mile}
-              onChange={(e) =>
-                setFormData({ ...formData, cost_per_mile: e.target.value })
-              }
-              placeholder="Ex: 0.029"
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="status">Status *</Label>
-            <Select
-              value={formData.status}
-              onValueChange={(value: "active" | "inactive") =>
-                setFormData({ ...formData, status: value })
-              }
+          <div className="flex gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+              className="flex-1"
             >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="active">Ativa</SelectItem>
-                <SelectItem value="inactive">Inativa</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex gap-3 justify-end pt-4">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancelar
             </Button>
-            <Button type="submit">Criar Conta</Button>
+            <Button type="submit" className="flex-1">
+              Salvar
+            </Button>
           </div>
         </form>
       </DialogContent>
