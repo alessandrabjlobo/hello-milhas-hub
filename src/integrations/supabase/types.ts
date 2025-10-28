@@ -61,6 +61,92 @@ export type Database = {
           },
         ]
       }
+      audit_logs: {
+        Row: {
+          action: string
+          changed_at: string
+          changed_by: string
+          diff: Json | null
+          id: string
+          record_id: string
+          supplier_id: string | null
+          table_name: string
+        }
+        Insert: {
+          action: string
+          changed_at?: string
+          changed_by: string
+          diff?: Json | null
+          id?: string
+          record_id: string
+          supplier_id?: string | null
+          table_name: string
+        }
+        Update: {
+          action?: string
+          changed_at?: string
+          changed_by?: string
+          diff?: Json | null
+          id?: string
+          record_id?: string
+          supplier_id?: string | null
+          table_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_logs_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_subscriptions: {
+        Row: {
+          created_at: string
+          grace_period_ends: string | null
+          id: string
+          pix_instructions: string | null
+          plan: Database["public"]["Enums"]["subscription_plan"]
+          receipt_reviewed: boolean | null
+          receipt_uploaded_at: string | null
+          receipt_url: string | null
+          renewal_date: string
+          status: Database["public"]["Enums"]["subscription_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          grace_period_ends?: string | null
+          id?: string
+          pix_instructions?: string | null
+          plan?: Database["public"]["Enums"]["subscription_plan"]
+          receipt_reviewed?: boolean | null
+          receipt_uploaded_at?: string | null
+          receipt_url?: string | null
+          renewal_date: string
+          status?: Database["public"]["Enums"]["subscription_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          grace_period_ends?: string | null
+          id?: string
+          pix_instructions?: string | null
+          plan?: Database["public"]["Enums"]["subscription_plan"]
+          receipt_reviewed?: boolean | null
+          receipt_uploaded_at?: string | null
+          receipt_url?: string | null
+          renewal_date?: string
+          status?: Database["public"]["Enums"]["subscription_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       cpf_registry: {
         Row: {
           airline_company_id: string
@@ -197,6 +283,44 @@ export type Database = {
           },
         ]
       }
+      mileage_movements: {
+        Row: {
+          account_id: string
+          amount: number
+          created_at: string
+          created_by: string
+          id: string
+          note: string | null
+          type: string
+        }
+        Insert: {
+          account_id: string
+          amount: number
+          created_at?: string
+          created_by: string
+          id?: string
+          note?: string | null
+          type: string
+        }
+        Update: {
+          account_id?: string
+          amount?: number
+          created_at?: string
+          created_by?: string
+          id?: string
+          note?: string | null
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mileage_movements_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "mileage_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           company_name: string | null
@@ -204,6 +328,7 @@ export type Database = {
           email: string | null
           full_name: string | null
           id: string
+          supplier_id: string | null
           updated_at: string
         }
         Insert: {
@@ -212,6 +337,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id: string
+          supplier_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -220,9 +346,18 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          supplier_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       quotes: {
         Row: {
@@ -466,6 +601,39 @@ export type Database = {
         }
         Relationships: []
       }
+      suppliers_airlines: {
+        Row: {
+          airline_company_id: string
+          created_at: string
+          supplier_id: string
+        }
+        Insert: {
+          airline_company_id: string
+          created_at?: string
+          supplier_id: string
+        }
+        Update: {
+          airline_company_id?: string
+          created_at?: string
+          supplier_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "suppliers_airlines_airline_company_id_fkey"
+            columns: ["airline_company_id"]
+            isOneToOne: false
+            referencedRelation: "airline_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "suppliers_airlines_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tickets: {
         Row: {
           airline: string
@@ -521,6 +689,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
       }
       verification_code_requests: {
         Row: {
@@ -589,13 +778,23 @@ export type Database = {
       }
       encrypt_cpf: { Args: { cpf_text: string }; Returns: string }
       encrypt_password: { Args: { password_text: string }; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       account_status: "active" | "inactive"
+      app_role: "admin" | "supplier_owner" | "seller"
       cpf_status: "available" | "blocked" | "expired"
       quote_status: "pending" | "sent" | "accepted" | "rejected" | "expired"
       renewal_type: "annual" | "rolling"
       sale_status: "pending" | "completed" | "cancelled"
+      subscription_plan: "start" | "pro"
+      subscription_status: "active" | "grace_period" | "suspended" | "cancelled"
       ticket_status: "confirmed" | "pending" | "cancelled"
     }
     CompositeTypes: {
@@ -725,10 +924,13 @@ export const Constants = {
   public: {
     Enums: {
       account_status: ["active", "inactive"],
+      app_role: ["admin", "supplier_owner", "seller"],
       cpf_status: ["available", "blocked", "expired"],
       quote_status: ["pending", "sent", "accepted", "rejected", "expired"],
       renewal_type: ["annual", "rolling"],
       sale_status: ["pending", "completed", "cancelled"],
+      subscription_plan: ["start", "pro"],
+      subscription_status: ["active", "grace_period", "suspended", "cancelled"],
       ticket_status: ["confirmed", "pending", "cancelled"],
     },
   },

@@ -69,13 +69,34 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
 
   useEffect(() => {
     const fetchData = async () => {
-      const [airlinesRes, suppliersRes] = await Promise.all([
-        supabase.from("airline_companies").select("id, name, code").order("name"),
+      const { data: userData } = await supabase.auth.getUser();
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("supplier_id")
+        .eq("id", userData.user?.id)
+        .single();
+
+      const supplierId = profileData?.supplier_id;
+
+      const [suppliersRes] = await Promise.all([
         supabase.from("suppliers").select("id, name").order("name"),
       ]);
 
-      if (airlinesRes.data) setAirlines(airlinesRes.data);
       if (suppliersRes.data) setSuppliers(suppliersRes.data);
+
+      // Fetch airlines filtered by supplier
+      if (supplierId) {
+        const { data: linkedData } = await supabase
+          .from("suppliers_airlines")
+          .select("airline_companies(id, name, code)")
+          .eq("supplier_id", supplierId);
+
+        const filteredAirlines = (linkedData || [])
+          .map((item: any) => item.airline_companies)
+          .filter(Boolean);
+
+        setAirlines(filteredAirlines);
+      }
     };
     if (open) fetchData();
   }, [open]);
