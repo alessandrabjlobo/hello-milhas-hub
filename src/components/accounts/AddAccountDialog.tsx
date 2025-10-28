@@ -42,7 +42,18 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
   const [airlines, setAirlines] = useState<AirlineCompany[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [showPassword, setShowPassword] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    airline_company_id: string | null;
+    supplier_id: string | null;
+    account_holder_name: string;
+    account_holder_cpf: string;
+    password: string;
+    account_number: string;
+    balance: string;
+    cost_per_mile: string;
+    cpf_limit: string;
+    status: "active" | "inactive";
+  }>({
     airline_company_id: null,
     supplier_id: null,
     account_holder_name: "",
@@ -52,7 +63,7 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
     balance: "",
     cost_per_mile: "0.029",
     cpf_limit: "25",
-    status: "active" as "active" | "inactive",
+    status: "active",
   });
   const { toast } = useToast();
 
@@ -95,18 +106,29 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
       return;
     }
 
-    const { error } = await supabase.from("mileage_accounts").insert({
-      airline_company_id: formData.airline_company_id,
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) {
+      toast({
+        title: "Erro de autenticação",
+        description: "Usuário não autenticado",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const { error } = await supabase.from("mileage_accounts").insert([{
+      user_id: userData.user.id,
+      airline_company_id: formData.airline_company_id!,
       supplier_id: formData.supplier_id,
       account_holder_name: formData.account_holder_name,
       account_holder_cpf: formData.account_holder_cpf.replace(/\D/g, ""),
-      password: formData.password || null,
+      password_encrypted: formData.password || null,
       account_number: formData.account_number,
       balance: Number(formData.balance || 0),
       cost_per_mile: Number(formData.cost_per_mile || 0),
       cpf_limit: Number(formData.cpf_limit || 0),
       status: formData.status,
-    });
+    }]);
 
     if (error) {
       toast({
