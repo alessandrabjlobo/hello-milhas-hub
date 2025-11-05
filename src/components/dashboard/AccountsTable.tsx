@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Table,
   TableBody,
@@ -10,13 +11,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Edit, Trash2 } from "lucide-react";
+import { Edit, Trash2, Eye } from "lucide-react";
 import { useMileageAccounts, MileageAccount } from "@/hooks/useMileageAccounts";
 import { AddAccountDialog } from "@/components/accounts/AddAccountDialog";
 import { EditAccountDialog } from "@/components/accounts/EditAccountDialog";
 import { DeleteAccountDialog } from "@/components/accounts/DeleteAccountDialog";
 
 export const AccountsTable = () => {
+  const navigate = useNavigate();
   const { accounts, loading, fetchAccounts, updateAccount, deleteAccount } =
     useMileageAccounts();
   const [editingAccount, setEditingAccount] = useState<MileageAccount | null>(null);
@@ -88,7 +90,16 @@ export const AccountsTable = () => {
                     <Button
                       variant="ghost"
                       size="icon"
+                      onClick={() => navigate(`/accounts/${account.id}`)}
+                      title="Ver detalhes"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       onClick={() => setEditingAccount(account)}
+                      title="Editar"
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
@@ -96,6 +107,7 @@ export const AccountsTable = () => {
                       variant="ghost"
                       size="icon"
                       onClick={() => setDeletingAccount(account)}
+                      title="Excluir"
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>

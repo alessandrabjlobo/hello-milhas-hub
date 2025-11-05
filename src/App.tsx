@@ -10,6 +10,7 @@ import Onboarding from "./pages/Onboarding";
 import MyAirlines from "./pages/MyAirlines";
 import Billing from "./pages/Billing";
 import AdminUsers from "./pages/AdminUsers";
+import AccountDetail from "./pages/AccountDetail";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import NotFound from "./pages/NotFound";
@@ -30,6 +31,7 @@ const App = () => (
           <Route path="/my-airlines" element={<MyAirlines />} />
           <Route path="/billing" element={<Billing />} />
           <Route path="/admin/users" element={<AdminUsers />} />
+          <Route path="/accounts/:id" element={<AccountDetail />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/privacy" element={<Privacy />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

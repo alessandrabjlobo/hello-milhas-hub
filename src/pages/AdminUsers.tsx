@@ -5,9 +5,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, UserPlus } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { InviteUserDialog } from "@/components/admin/InviteUserDialog";
 
 interface UserProfile {
   id: string;
@@ -96,10 +97,7 @@ export default function AdminUsers() {
             <p className="text-muted-foreground">Convide e gerencie usuários do sistema</p>
           </div>
         </div>
-        <Button>
-          <UserPlus className="h-4 w-4 mr-2" />
-          Convidar Usuário
-        </Button>
+        <InviteUserDialog onUserInvited={fetchUsers} />
       </div>
 
       <Card>

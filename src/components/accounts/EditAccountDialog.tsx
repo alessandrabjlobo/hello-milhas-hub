@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { MileageAccount } from "@/hooks/useMileageAccounts";
+import { applyCPFMask, applyNumericMask } from "@/lib/input-masks";
 
 interface EditAccountDialogProps {
   account: MileageAccount | null;
@@ -35,6 +36,9 @@ export const EditAccountDialog = ({
     balance: "",
     cost_per_mile: "",
     status: "active" as "active" | "inactive",
+    account_holder_name: "",
+    account_holder_cpf: "",
+    cpf_limit: "",
   });
 
   useEffect(() => {
@@ -44,6 +48,9 @@ export const EditAccountDialog = ({
         balance: account.balance.toString(),
         cost_per_mile: account.cost_per_mile.toString(),
         status: account.status,
+        account_holder_name: account.account_holder_name || "",
+        account_holder_cpf: account.account_holder_cpf || "",
+        cpf_limit: account.cpf_limit?.toString() || "25",
       });
     }
   }, [account]);
@@ -57,6 +64,9 @@ export const EditAccountDialog = ({
       balance: parseInt(formData.balance),
       cost_per_mile: parseFloat(formData.cost_per_mile),
       status: formData.status,
+      account_holder_name: formData.account_holder_name || null,
+      account_holder_cpf: formData.account_holder_cpf || null,
+      cpf_limit: parseInt(formData.cpf_limit) || 25,
     });
 
     if (success) {
@@ -114,6 +124,44 @@ export const EditAccountDialog = ({
               value={formData.cost_per_mile}
               onChange={(e) =>
                 setFormData({ ...formData, cost_per_mile: e.target.value })
+              }
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="edit_holder_name">Titular da Conta</Label>
+            <Input
+              id="edit_holder_name"
+              value={formData.account_holder_name}
+              onChange={(e) =>
+                setFormData({ ...formData, account_holder_name: e.target.value })
+              }
+              placeholder="Nome do titular"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="edit_holder_cpf">CPF do Titular</Label>
+            <Input
+              id="edit_holder_cpf"
+              value={formData.account_holder_cpf}
+              onChange={(e) =>
+                setFormData({ ...formData, account_holder_cpf: applyCPFMask(e.target.value) })
+              }
+              placeholder="000.000.000-00"
+              maxLength={14}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="edit_cpf_limit">Limite de CPFs</Label>
+            <Input
+              id="edit_cpf_limit"
+              type="number"
+              min="1"
+              value={formData.cpf_limit}
+              onChange={(e) =>
+                setFormData({ ...formData, cpf_limit: e.target.value })
               }
             />
           </div>

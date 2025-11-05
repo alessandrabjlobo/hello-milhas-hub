@@ -10,6 +10,10 @@ export interface MileageAccount {
   balance: number;
   cost_per_mile: number;
   status: "active" | "inactive";
+  account_holder_name?: string | null;
+  account_holder_cpf?: string | null;
+  cpf_limit?: number;
+  cpf_count?: number;
   created_at: string;
   updated_at: string;
   airline_companies?: {
