@@ -424,59 +424,95 @@ export type Database = {
       }
       sales: {
         Row: {
+          boarding_fee: number | null
           client_contact: string | null
           client_cpf_encrypted: string
           client_name: string
           cost_per_mile: number
           cpf_used_id: string | null
           created_at: string
+          customer_cpf: string | null
+          customer_name: string | null
+          customer_phone: string | null
           id: string
           mileage_account_id: string | null
+          miles_needed: number | null
           miles_used: number
           notes: string | null
+          passengers: number | null
+          price_per_passenger: number | null
+          price_total: number | null
           profit: number
+          profit_estimate: number | null
           profit_margin: number
+          route_text: string | null
           sale_price: number
           status: Database["public"]["Enums"]["sale_status"]
+          supplier_id: string | null
           total_cost: number
+          travel_dates: Json | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          boarding_fee?: number | null
           client_contact?: string | null
           client_cpf_encrypted: string
           client_name: string
           cost_per_mile: number
           cpf_used_id?: string | null
           created_at?: string
+          customer_cpf?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
           id?: string
           mileage_account_id?: string | null
+          miles_needed?: number | null
           miles_used: number
           notes?: string | null
+          passengers?: number | null
+          price_per_passenger?: number | null
+          price_total?: number | null
           profit: number
+          profit_estimate?: number | null
           profit_margin: number
+          route_text?: string | null
           sale_price: number
           status?: Database["public"]["Enums"]["sale_status"]
+          supplier_id?: string | null
           total_cost: number
+          travel_dates?: Json | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          boarding_fee?: number | null
           client_contact?: string | null
           client_cpf_encrypted?: string
           client_name?: string
           cost_per_mile?: number
           cpf_used_id?: string | null
           created_at?: string
+          customer_cpf?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
           id?: string
           mileage_account_id?: string | null
+          miles_needed?: number | null
           miles_used?: number
           notes?: string | null
+          passengers?: number | null
+          price_per_passenger?: number | null
+          price_total?: number | null
           profit?: number
+          profit_estimate?: number | null
           profit_margin?: number
+          route_text?: string | null
           sale_price?: number
           status?: Database["public"]["Enums"]["sale_status"]
+          supplier_id?: string | null
           total_cost?: number
+          travel_dates?: Json | null
           updated_at?: string
           user_id?: string
         }
@@ -493,6 +529,13 @@ export type Database = {
             columns: ["mileage_account_id"]
             isOneToOne: false
             referencedRelation: "mileage_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
           {
@@ -637,48 +680,66 @@ export type Database = {
       tickets: {
         Row: {
           airline: string
+          attachments: Json | null
           created_at: string
           departure_date: string
           id: string
           issued_at: string | null
           passenger_cpf_encrypted: string
           passenger_name: string
+          pnr: string | null
           return_date: string | null
           route: string
           sale_id: string
           status: Database["public"]["Enums"]["ticket_status"]
           ticket_code: string
+          ticket_number: string | null
           updated_at: string
+          verification_status:
+            | Database["public"]["Enums"]["verification_status"]
+            | null
         }
         Insert: {
           airline: string
+          attachments?: Json | null
           created_at?: string
           departure_date: string
           id?: string
           issued_at?: string | null
           passenger_cpf_encrypted: string
           passenger_name: string
+          pnr?: string | null
           return_date?: string | null
           route: string
           sale_id: string
           status?: Database["public"]["Enums"]["ticket_status"]
           ticket_code: string
+          ticket_number?: string | null
           updated_at?: string
+          verification_status?:
+            | Database["public"]["Enums"]["verification_status"]
+            | null
         }
         Update: {
           airline?: string
+          attachments?: Json | null
           created_at?: string
           departure_date?: string
           id?: string
           issued_at?: string | null
           passenger_cpf_encrypted?: string
           passenger_name?: string
+          pnr?: string | null
           return_date?: string | null
           route?: string
           sale_id?: string
           status?: Database["public"]["Enums"]["ticket_status"]
           ticket_code?: string
+          ticket_number?: string | null
           updated_at?: string
+          verification_status?:
+            | Database["public"]["Enums"]["verification_status"]
+            | null
         }
         Relationships: [
           {
@@ -778,6 +839,7 @@ export type Database = {
       }
       encrypt_cpf: { Args: { cpf_text: string }; Returns: string }
       encrypt_password: { Args: { password_text: string }; Returns: string }
+      get_user_supplier_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -785,6 +847,8 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_locked: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       account_status: "active" | "inactive"
@@ -796,6 +860,7 @@ export type Database = {
       subscription_plan: "start" | "pro"
       subscription_status: "active" | "grace_period" | "suspended" | "cancelled"
       ticket_status: "confirmed" | "pending" | "cancelled"
+      verification_status: "pending" | "requested" | "received" | "completed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -932,6 +997,7 @@ export const Constants = {
       subscription_plan: ["start", "pro"],
       subscription_status: ["active", "grace_period", "suspended", "cancelled"],
       ticket_status: ["confirmed", "pending", "cancelled"],
+      verification_status: ["pending", "requested", "received", "completed"],
     },
   },
 } as const

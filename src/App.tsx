@@ -3,14 +3,13 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { SidebarProvider } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/shared/AppSidebar";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Auth from "./pages/Auth";
-import Onboarding from "./pages/Onboarding";
-import MyAirlines from "./pages/MyAirlines";
-import Billing from "./pages/Billing";
-import AdminUsers from "./pages/AdminUsers";
-import AccountDetail from "./pages/AccountDetail";
+import NewSaleWizard from "./pages/sales/NewSaleWizard";
+import SalesList from "./pages/sales/SalesList";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import NotFound from "./pages/NotFound";
@@ -26,16 +25,26 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/onboarding" element={<Onboarding />} />
-          <Route path="/my-airlines" element={<MyAirlines />} />
-          <Route path="/billing" element={<Billing />} />
-          <Route path="/admin/users" element={<AdminUsers />} />
-          <Route path="/accounts/:id" element={<AccountDetail />} />
-          <Route path="/terms" element={<Terms />} />
-          <Route path="/privacy" element={<Privacy />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
+          <Route path="/legal/terms" element={<Terms />} />
+          <Route path="/legal/privacy" element={<Privacy />} />
+          <Route
+            path="/*"
+            element={
+              <SidebarProvider>
+                <div className="flex min-h-screen w-full">
+                  <AppSidebar />
+                  <main className="flex-1">
+                    <Routes>
+                      <Route path="/dashboard" element={<Dashboard />} />
+                      <Route path="/sales/new" element={<NewSaleWizard />} />
+                      <Route path="/sales" element={<SalesList />} />
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </main>
+                </div>
+              </SidebarProvider>
+            }
+          />
         </Routes>
       </BrowserRouter>
     </TooltipProvider>
