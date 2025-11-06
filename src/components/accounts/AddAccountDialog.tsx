@@ -22,9 +22,8 @@ import { Eye, EyeOff, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
-// Hooks para fornecedor atual e regras locais (sem SQL)
-import { useUserRole } from "@/hooks/useUserRole";        // deve expor: { supplierId }
-import { useProgramRules } from "@/hooks/useProgramRules"; // getRule(scope)-> { cpf_limit, period }
+import { useUserRole } from "@/hooks/useUserRole";
+import { useProgramRules } from "@/hooks/useProgramRules";
 
 type AirlineCompany = { id: string; name: string; code: string };
 type Supplier = { id: string; name: string };
@@ -36,24 +35,24 @@ interface AddAccountDialogProps {
 export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
   const [open, setOpen] = useState(false);
 
-  // Dados para selects
   const [airlines, setAirlines] = useState<AirlineCompany[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loadingAirlines, setLoadingAirlines] = useState(false);
 
-  // Supplier “preferencial” que vem do perfil (se existir)
   const { supplierId: supplierFromRole } = useUserRole();
   const [profileSupplierId, setProfileSupplierId] = useState<string>("");
 
-  // Regras por (supplier|global) + airline
-  // scope usado: fornecedor escolhido no form OU fornecedor do perfil OU "global"
+  // 👇 showPassword AGORA está definido
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Regras: usa fornecedor do perfil (se houver), senão escopo "global"
   const scopeForRules =
     (profileSupplierId || supplierFromRole || "").trim() || "global";
   const { getRule } = useProgramRules(scopeForRules);
 
   const { toast } = useToast();
 
-  // Form SEMPRE com strings ("" = vazio) pra evitar alternância controlado/não-controlado
+  // Form controlado (strings) pra evitar warnings
   const [formData, setFormData] = useState<{
     airline_company_id: string;
     supplier_id: string; // opcional
@@ -108,10 +107,8 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
     }
   }, [toast]);
 
-  // Ao abrir: carregar fornecedores (para o seletor opcional), pegar supplier do perfil e TODAS as cias
   useEffect(() => {
     if (!open) return;
-
     (async () => {
       try {
         const [{ data: userData }, { data: suppliersRes }] = await Promise.all([
@@ -121,34 +118,31 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
         if (suppliersRes) setSuppliers(suppliersRes);
 
         let initialSupplier = "";
-        if (userData.user?.id) {
+        if (userData?.user?.id) {
           const { data: profileData } = await supabase
             .from("profiles")
             .select("supplier_id")
             .eq("id", userData.user.id)
-            .single();
-          initialSupplier = profileData?.supplier_id ?? "";
+            .maybeSingle();
+          initialSupplier = (profileData?.supplier_id as string | undefined) ?? "";
           setProfileSupplierId(initialSupplier);
         }
 
-        // Caso o form ainda não tenha fornecedor e exista um do perfil, aplica
         if (!formData.supplier_id && initialSupplier) {
           setFormData((f) => ({ ...f, supplier_id: initialSupplier }));
         }
 
         await fetchAllAirlines();
       } catch (err: any) {
-        toast({
-          title: "Erro ao carregar dados",
-          description: err.message,
-          variant: "destructive",
-        });
+        // Se der 400/erro no Lovable, só não bloqueie o fluxo
+        console.warn("Falha ao carregar dados de perfil/suppliers:", err?.message || err);
+        await fetchAllAirlines();
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // Ao trocar de programa, aplica regra de CPF default (se existir no localStorage)
+  // aplica regra default de CPF ao escolher a cia
   const handlePickAirline = (airlineId: string) => {
     const rule = getRule(airlineId);
     setFormData((f) => ({
@@ -176,7 +170,7 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
     }
 
     const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) {
+    if (!userData?.user) {
       toast({
         title: "Erro de autenticação",
         description: "Usuário não autenticado",
@@ -185,12 +179,11 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
       return;
     }
 
-    // Cria a conta — sem SQL extra de vínculo
     const { error } = await supabase.from("mileage_accounts").insert([
       {
         user_id: userData.user.id,
         airline_company_id: formData.airline_company_id,
-        supplier_id: formData.supplier_id || null, // se for “minha conta”, manda null
+        supplier_id: formData.supplier_id || null,
         account_holder_name: formData.account_holder_name,
         account_holder_cpf: formData.account_holder_cpf.replace(/\D/g, ""),
         password_encrypted: formData.password || null,
@@ -216,7 +209,6 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
       description: "A conta de milhagem foi cadastrada com sucesso.",
     });
 
-    // Reset mantendo supplier padrão do perfil (se houver)
     setOpen(false);
     setFormData({
       airline_company_id: "",
@@ -247,8 +239,8 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
         <DialogHeader>
           <DialogTitle>Adicionar Conta de Milhagem</DialogTitle>
           <DialogDescription>
-            Escolha o programa aqui — a conta já nasce vinculada a ele. Regras de CPF podem ser
-            definidas em Configurações e são aplicadas automaticamente como default.
+            Escolha a companhia aqui; as regras de CPF (se definidas nas Configurações)
+            serão aplicadas como padrão.
           </DialogDescription>
         </DialogHeader>
 
@@ -258,9 +250,7 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
             <Label htmlFor="supplier">Fornecedor</Label>
             <Select
               value={formData.supplier_id || ""}
-              onValueChange={(value) =>
-                setFormData((f) => ({ ...f, supplier_id: value }))
-              }
+              onValueChange={(value) => setFormData((f) => ({ ...f, supplier_id: value }))}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Selecione o fornecedor (opcional)" />
@@ -309,10 +299,7 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
                 id="account_holder_name"
                 value={formData.account_holder_name}
                 onChange={(e) =>
-                  setFormData((f) => ({
-                    ...f,
-                    account_holder_name: e.target.value,
-                  }))
+                  setFormData((f) => ({ ...f, account_holder_name: e.target.value }))
                 }
               />
             </div>
@@ -323,10 +310,7 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
                 id="account_holder_cpf"
                 value={formData.account_holder_cpf}
                 onChange={(e) =>
-                  setFormData((f) => ({
-                    ...f,
-                    account_holder_cpf: formatCPF(e.target.value),
-                  }))
+                  setFormData((f) => ({ ...f, account_holder_cpf: formatCPF(e.target.value) }))
                 }
                 maxLength={14}
                 placeholder="000.000.000-00"
@@ -345,16 +329,14 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
               />
             </div>
 
-            {/* Senha opcional */}
+            {/* Senha (opcional) */}
             <div className="space-y-2 sm:col-span-2 relative">
               <Label htmlFor="password">Senha (opcional)</Label>
               <Input
                 id="password"
                 type={showPassword ? "text" : "password"}
                 value={formData.password}
-                onChange={(e) =>
-                  setFormData((f) => ({ ...f, password: e.target.value }))
-                }
+                onChange={(e) => setFormData((f) => ({ ...f, password: e.target.value }))}
                 placeholder="Senha de acesso à conta"
                 className="pr-10"
               />
@@ -363,7 +345,7 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
                 variant="ghost"
                 size="icon"
                 className="absolute right-0 top-0 h-full"
-                onClick={() => setShowPassword(!showPassword)}
+                onClick={() => setShowPassword((v) => !v)}
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </Button>
@@ -377,9 +359,7 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
                 type="number"
                 inputMode="numeric"
                 value={formData.balance}
-                onChange={(e) =>
-                  setFormData((f) => ({ ...f, balance: e.target.value }))
-                }
+                onChange={(e) => setFormData((f) => ({ ...f, balance: e.target.value }))}
                 placeholder="Ex: 100000"
               />
             </div>
@@ -406,12 +386,9 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
                 type="number"
                 inputMode="numeric"
                 value={formData.cpf_limit}
-                onChange={(e) =>
-                  setFormData((f) => ({ ...f, cpf_limit: e.target.value }))
-                }
+                onChange={(e) => setFormData((f) => ({ ...f, cpf_limit: e.target.value }))}
                 placeholder="Ex: 25"
               />
-              {/* dica visual opcional: poderia mostrar a origem do default (regra aplicada) */}
             </div>
 
             <div className="space-y-2">
