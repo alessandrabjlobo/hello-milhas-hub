@@ -1,14 +1,16 @@
-// Regras guardadas em localStorage por (supplierId | "global") + airlineId
-// Estrutura: { [scope]: { [airlineId]: { cpf_limit: number, period: "mes" | "dia" } } }
+// Regras guardadas em localStorage por (scope -> airlineId)
+// scope = supplierId atual (quando houver) ou "global".
+// Estrutura no localStorage:
+// { [scope: string]: { [airlineId: string]: { cpf_limit: number, period: "mes" | "dia" } } }
 
 import { useEffect, useState } from "react";
 
-type Rule = { cpf_limit: number; period: "mes" | "dia" };
-type Rules = Record<string, Record<string, Rule>>;
+export type Rule = { cpf_limit: number; period: "mes" | "dia" };
+type RulesBlob = Record<string, Record<string, Rule>>;
 
 const LS_KEY = "hmh:program_rules";
 
-function read(): Rules {
+function readFromLS(): RulesBlob {
   try {
     const raw = localStorage.getItem(LS_KEY);
     return raw ? JSON.parse(raw) : {};
@@ -16,53 +18,53 @@ function read(): Rules {
     return {};
   }
 }
-function write(v: Rules) {
+function writeToLS(v: RulesBlob) {
   localStorage.setItem(LS_KEY, JSON.stringify(v));
 }
 
 export function useProgramRules(scope: string) {
-  // scope = supplierId ou "global"
-  const [rules, setRules] = useState<Rules>(() => read());
+  const [blob, setBlob] = useState<RulesBlob>(() => readFromLS());
 
+  // sincroniza entre abas
   useEffect(() => {
-    // sincroniza múltiplas abas
-    const handler = (e: StorageEvent) => {
-      if (e.key === LS_KEY) setRules(read());
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === LS_KEY) setBlob(readFromLS());
     };
-    window.addEventListener("storage", handler);
-    return () => window.removeEventListener("storage", handler);
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, []);
 
   const getRule = (airlineId: string): Rule | null => {
-    const rScope = rules[scope] || {};
-    return rScope[airlineId] || null;
+    const bucket = blob[scope] || {};
+    return bucket[airlineId] || null;
   };
 
   const setRule = (airlineId: string, rule: Rule) => {
-    setRules(prev => {
+    setBlob(prev => {
       const next = { ...prev };
       const bucket = { ...(next[scope] || {}) };
       bucket[airlineId] = rule;
       next[scope] = bucket;
-      write(next);
+      writeToLS(next);
       return next;
     });
   };
 
   const deleteRule = (airlineId: string) => {
-    setRules(prev => {
+    setBlob(prev => {
       const next = { ...prev };
       const bucket = { ...(next[scope] || {}) };
       delete bucket[airlineId];
       next[scope] = bucket;
-      write(next);
+      writeToLS(next);
       return next;
     });
   };
 
-  // lista para UI
-  const list = Object.entries(rules[scope] || {}).map(([airlineId, rule]) => ({
-    airlineId, ...rule,
+  // lista amigável pra UI
+  const list = Object.entries(blob[scope] || {}).map(([airlineId, rule]) => ({
+    airlineId,
+    ...rule,
   }));
 
   return { getRule, setRule, deleteRule, list };
