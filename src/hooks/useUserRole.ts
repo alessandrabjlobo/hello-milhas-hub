@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 type UseUserRoleReturn = {
-  supplierId: string | null;            // pode vir do perfil OU do localStorage
+  supplierId: string | null;
   setSupplierIdLocal: (id: string) => void;
   clearSupplierIdLocal: () => void;
   loading: boolean;
@@ -17,34 +17,45 @@ export function useUserRole(): UseUserRoleReturn {
   const [role, setRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const readLocal = () => {
+    try {
+      const v = localStorage.getItem(LOCAL_KEY) || "";
+      return v || null;
+    } catch {
+      return null;
+    }
+  };
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      const uid = userData.user?.id;
-
-      if (uid) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("supplier_id, role")
-          .eq("id", uid)
-          .single();
-
-        const profileSupplier = profile?.supplier_id ?? null;
-        setRole(profile?.role ?? null);
-
-        if (profileSupplier) {
-          setSupplierId(profileSupplier);
-        } else {
-          // fallback: localStorage
-          const local = localStorage.getItem(LOCAL_KEY) || "";
-          setSupplierId(local || null);
-        }
-      } else {
-        // sem auth -> só localStorage
-        const local = localStorage.getItem(LOCAL_KEY) || "";
-        setSupplierId(local || null);
+      // tentar pegar do perfil; se falhar, usar localStorage
+      const { data: userData, error: authErr } = await supabase.auth.getUser();
+      if (authErr || !userData?.user?.id) {
+        setSupplierId(readLocal());
+        setRole(null);
+        return;
       }
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("supplier_id, role")
+        .eq("id", userData.user.id)
+        .maybeSingle(); // evita erro se não existir
+
+      if (error) {
+        // falha REST (ex.: 400 no Lovable)? usar localStorage
+        setSupplierId(readLocal());
+        setRole(null);
+        return;
+      }
+
+      const supSupplier = (data?.supplier_id as string | null) ?? null;
+      setSupplierId(supSupplier ?? readLocal());
+      setRole((data?.role as string | null) ?? null);
+    } catch {
+      setSupplierId(readLocal());
+      setRole(null);
     } finally {
       setLoading(false);
     }
@@ -55,12 +66,16 @@ export function useUserRole(): UseUserRoleReturn {
   }, [load]);
 
   const setSupplierIdLocal = (id: string) => {
-    localStorage.setItem(LOCAL_KEY, id);
+    try {
+      localStorage.setItem(LOCAL_KEY, id);
+    } catch {}
     setSupplierId(id);
   };
 
   const clearSupplierIdLocal = () => {
-    localStorage.removeItem(LOCAL_KEY);
+    try {
+      localStorage.removeItem(LOCAL_KEY);
+    } catch {}
     setSupplierId(null);
   };
 
