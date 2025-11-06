@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle, Building2, Phone, CreditCard, Link as LinkIcon } from "lucide-react";
+import { Building2, Phone, CreditCard, Link as LinkIcon } from "lucide-react";
 import { useSuppliers } from "@/hooks/useSuppliers";
 import { useMileageAccounts } from "@/hooks/useMileageAccounts";
 import { AddSupplierDialog } from "@/components/suppliers/AddSupplierDialog";
@@ -12,9 +12,9 @@ import { DeleteSupplierDialog } from "@/components/suppliers/DeleteSupplierDialo
 import { EmptyState } from "@/components/shared/EmptyState";
 
 export default function Suppliers() {
-  const { suppliers, loading } = useSuppliers();
+  const { suppliers, loading, createSupplier, updateSupplier, deleteSupplier } = useSuppliers();
   const { accounts } = useMileageAccounts();
-  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  
   const [editingSupplier, setEditingSupplier] = useState<any>(null);
   const [deletingSupplier, setDeletingSupplier] = useState<any>(null);
 
@@ -47,10 +47,7 @@ export default function Suppliers() {
               {suppliers.length} fornecedor(es) cadastrado(s)
             </p>
           </div>
-          <Button onClick={() => setAddDialogOpen(true)}>
-            <PlusCircle className="h-4 w-4 mr-2" />
-            Novo Fornecedor
-          </Button>
+          <AddSupplierDialog onSupplierAdded={createSupplier} />
         </div>
 
         {suppliers.length === 0 ? (
@@ -59,9 +56,10 @@ export default function Suppliers() {
               icon={Building2}
               title="Nenhum fornecedor cadastrado"
               description="Cadastre fornecedores para gerenciar contas de milhagem e pagamentos."
-              actionLabel="Novo Fornecedor"
-              onAction={() => setAddDialogOpen(true)}
             />
+            <div className="text-center pb-6">
+              <AddSupplierDialog onSupplierAdded={createSupplier} />
+            </div>
           </Card>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">

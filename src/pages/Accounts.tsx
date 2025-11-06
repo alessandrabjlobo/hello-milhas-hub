@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,16 +11,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Eye, PlusCircle, CreditCard, TrendingUp, AlertTriangle } from "lucide-react";
+import { Eye, CreditCard, TrendingUp, AlertTriangle } from "lucide-react";
 import { useMileageAccounts } from "@/hooks/useMileageAccounts";
 import { AddAccountDialog } from "@/components/accounts/AddAccountDialog";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { AddMovementDialog } from "@/components/movements/AddMovementDialog";
 
 export default function Accounts() {
-  const { accounts, loading } = useMileageAccounts();
-  const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [movementDialogAccount, setMovementDialogAccount] = useState<string | null>(null);
+  const { accounts, loading, fetchAccounts } = useMileageAccounts();
 
   const getCPFBadge = (used: number, limit: number) => {
     const percentage = (used / limit) * 100;
@@ -64,21 +61,21 @@ export default function Accounts() {
               {accounts.length} conta(s) cadastrada(s)
             </p>
           </div>
-          <Button onClick={() => setAddDialogOpen(true)}>
-            <PlusCircle className="h-4 w-4 mr-2" />
-            Nova Conta
-          </Button>
+          <AddAccountDialog onAccountAdded={fetchAccounts} />
         </div>
 
         <Card>
           {accounts.length === 0 ? (
-            <EmptyState
-              icon={CreditCard}
-              title="Nenhuma conta cadastrada"
-              description="Cadastre a primeira conta de milhagem para começar."
-              actionLabel="Nova Conta"
-              onAction={() => setAddDialogOpen(true)}
-            />
+            <>
+              <EmptyState
+                icon={CreditCard}
+                title="Nenhuma conta cadastrada"
+                description="Cadastre a primeira conta de milhagem para começar."
+              />
+              <div className="text-center pb-6">
+                <AddAccountDialog onAccountAdded={fetchAccounts} />
+              </div>
+            </>
           ) : (
             <Table>
               <TableHeader>
@@ -136,13 +133,7 @@ export default function Accounts() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setMovementDialogAccount(account.id)}
-                        >
-                          Movimentar
-                        </Button>
+                        <AddMovementDialog accountId={account.id} onMovementAdded={fetchAccounts} />
                         <Button variant="ghost" size="icon" asChild>
                           <Link to={`/accounts/${account.id}`}>
                             <Eye className="h-4 w-4" />
@@ -157,16 +148,6 @@ export default function Accounts() {
           )}
         </Card>
       </div>
-
-      <AddAccountDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} />
-      
-      {movementDialogAccount && (
-        <AddMovementDialog
-          open={true}
-          onOpenChange={(open) => !open && setMovementDialogAccount(null)}
-          accountId={movementDialogAccount}
-        />
-      )}
     </div>
   );
 }
