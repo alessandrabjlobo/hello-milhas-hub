@@ -2,9 +2,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/shared/AppSidebar";
+
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Auth from "./pages/Auth";
@@ -15,8 +16,8 @@ import Accounts from "./pages/Accounts";
 import Suppliers from "./pages/Suppliers";
 import Tickets from "./pages/Tickets";
 import Reports from "./pages/Reports";
-import ProgramRules from "./pages/ProgramRules";
-import MyAirlines from "./pages/MyAirlines";
+import ProgramRules from "./pages/ProgramRules";         // se estiver em pages/settings, mude para "./pages/settings/ProgramRules"
+import MyAirlines from "./pages/MyAirlines";             // idem: "./pages/settings/MyAirlines"
 import Billing from "./pages/Billing";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
@@ -35,6 +36,8 @@ const App = () => (
           <Route path="/auth" element={<Auth />} />
           <Route path="/legal/terms" element={<Terms />} />
           <Route path="/legal/privacy" element={<Privacy />} />
+
+          {/* app “logado” com sidebar */}
           <Route
             path="/*"
             element={
@@ -51,9 +54,17 @@ const App = () => (
                       <Route path="/suppliers" element={<Suppliers />} />
                       <Route path="/tickets" element={<Tickets />} />
                       <Route path="/reports" element={<Reports />} />
+
+                      {/* Settings */}
                       <Route path="/settings/my-airlines" element={<MyAirlines />} />
                       <Route path="/settings/program-rules" element={<ProgramRules />} />
                       <Route path="/settings/billing" element={<Billing />} />
+
+                      {/* Redirects de compatibilidade (evita 404 em links antigos) */}
+                      <Route path="/my-airlines" element={<Navigate to="/settings/my-airlines" replace />} />
+                      <Route path="/program-rules" element={<Navigate to="/settings/program-rules" replace />} />
+
+                      {/* 404 local */}
                       <Route path="*" element={<NotFound />} />
                     </Routes>
                   </main>
