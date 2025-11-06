@@ -1,4 +1,6 @@
-import { useLocation, Link } from "react-router-dom";
+// src/components/shared/AppSidebar.tsx
+import * as React from "react";
+import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -62,161 +64,189 @@ const adminNavItems = [
   { title: "Usuários", url: "/admin/users", icon: Shield },
 ];
 
+const linkBase =
+  "flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm transition-colors";
+const linkActive =
+  "bg-muted text-primary font-medium";
+const linkInactive =
+  "text-muted-foreground hover:bg-accent hover:text-accent-foreground";
+
+function ItemLink({
+  to,
+  icon: Icon,
+  title,
+  collapsed,
+  exact = false,
+}: {
+  to: string;
+  icon: React.ComponentType<React.ComponentProps<"svg">>;
+  title: string;
+  collapsed: boolean;
+  exact?: boolean;
+}) {
+  const location = useLocation();
+  const isActivePath =
+    exact
+      ? location.pathname === to
+      : location.pathname === to || location.pathname.startsWith(to + "/");
+
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton asChild>
+        {/* Usamos NavLink só pra a11y (aria-current), mas controlamos a classe pelo helper acima */}
+        <NavLink
+          to={to}
+          aria-current={isActivePath ? "page" : undefined}
+          className={`${linkBase} ${isActivePath ? linkActive : linkInactive}`}
+        >
+          <Icon className="h-4 w-4" />
+          {!collapsed && <span>{title}</span>}
+        </NavLink>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+}
+
 export function AppSidebar() {
   const { state } = useSidebar();
-  const location = useLocation();
-  const { isAdmin } = useUserRole();
-
-  const isActive = (path: string) => location.pathname === path;
   const collapsed = state === "collapsed";
+
+  // Deriva isAdmin do role (o hook que te passei expõe "role")
+  const { role } = useUserRole();
+  const isAdmin = role === "admin";
 
   return (
     <Sidebar className={collapsed ? "w-14" : "w-60"}>
       <SidebarTrigger className="m-2 self-end" />
 
       <SidebarContent>
+        {/* Principal */}
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
               {mainNavItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <Link
-                      to={item.url}
-                      className={isActive(item.url) ? "bg-muted text-primary font-medium" : ""}
-                    >
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                <ItemLink
+                  key={item.url}
+                  to={item.url}
+                  icon={item.icon}
+                  title={item.title}
+                  collapsed={collapsed}
+                  exact
+                />
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
+        {/* Vendas */}
         <SidebarGroup>
           <SidebarGroupLabel>Vendas</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {salesNavItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <Link
-                      to={item.url}
-                      className={isActive(item.url) ? "bg-muted text-primary font-medium" : ""}
-                    >
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                <ItemLink
+                  key={item.url}
+                  to={item.url}
+                  icon={item.icon}
+                  title={item.title}
+                  collapsed={collapsed}
+                />
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
+        {/* Operações */}
         <SidebarGroup>
           <SidebarGroupLabel>Operações</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {operationsNavItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <Link
-                      to={item.url}
-                      className={isActive(item.url) ? "bg-muted text-primary font-medium" : ""}
-                    >
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                <ItemLink
+                  key={item.url}
+                  to={item.url}
+                  icon={item.icon}
+                  title={item.title}
+                  collapsed={collapsed}
+                />
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
+        {/* Relatórios */}
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
               {reportsNavItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <Link
-                      to={item.url}
-                      className={isActive(item.url) ? "bg-muted text-primary font-medium" : ""}
-                    >
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                <ItemLink
+                  key={item.url}
+                  to={item.url}
+                  icon={item.icon}
+                  title={item.title}
+                  collapsed={collapsed}
+                />
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
+        {/* Configurações */}
         <SidebarGroup>
-          <SidebarGroupLabel>Configurações</SidebarGroupLabel>
+          <SidebarGroupLabel>
+            <div className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              {!collapsed && <span>Configurações</span>}
+            </div>
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {settingsNavItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <Link
-                      to={item.url}
-                      className={isActive(item.url) ? "bg-muted text-primary font-medium" : ""}
-                    >
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                <ItemLink
+                  key={item.url}
+                  to={item.url}
+                  icon={item.icon}
+                  title={item.title}
+                  collapsed={collapsed}
+                />
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
+        {/* Admin */}
         {isAdmin && (
           <SidebarGroup>
             <SidebarGroupLabel>Admin</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {adminNavItems.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild>
-                      <Link
-                        to={item.url}
-                        className={isActive(item.url) ? "bg-muted text-primary font-medium" : ""}
-                      >
-                        <item.icon className="h-4 w-4" />
-                        {!collapsed && <span>{item.title}</span>}
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
+                  <ItemLink
+                    key={item.url}
+                    to={item.url}
+                    icon={item.icon}
+                    title={item.title}
+                    collapsed={collapsed}
+                  />
                 ))}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
         )}
 
+        {/* Legal */}
         <SidebarGroup>
           <SidebarGroupLabel>Legal</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {legalNavItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <Link
-                      to={item.url}
-                      className={isActive(item.url) ? "bg-muted text-primary font-medium" : ""}
-                    >
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                <ItemLink
+                  key={item.url}
+                  to={item.url}
+                  icon={item.icon}
+                  title={item.title}
+                  collapsed={collapsed}
+                />
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
@@ -225,3 +255,5 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
+
+export default AppSidebar;
