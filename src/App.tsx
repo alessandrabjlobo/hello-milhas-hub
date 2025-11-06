@@ -10,6 +10,14 @@ import Dashboard from "./pages/Dashboard";
 import Auth from "./pages/Auth";
 import NewSaleWizard from "./pages/sales/NewSaleWizard";
 import SalesList from "./pages/sales/SalesList";
+import AccountDetail from "./pages/AccountDetail";
+import Accounts from "./pages/Accounts";
+import Suppliers from "./pages/Suppliers";
+import Tickets from "./pages/Tickets";
+import Reports from "./pages/Reports";
+import ProgramRules from "./pages/ProgramRules";
+import MyAirlines from "./pages/MyAirlines";
+import Billing from "./pages/Billing";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import NotFound from "./pages/NotFound";
@@ -38,6 +46,14 @@ const App = () => (
                       <Route path="/dashboard" element={<Dashboard />} />
                       <Route path="/sales/new" element={<NewSaleWizard />} />
                       <Route path="/sales" element={<SalesList />} />
+                      <Route path="/accounts/:id" element={<AccountDetail />} />
+                      <Route path="/accounts" element={<Accounts />} />
+                      <Route path="/suppliers" element={<Suppliers />} />
+                      <Route path="/tickets" element={<Tickets />} />
+                      <Route path="/reports" element={<Reports />} />
+                      <Route path="/settings/my-airlines" element={<MyAirlines />} />
+                      <Route path="/settings/program-rules" element={<ProgramRules />} />
+                      <Route path="/settings/billing" element={<Billing />} />
                       <Route path="*" element={<NotFound />} />
                     </Routes>
                   </main>

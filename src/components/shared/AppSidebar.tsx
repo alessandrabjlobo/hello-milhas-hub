@@ -53,6 +53,11 @@ const settingsNavItems = [
   { title: "Plano & Pagamento", url: "/settings/billing", icon: DollarSign },
 ];
 
+const legalNavItems = [
+  { title: "Termos de Uso", url: "/legal/terms", icon: FileText },
+  { title: "Política de Privacidade", url: "/legal/privacy", icon: Shield },
+];
+
 const adminNavItems = [
   { title: "Usuários", url: "/admin/users", icon: Shield },
 ];
@@ -195,6 +200,27 @@ export function AppSidebar() {
             </SidebarGroupContent>
           </SidebarGroup>
         )}
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Legal</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {legalNavItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild>
+                    <Link
+                      to={item.url}
+                      className={isActive(item.url) ? "bg-muted text-primary font-medium" : ""}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      {!collapsed && <span>{item.title}</span>}
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
     </Sidebar>
   );

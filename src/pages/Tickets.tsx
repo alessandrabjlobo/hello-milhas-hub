@@ -1,0 +1,176 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { PlusCircle, Ticket as TicketIcon, FileText, Calendar } from "lucide-react";
+import { useTickets } from "@/hooks/useTickets";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { RegisterTicketDialog } from "@/components/tickets/RegisterTicketDialog";
+
+export default function Tickets() {
+  const navigate = useNavigate();
+  const { tickets, loading } = useTickets();
+  const [registerDialogOpen, setRegisterDialogOpen] = useState(false);
+
+  const getStatusBadge = (status: string) => {
+    const variants: Record<string, "default" | "secondary" | "destructive"> = {
+      pending: "secondary",
+      issued: "default",
+      cancelled: "destructive",
+    };
+    
+    const labels: Record<string, string> = {
+      pending: "Pendente",
+      issued: "Emitido",
+      cancelled: "Cancelado",
+    };
+
+    return (
+      <Badge variant={variants[status] || "default"}>
+        {labels[status] || status}
+      </Badge>
+    );
+  };
+
+  const getVerificationBadge = (status: string | null) => {
+    if (!status) return <Badge variant="secondary">-</Badge>;
+    
+    const variants: Record<string, "default" | "secondary" | "outline"> = {
+      pending: "secondary",
+      requested: "outline",
+      received: "default",
+      completed: "default",
+    };
+    
+    const labels: Record<string, string> = {
+      pending: "Pendente",
+      requested: "Solicitado",
+      received: "Recebido",
+      completed: "Completo",
+    };
+
+    return (
+      <Badge variant={variants[status] || "secondary"}>
+        {labels[status] || status}
+      </Badge>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="p-6">
+        <div className="max-w-7xl mx-auto space-y-6">
+          <Skeleton className="h-12 w-full" />
+          <Card className="p-6">
+            <div className="space-y-4">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
+            </div>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold">Passagens</h1>
+            <p className="text-muted-foreground">
+              {tickets.length} passagem(ns) registrada(s)
+            </p>
+          </div>
+          <Button onClick={() => setRegisterDialogOpen(true)}>
+            <PlusCircle className="h-4 w-4 mr-2" />
+            Registrar Emissão
+          </Button>
+        </div>
+
+        <Card>
+          {tickets.length === 0 ? (
+            <EmptyState
+              icon={TicketIcon}
+              title="Nenhuma passagem registrada"
+              description="Registre a primeira emissão de passagem para começar."
+              actionLabel="Registrar Emissão"
+              onAction={() => setRegisterDialogOpen(true)}
+            />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Data Emissão</TableHead>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>Rota</TableHead>
+                  <TableHead>Companhia</TableHead>
+                  <TableHead>PNR</TableHead>
+                  <TableHead>Bilhete</TableHead>
+                  <TableHead>Verificação</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {tickets.map((ticket) => (
+                  <TableRow key={ticket.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        {ticket.issued_at
+                          ? new Date(ticket.issued_at).toLocaleDateString("pt-BR")
+                          : "-"}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium">
+                          {ticket.sales?.customer_name || "-"}
+                        </p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        {ticket.sales?.route_text || ticket.route}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">
+                        {ticket.sales?.mileage_accounts?.airline_companies?.code || "-"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-mono text-sm">
+                      {ticket.pnr || "-"}
+                    </TableCell>
+                    <TableCell className="font-mono text-sm">
+                      {ticket.ticket_number || "-"}
+                    </TableCell>
+                    <TableCell>{getVerificationBadge(ticket.verification_status)}</TableCell>
+                    <TableCell>{getStatusBadge(ticket.status)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </Card>
+      </div>
+
+      <RegisterTicketDialog
+        open={registerDialogOpen}
+        onOpenChange={setRegisterDialogOpen}
+      />
+    </div>
+  );
+}
