@@ -14,12 +14,13 @@ import { EmptyState } from "@/components/shared/EmptyState";
 export default function Suppliers() {
   const { suppliers, loading, createSupplier, updateSupplier, deleteSupplier } = useSuppliers();
   const { accounts } = useMileageAccounts();
-  
+
   const [editingSupplier, setEditingSupplier] = useState<any>(null);
   const [deletingSupplier, setDeletingSupplier] = useState<any>(null);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
 
   const getLinkedAccountsCount = (supplierId: string) => {
-    return accounts.filter(acc => (acc as any).supplier_id === supplierId).length;
+    return accounts.filter((acc) => (acc as any).supplier_id === supplierId).length;
   };
 
   if (loading) {
@@ -47,7 +48,7 @@ export default function Suppliers() {
               {suppliers.length} fornecedor(es) cadastrado(s)
             </p>
           </div>
-          <AddSupplierDialog onSupplierAdded={createSupplier} />
+          <Button onClick={() => setAddDialogOpen(true)}>Novo fornecedor</Button>
         </div>
 
         {suppliers.length === 0 ? (
@@ -58,7 +59,7 @@ export default function Suppliers() {
               description="Cadastre fornecedores para gerenciar contas de milhagem e pagamentos."
             />
             <div className="text-center pb-6">
-              <AddSupplierDialog onSupplierAdded={createSupplier} />
+              <Button onClick={() => setAddDialogOpen(true)}>Novo fornecedor</Button>
             </div>
           </Card>
         ) : (
@@ -81,6 +82,7 @@ export default function Suppliers() {
                     </div>
                   </div>
                 </CardHeader>
+
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     {supplier.pix_key && (
@@ -92,20 +94,20 @@ export default function Suppliers() {
                         <span className="font-mono text-xs">{supplier.pix_key}</span>
                       </div>
                     )}
-                    
+
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground flex items-center gap-2">
                         <LinkIcon className="h-4 w-4" />
                         Contas vinculadas
                       </span>
-                      <Badge variant="outline">
-                        {getLinkedAccountsCount(supplier.id)}
-                      </Badge>
+                      <Badge variant="outline">{getLinkedAccountsCount(supplier.id)}</Badge>
                     </div>
 
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">Tipo de Pagamento</span>
-                      <Badge variant={supplier.payment_type === "prepaid" ? "default" : "secondary"}>
+                      <Badge
+                        variant={supplier.payment_type === "prepaid" ? "default" : "secondary"}
+                      >
                         {supplier.payment_type === "prepaid" ? "Pré-pago" : "Por Uso"}
                       </Badge>
                     </div>
@@ -142,8 +144,14 @@ export default function Suppliers() {
         )}
       </div>
 
-      <AddSupplierDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} />
-      
+      {/* Dialog controlado para criar fornecedor */}
+      <AddSupplierDialog
+        open={addDialogOpen}
+        onOpenChange={setAddDialogOpen}
+        onSupplierAdded={createSupplier}
+      />
+
+      {/* Dialog de edição */}
       {editingSupplier && (
         <EditSupplierDialog
           supplier={editingSupplier}
@@ -151,7 +159,8 @@ export default function Suppliers() {
           onOpenChange={(open) => !open && setEditingSupplier(null)}
         />
       )}
-      
+
+      {/* Dialog de exclusão */}
       {deletingSupplier && (
         <DeleteSupplierDialog
           supplier={deletingSupplier}
