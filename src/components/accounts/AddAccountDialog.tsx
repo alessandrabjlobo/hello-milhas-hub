@@ -23,16 +23,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 
-type AirlineCompany = {
-  id: string;
-  name: string;
-  code: string;
-};
-
-type Supplier = {
-  id: string;
-  name: string;
-};
+type AirlineCompany = { id: string; name: string; code: string };
+type Supplier = { id: string; name: string };
 
 interface AddAccountDialogProps {
   onAccountAdded: () => void;
@@ -40,18 +32,22 @@ interface AddAccountDialogProps {
 
 export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
   const [open, setOpen] = useState(false);
+
+  // Agora buscamos TODAS as companhias (sem filtro por fornecedor)
   const [airlines, setAirlines] = useState<AirlineCompany[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loadingAirlines, setLoadingAirlines] = useState(false);
+
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [profileSupplierId, setProfileSupplierId] = useState<string>("");
+
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Sempre strings ("" quando vazio) para não alternar controlado/não-controlado
+  // Sempre strings ("" quando vazio) p/ evitar warning controlado/não-controlado
   const [formData, setFormData] = useState<{
     airline_company_id: string;
-    supplier_id: string;
+    supplier_id: string; // opcional: vazio = conta "minha" (sem fornecedor)
     account_holder_name: string;
     account_holder_cpf: string;
     password: string;
@@ -82,51 +78,36 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
       .replace(/(-\d{2})\d+?$/, "$1");
   };
 
-  const fetchAirlinesBySupplier = useCallback(
-    async (supplierId: string) => {
-      setLoadingAirlines(true);
-      try {
-        if (!supplierId) {
-          setAirlines([]);
-          return;
-        }
-        const { data: linkedData, error } = await supabase
-          .from("suppliers_airlines")
-          .select("airline_companies(id, name, code)")
-          .eq("supplier_id", supplierId);
+  const fetchAllAirlines = useCallback(async () => {
+    setLoadingAirlines(true);
+    try {
+      const { data, error } = await supabase
+        .from("airline_companies")
+        .select("id, name, code")
+        .order("name");
+      if (error) throw error;
+      setAirlines(data ?? []);
+    } catch (err: any) {
+      toast({
+        title: "Erro ao carregar companhias",
+        description: err.message,
+        variant: "destructive",
+      });
+      setAirlines([]);
+    } finally {
+      setLoadingAirlines(false);
+    }
+  }, [toast]);
 
-        if (error) throw error;
-
-        const filteredAirlines: AirlineCompany[] = (linkedData || [])
-          .map((item: any) => item.airline_companies)
-          .filter(Boolean);
-
-        setAirlines(filteredAirlines);
-      } catch (err: any) {
-        toast({
-          title: "Erro ao carregar programas",
-          description: err.message,
-          variant: "destructive",
-        });
-        setAirlines([]);
-      } finally {
-        setLoadingAirlines(false);
-      }
-    },
-    [toast]
-  );
-
-  // Ao abrir: carrega lista de fornecedores e supplier do perfil
+  // Ao abrir: carrega fornecedores, supplier do perfil e TODAS as cias
   useEffect(() => {
     if (!open) return;
-
     (async () => {
       try {
         const [{ data: userData }, { data: suppliersRes }] = await Promise.all([
           supabase.auth.getUser(),
           supabase.from("suppliers").select("id, name").order("name"),
         ]);
-
         if (suppliersRes) setSuppliers(suppliersRes);
 
         let initialSupplier = "";
@@ -136,16 +117,15 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
             .select("supplier_id")
             .eq("id", userData.user.id)
             .single();
-
           initialSupplier = profileData?.supplier_id ?? "";
           setProfileSupplierId(initialSupplier);
         }
 
-        // se o form ainda não tiver supplier, usa o do perfil
-        const supplierToUse = formData.supplier_id || initialSupplier || "";
-        setFormData((f) => ({ ...f, supplier_id: supplierToUse }));
+        if (!formData.supplier_id && initialSupplier) {
+          setFormData((f) => ({ ...f, supplier_id: initialSupplier }));
+        }
 
-        await fetchAirlinesBySupplier(supplierToUse);
+        await fetchAllAirlines();
       } catch (err: any) {
         toast({
           title: "Erro ao carregar dados",
@@ -156,14 +136,6 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
-
-  // Mudou fornecedor: limpa programa e recarrega companhias
-  useEffect(() => {
-    if (!open) return;
-    fetchAirlinesBySupplier(formData.supplier_id || "");
-    setFormData((f) => ({ ...f, airline_company_id: "" }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.supplier_id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -192,12 +164,35 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
       return;
     }
 
+    // 1) (Opcional) Vincula automaticamente a cia ao fornecedor escolhido
+    //    Se não tiver fornecedor (string vazia), seguimos sem vincular.
+    if (formData.supplier_id) {
+      try {
+        // upsert evita duplicidade (ajuste onConflict conforme seu schema)
+        const { error: upsertErr } = await supabase
+          .from("suppliers_airlines")
+          .upsert(
+            {
+              supplier_id: formData.supplier_id,
+              airline_company_id: formData.airline_company_id,
+            },
+            { onConflict: "supplier_id,airline_company_id", ignoreDuplicates: true }
+          );
+        // Se houver RLS impedindo, não travamos o fluxo de criação da conta
+        if (upsertErr) {
+          console.warn("Falha ao vincular automaticamente (seguindo sem travar):", upsertErr);
+        }
+      } catch (err) {
+        console.warn("Falha ao vincular automaticamente (seguindo sem travar):", err);
+      }
+    }
+
+    // 2) Cria a conta de milhagem
     const { error } = await supabase.from("mileage_accounts").insert([
       {
         user_id: userData.user.id,
         airline_company_id: formData.airline_company_id,
-        // se sua coluna aceitar null, mande null quando vazio
-        supplier_id: formData.supplier_id || null,
+        supplier_id: formData.supplier_id || null, // deixe null se for “minha própria conta”
         account_holder_name: formData.account_holder_name,
         account_holder_cpf: formData.account_holder_cpf.replace(/\D/g, ""),
         password_encrypted: formData.password || null,
@@ -240,11 +235,6 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
     onAccountAdded();
   };
 
-  const noAirlinesForSupplier =
-    !loadingAirlines &&
-    (airlines?.length ?? 0) === 0 &&
-    (formData.supplier_id || "") !== "";
-
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -258,12 +248,13 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
         <DialogHeader>
           <DialogTitle>Adicionar Conta de Milhagem</DialogTitle>
           <DialogDescription>
-            Cadastre uma nova conta vinculada a um fornecedor
+            Cadastre uma nova conta (o programa será escolhido aqui e,
+            se houver fornecedor selecionado, será vinculado automaticamente).
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Fornecedor */}
+          {/* Fornecedor (opcional) */}
           <div className="space-y-2">
             <Label htmlFor="supplier">Fornecedor</Label>
             <Select
@@ -285,42 +276,31 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
             </Select>
           </div>
 
-          {/* Programa de Milhagem */}
+          {/* Programa de Milhagem (todas as cias) */}
           <div className="space-y-2">
             <Label htmlFor="airline">Programa de Milhagem *</Label>
-
-            {noAirlinesForSupplier ? (
-              <div className="rounded-md border p-3 text-sm text-muted-foreground">
-                Este fornecedor ainda não possui companhias vinculadas.
-                <div className="mt-2">
-                  <Button
-                    size="sm"
-                    type="button"
-                    onClick={() => navigate("/settings/my-airlines")}
-                  >
-                    Vincular companhias
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <Select
-                value={formData.airline_company_id || ""}
-                onValueChange={(value) =>
-                  setFormData((f) => ({ ...f, airline_company_id: value }))
-                }
-                disabled={loadingAirlines || (airlines?.length ?? 0) === 0}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o programa" />
-                </SelectTrigger>
-                <SelectContent position="popper" className="max-h-60">
-                  {airlines.map((airline) => (
-                    <SelectItem key={airline.id} value={airline.id}>
-                      {airline.name} ({airline.code})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <Select
+              value={formData.airline_company_id || ""}
+              onValueChange={(value) =>
+                setFormData((f) => ({ ...f, airline_company_id: value }))
+              }
+              disabled={loadingAirlines || (airlines?.length ?? 0) === 0}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o programa" />
+              </SelectTrigger>
+              <SelectContent position="popper" className="max-h-60">
+                {airlines.map((airline) => (
+                  <SelectItem key={airline.id} value={airline.id}>
+                    {airline.name} ({airline.code})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {!loadingAirlines && airlines.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                Nenhuma companhia cadastrada. Fale com o administrador.
+              </p>
             )}
           </div>
 
