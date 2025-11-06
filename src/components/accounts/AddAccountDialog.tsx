@@ -21,7 +21,10 @@ import {
 import { Eye, EyeOff, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useNavigate } from "react-router-dom";
+
+// Hooks para fornecedor atual e regras locais (sem SQL)
+import { useUserRole } from "@/hooks/useUserRole";        // deve expor: { supplierId }
+import { useProgramRules } from "@/hooks/useProgramRules"; // getRule(scope)-> { cpf_limit, period }
 
 type AirlineCompany = { id: string; name: string; code: string };
 type Supplier = { id: string; name: string };
@@ -33,21 +36,27 @@ interface AddAccountDialogProps {
 export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
   const [open, setOpen] = useState(false);
 
-  // Agora buscamos TODAS as companhias (sem filtro por fornecedor)
+  // Dados para selects
   const [airlines, setAirlines] = useState<AirlineCompany[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loadingAirlines, setLoadingAirlines] = useState(false);
 
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  // Supplier “preferencial” que vem do perfil (se existir)
+  const { supplierId: supplierFromRole } = useUserRole();
   const [profileSupplierId, setProfileSupplierId] = useState<string>("");
 
-  const [showPassword, setShowPassword] = useState(false);
-  const navigate = useNavigate();
+  // Regras por (supplier|global) + airline
+  // scope usado: fornecedor escolhido no form OU fornecedor do perfil OU "global"
+  const scopeForRules =
+    (profileSupplierId || supplierFromRole || "").trim() || "global";
+  const { getRule } = useProgramRules(scopeForRules);
+
   const { toast } = useToast();
 
-  // Sempre strings ("" quando vazio) p/ evitar warning controlado/não-controlado
+  // Form SEMPRE com strings ("" = vazio) pra evitar alternância controlado/não-controlado
   const [formData, setFormData] = useState<{
     airline_company_id: string;
-    supplier_id: string; // opcional: vazio = conta "minha" (sem fornecedor)
+    supplier_id: string; // opcional
     account_holder_name: string;
     account_holder_cpf: string;
     password: string;
@@ -99,9 +108,10 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
     }
   }, [toast]);
 
-  // Ao abrir: carrega fornecedores, supplier do perfil e TODAS as cias
+  // Ao abrir: carregar fornecedores (para o seletor opcional), pegar supplier do perfil e TODAS as cias
   useEffect(() => {
     if (!open) return;
+
     (async () => {
       try {
         const [{ data: userData }, { data: suppliersRes }] = await Promise.all([
@@ -121,6 +131,7 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
           setProfileSupplierId(initialSupplier);
         }
 
+        // Caso o form ainda não tenha fornecedor e exista um do perfil, aplica
         if (!formData.supplier_id && initialSupplier) {
           setFormData((f) => ({ ...f, supplier_id: initialSupplier }));
         }
@@ -136,6 +147,16 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  // Ao trocar de programa, aplica regra de CPF default (se existir no localStorage)
+  const handlePickAirline = (airlineId: string) => {
+    const rule = getRule(airlineId);
+    setFormData((f) => ({
+      ...f,
+      airline_company_id: airlineId,
+      cpf_limit: rule ? String(rule.cpf_limit) : f.cpf_limit,
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -164,35 +185,12 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
       return;
     }
 
-    // 1) (Opcional) Vincula automaticamente a cia ao fornecedor escolhido
-    //    Se não tiver fornecedor (string vazia), seguimos sem vincular.
-    if (formData.supplier_id) {
-      try {
-        // upsert evita duplicidade (ajuste onConflict conforme seu schema)
-        const { error: upsertErr } = await supabase
-          .from("suppliers_airlines")
-          .upsert(
-            {
-              supplier_id: formData.supplier_id,
-              airline_company_id: formData.airline_company_id,
-            },
-            { onConflict: "supplier_id,airline_company_id", ignoreDuplicates: true }
-          );
-        // Se houver RLS impedindo, não travamos o fluxo de criação da conta
-        if (upsertErr) {
-          console.warn("Falha ao vincular automaticamente (seguindo sem travar):", upsertErr);
-        }
-      } catch (err) {
-        console.warn("Falha ao vincular automaticamente (seguindo sem travar):", err);
-      }
-    }
-
-    // 2) Cria a conta de milhagem
+    // Cria a conta — sem SQL extra de vínculo
     const { error } = await supabase.from("mileage_accounts").insert([
       {
         user_id: userData.user.id,
         airline_company_id: formData.airline_company_id,
-        supplier_id: formData.supplier_id || null, // deixe null se for “minha própria conta”
+        supplier_id: formData.supplier_id || null, // se for “minha conta”, manda null
         account_holder_name: formData.account_holder_name,
         account_holder_cpf: formData.account_holder_cpf.replace(/\D/g, ""),
         password_encrypted: formData.password || null,
@@ -218,10 +216,11 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
       description: "A conta de milhagem foi cadastrada com sucesso.",
     });
 
+    // Reset mantendo supplier padrão do perfil (se houver)
     setOpen(false);
     setFormData({
       airline_company_id: "",
-      supplier_id: profileSupplierId, // volta ao do perfil por padrão
+      supplier_id: (profileSupplierId || "").trim(),
       account_holder_name: "",
       account_holder_cpf: "",
       password: "",
@@ -248,8 +247,8 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
         <DialogHeader>
           <DialogTitle>Adicionar Conta de Milhagem</DialogTitle>
           <DialogDescription>
-            Cadastre uma nova conta (o programa será escolhido aqui e,
-            se houver fornecedor selecionado, será vinculado automaticamente).
+            Escolha o programa aqui — a conta já nasce vinculada a ele. Regras de CPF podem ser
+            definidas em Configurações e são aplicadas automaticamente como default.
           </DialogDescription>
         </DialogHeader>
 
@@ -281,9 +280,7 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
             <Label htmlFor="airline">Programa de Milhagem *</Label>
             <Select
               value={formData.airline_company_id || ""}
-              onValueChange={(value) =>
-                setFormData((f) => ({ ...f, airline_company_id: value }))
-              }
+              onValueChange={handlePickAirline}
               disabled={loadingAirlines || (airlines?.length ?? 0) === 0}
             >
               <SelectTrigger>
@@ -414,6 +411,7 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
                 }
                 placeholder="Ex: 25"
               />
+              {/* dica visual opcional: poderia mostrar a origem do default (regra aplicada) */}
             </div>
 
             <div className="space-y-2">
