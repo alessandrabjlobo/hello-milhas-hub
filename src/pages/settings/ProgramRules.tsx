@@ -7,19 +7,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { Trash2 } from "lucide-react";
 
+// ✅ combobox com busca
+import { AirlineCombobox } from "@/components/airlines/AirlineCombobox";
+
 type Airline = { id: string; name: string; code: string };
+type Period = "calendar_year" | "rolling_year";
 
 export default function ProgramRules() {
   const { supplierId } = useUserRole();
-  const { programs, loading: programsLoading, createOrUpdateProgram, deleteProgram } = useAgencyPrograms(supplierId);
+  const { programs, loading: programsLoading, createOrUpdateProgram, deleteProgram } =
+    useAgencyPrograms(supplierId);
 
   const [airlines, setAirlines] = useState<Airline[]>([]);
   const [airlineId, setAirlineId] = useState("");
   const [cpfLimit, setCpfLimit] = useState("25");
-  const [period, setPeriod] = useState<"month" | "day">("month");
+  const [period, setPeriod] = useState<Period>("calendar_year");
 
   useEffect(() => {
     (async () => {
@@ -31,25 +35,28 @@ export default function ProgramRules() {
     })();
   }, []);
 
-  // map id -> info pra exibir nome ao listar
-  const byId = useMemo(() => {
-    const m: Record<string, Airline> = {};
-    airlines.forEach(a => (m[a.id] = a));
-    return m;
-  }, [airlines]);
+  const options = useMemo(
+    () => airlines.map((a) => ({ id: a.id, label: `${a.name} (${a.code})` })),
+    [airlines]
+  );
 
   const addOrUpdate = async () => {
     if (!airlineId) return;
     const success = await createOrUpdateProgram(airlineId, {
       cpf_limit: Number(cpfLimit || 0),
+      // ⚠️ backend deve aceitar estes valores:
+      // 'calendar_year' (vira em 01/jan) | 'rolling_year' (12 meses após uso)
       cpf_period: period,
     });
     if (success) {
       setAirlineId("");
       setCpfLimit("25");
-      setPeriod("month");
+      setPeriod("calendar_year");
     }
   };
+
+  const renderPeriod = (p?: string) =>
+    p === "rolling_year" ? "em 1 ano após uso" : "por ano (01/jan)";
 
   return (
     <div className="container max-w-4xl mx-auto p-6 space-y-6">
@@ -63,22 +70,17 @@ export default function ProgramRules() {
       <Card>
         <CardHeader>
           <CardTitle>Adicionar Programa</CardTitle>
-          <CardDescription>
-            Selecione um programa de milhas e defina as regras padrão
-          </CardDescription>
+          <CardDescription>Selecione um programa e defina as regras padrão</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid md:grid-cols-3 gap-3">
-            <Select value={airlineId} onValueChange={setAirlineId}>
-              <SelectTrigger><SelectValue placeholder="Programa/Cia" /></SelectTrigger>
-              <SelectContent className="max-h-64">
-                {airlines.map(a => (
-                  <SelectItem key={a.id} value={a.id}>
-                    {a.name} ({a.code})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* 🔎 combobox digitável */}
+            <AirlineCombobox
+              options={options}
+              value={airlineId}
+              onChange={setAirlineId}
+              placeholder="Programa/Cia"
+            />
 
             <Input
               placeholder="Limite por CPF"
@@ -87,16 +89,19 @@ export default function ProgramRules() {
               inputMode="numeric"
             />
 
-            <Select value={period} onValueChange={(v: "month" | "day") => setPeriod(v)}>
-              <SelectTrigger><SelectValue placeholder="Período" /></SelectTrigger>
+            {/* novo período */}
+            <Select value={period} onValueChange={(v: Period) => setPeriod(v)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Período" />
+              </SelectTrigger>
               <SelectContent>
-                <SelectItem value="month">por mês</SelectItem>
-                <SelectItem value="day">por dia</SelectItem>
+                <SelectItem value="calendar_year">por ano (vira em 01/jan)</SelectItem>
+                <SelectItem value="rolling_year">em 1 ano após uso</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          <Button onClick={addOrUpdate}>Salvar Regra</Button>
+          <Button onClick={addOrUpdate} disabled={!airlineId}>Salvar Regra</Button>
         </CardContent>
       </Card>
 
@@ -115,7 +120,7 @@ export default function ProgramRules() {
               Nenhum programa configurado. Adicione programas para começar.
             </p>
           ) : (
-            programs.map(prog => (
+            programs.map((prog) => (
               <div
                 key={prog.id}
                 className="flex items-center justify-between border rounded-md px-3 py-2"
@@ -126,14 +131,10 @@ export default function ProgramRules() {
                   </div>
                   <div className="text-sm text-muted-foreground">
                     Limite por CPF: <b>{prog.cpf_limit}</b> — Período:{" "}
-                    <b>{prog.cpf_period === "month" ? "mês" : "dia"}</b>
+                    <b>{renderPeriod(prog.cpf_period)}</b>
                   </div>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => deleteProgram(prog.id)}
-                >
+                <Button variant="outline" size="sm" onClick={() => deleteProgram(prog.id)}>
                   <Trash2 className="h-4 w-4 mr-2" />
                   Remover
                 </Button>
