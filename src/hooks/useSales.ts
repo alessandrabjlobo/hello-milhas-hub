@@ -63,21 +63,57 @@ export const useSales = () => {
         .eq("id", userData.user.id)
         .single();
 
+      // Get account to fetch cost_per_mile
+      let costPerMileSnapshot = 0.029; // default
+      if (saleData.mileage_account_id) {
+        const { data: accountData } = await supabase
+          .from("mileage_accounts")
+          .select("cost_per_mile")
+          .eq("id", saleData.mileage_account_id)
+          .single();
+        
+        if (accountData) {
+          costPerMileSnapshot = Number(accountData.cost_per_mile);
+        }
+      }
+
+      const milesUsed = Number(saleData.miles_needed) || 0;
+      const priceTotal = Number(saleData.price_total) || 0;
+      
+      // Calculate costs and margins
+      const totalCost = milesUsed * costPerMileSnapshot;
+      const marginValue = priceTotal - totalCost;
+      const marginPercentage = priceTotal > 0 ? (marginValue / priceTotal) * 100 : 0;
+
       const { error } = await supabase.from("sales").insert({
         ...saleData,
         user_id: userData.user.id,
         supplier_id: profile?.supplier_id,
         client_name: saleData.customer_name || "",
         client_cpf_encrypted: saleData.customer_cpf || "",
-        miles_used: saleData.miles_needed || 0,
-        cost_per_mile: 0.029,
-        total_cost: 0,
-        sale_price: saleData.price_total || 0,
-        profit: 0,
-        profit_margin: 0,
+        miles_used: milesUsed,
+        cost_per_mile_snapshot: costPerMileSnapshot,
+        total_cost: totalCost,
+        sale_price: priceTotal,
+        margin_value: marginValue,
+        margin_percentage: marginPercentage,
+        profit: marginValue,
+        profit_margin: marginPercentage,
       } as SaleInsert);
 
       if (error) throw error;
+
+      // Update account balance
+      if (saleData.mileage_account_id && milesUsed > 0) {
+        const { error: balanceError } = await supabase.rpc("update_account_balance", {
+          account_id: saleData.mileage_account_id,
+          miles_delta: -milesUsed,
+        });
+
+        if (balanceError) {
+          console.error("Failed to update balance:", balanceError);
+        }
+      }
 
       toast({
         title: "Venda criada!",

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
-import { useProgramRules, Rule } from "@/hooks/useProgramRules";
+import { useAgencyPrograms } from "@/hooks/useAgencyPrograms";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,19 +13,13 @@ import { Trash2 } from "lucide-react";
 type Airline = { id: string; name: string; code: string };
 
 export default function ProgramRules() {
-  // scope = fornecedor atual (se existir) senão "global"
   const { supplierId } = useUserRole();
-  const [scopeMode, setScopeMode] = useState<"supplier" | "global">(
-    supplierId ? "supplier" : "global"
-  );
-  const scope = scopeMode === "supplier" && supplierId ? supplierId : "global";
-
-  const { list, setRule, deleteRule } = useProgramRules(scope);
+  const { programs, loading: programsLoading, createOrUpdateProgram, deleteProgram } = useAgencyPrograms(supplierId);
 
   const [airlines, setAirlines] = useState<Airline[]>([]);
   const [airlineId, setAirlineId] = useState("");
   const [cpfLimit, setCpfLimit] = useState("25");
-  const [period, setPeriod] = useState<Rule["period"]>("mes");
+  const [period, setPeriod] = useState<"month" | "day">("month");
 
   useEffect(() => {
     (async () => {
@@ -44,50 +38,33 @@ export default function ProgramRules() {
     return m;
   }, [airlines]);
 
-  const addOrUpdate = () => {
+  const addOrUpdate = async () => {
     if (!airlineId) return;
-    setRule(airlineId, { cpf_limit: Number(cpfLimit || 0), period });
-    setAirlineId("");
-    setCpfLimit("25");
-    setPeriod("mes");
+    const success = await createOrUpdateProgram(airlineId, {
+      cpf_limit: Number(cpfLimit || 0),
+      cpf_period: period,
+    });
+    if (success) {
+      setAirlineId("");
+      setCpfLimit("25");
+      setPeriod("month");
+    }
   };
 
   return (
     <div className="container max-w-4xl mx-auto p-6 space-y-6">
-      <div className="flex items-end justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Regras do Programa</h1>
-          <p className="text-muted-foreground">
-            Defina o limite de uso de CPF por companhia. Essas regras entram como padrão ao criar novas contas.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Select
-            value={scopeMode}
-            onValueChange={(v: "supplier" | "global") => setScopeMode(v)}
-          >
-            <SelectTrigger className="w-[220px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="supplier" disabled={!supplierId}>
-                {supplierId ? "Escopo: Fornecedor atual" : "Fornecedor indisponível"}
-              </SelectItem>
-              <SelectItem value="global">Escopo: Global</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+      <div>
+        <h1 className="text-3xl font-bold">Programas Configurados</h1>
+        <p className="text-muted-foreground">
+          Selecione quais programas de milhas sua agência trabalha e defina as regras padrão para cada um.
+        </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Nova Regra</CardTitle>
+          <CardTitle>Adicionar Programa</CardTitle>
           <CardDescription>
-            Escopo atual:{" "}
-            <Badge variant="secondary">
-              {scope === "global" ? "Global" : `Fornecedor (${scope.slice(0, 6)}...)`}
-            </Badge>
+            Selecione um programa de milhas e defina as regras padrão
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -110,11 +87,11 @@ export default function ProgramRules() {
               inputMode="numeric"
             />
 
-            <Select value={period} onValueChange={(v: Rule["period"]) => setPeriod(v)}>
+            <Select value={period} onValueChange={(v: "month" | "day") => setPeriod(v)}>
               <SelectTrigger><SelectValue placeholder="Período" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="mes">por mês</SelectItem>
-                <SelectItem value="dia">por dia</SelectItem>
+                <SelectItem value="month">por mês</SelectItem>
+                <SelectItem value="day">por dia</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -125,40 +102,43 @@ export default function ProgramRules() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Regras Atuais</CardTitle>
-          <CardDescription>Aplicadas automaticamente no cadastro.</CardDescription>
+          <CardTitle>Programas Ativos</CardTitle>
+          <CardDescription>
+            Esses programas estarão disponíveis ao cadastrar contas e realizar vendas.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
-          {list.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhuma regra definida.</p>
+          {programsLoading ? (
+            <p className="text-sm text-muted-foreground">Carregando...</p>
+          ) : programs.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Nenhum programa configurado. Adicione programas para começar.
+            </p>
           ) : (
-            list.map(r => {
-              const a = byId[r.airlineId];
-              return (
-                <div
-                  key={r.airlineId}
-                  className="flex items-center justify-between border rounded-md px-3 py-2"
-                >
-                  <div className="space-y-0.5">
-                    <div className="font-medium">
-                      {a ? `${a.name} (${a.code})` : `Cia ${r.airlineId}`}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      Limite por CPF: <b>{r.cpf_limit}</b> — Período:{" "}
-                      <b>{r.period === "mes" ? "mês" : "dia"}</b>
-                    </div>
+            programs.map(prog => (
+              <div
+                key={prog.id}
+                className="flex items-center justify-between border rounded-md px-3 py-2"
+              >
+                <div className="space-y-0.5">
+                  <div className="font-medium">
+                    {prog.airline_companies?.name} ({prog.airline_companies?.code})
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => deleteRule(r.airlineId)}
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Remover
-                  </Button>
+                  <div className="text-sm text-muted-foreground">
+                    Limite por CPF: <b>{prog.cpf_limit}</b> — Período:{" "}
+                    <b>{prog.cpf_period === "month" ? "mês" : "dia"}</b>
+                  </div>
                 </div>
-              );
-            })
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => deleteProgram(prog.id)}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Remover
+                </Button>
+              </div>
+            ))
           )}
         </CardContent>
       </Card>

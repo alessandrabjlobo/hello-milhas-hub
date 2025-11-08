@@ -1,4 +1,3 @@
-// src/components/accounts/AddAccountDialog.tsx
 import { useState, useEffect, useCallback } from "react";
 import {
   Dialog,
@@ -18,12 +17,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Eye, EyeOff, Plus } from "lucide-react";
+import { Eye, EyeOff, Plus, Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-
 import { useUserRole } from "@/hooks/useUserRole";
-import { useProgramRules } from "@/hooks/useProgramRules";
+import { useAgencyPrograms } from "@/hooks/useAgencyPrograms";
+import { useNavigate } from "react-router-dom";
 
 type AirlineCompany = { id: string; name: string; code: string };
 type Supplier = { id: string; name: string };
@@ -34,45 +33,37 @@ interface AddAccountDialogProps {
 
 export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
 
-  const [airlines, setAirlines] = useState<AirlineCompany[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [loadingAirlines, setLoadingAirlines] = useState(false);
 
-  const { supplierId: supplierFromRole } = useUserRole();
-  const [profileSupplierId, setProfileSupplierId] = useState<string>("");
-
-  // 👇 showPassword AGORA está definido
+  const { supplierId } = useUserRole();
+  const { programs, loading: programsLoading } = useAgencyPrograms(supplierId);
   const [showPassword, setShowPassword] = useState(false);
-
-  // Regras: usa fornecedor do perfil (se houver), senão escopo "global"
-  const scopeForRules =
-    (profileSupplierId || supplierFromRole || "").trim() || "global";
-  const { getRule } = useProgramRules(scopeForRules);
 
   const { toast } = useToast();
 
   // Form controlado (strings) pra evitar warnings
   const [formData, setFormData] = useState<{
     airline_company_id: string;
-    supplier_id: string; // opcional
+    supplier_id: string;
     account_holder_name: string;
     account_holder_cpf: string;
     password: string;
     account_number: string;
     balance: string;
-    cost_per_mile: string;
+    price_per_thousand: string; // Changed from cost_per_mile
     cpf_limit: string;
     status: "active" | "inactive";
   }>({
     airline_company_id: "",
-    supplier_id: "",
+    supplier_id: supplierId || "",
     account_holder_name: "",
     account_holder_cpf: "",
     password: "",
     account_number: "",
     balance: "",
-    cost_per_mile: "0.029",
+    price_per_thousand: "29", // Default price per 1000 miles
     cpf_limit: "25",
     status: "active",
   });
@@ -86,69 +77,32 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
       .replace(/(-\d{2})\d+?$/, "$1");
   };
 
-  const fetchAllAirlines = useCallback(async () => {
-    setLoadingAirlines(true);
-    try {
-      const { data, error } = await supabase
-        .from("airline_companies")
-        .select("id, name, code")
-        .order("name");
-      if (error) throw error;
-      setAirlines(data ?? []);
-    } catch (err: any) {
-      toast({
-        title: "Erro ao carregar companhias",
-        description: err.message,
-        variant: "destructive",
-      });
-      setAirlines([]);
-    } finally {
-      setLoadingAirlines(false);
-    }
-  }, [toast]);
-
   useEffect(() => {
     if (!open) return;
     (async () => {
       try {
-        const [{ data: userData }, { data: suppliersRes }] = await Promise.all([
-          supabase.auth.getUser(),
-          supabase.from("suppliers").select("id, name").order("name"),
-        ]);
+        const { data: suppliersRes } = await supabase
+          .from("suppliers")
+          .select("id, name")
+          .order("name");
         if (suppliersRes) setSuppliers(suppliersRes);
 
-        let initialSupplier = "";
-        if (userData?.user?.id) {
-          const { data: profileData } = await supabase
-            .from("profiles")
-            .select("supplier_id")
-            .eq("id", userData.user.id)
-            .maybeSingle();
-          initialSupplier = (profileData?.supplier_id as string | undefined) ?? "";
-          setProfileSupplierId(initialSupplier);
+        if (supplierId && !formData.supplier_id) {
+          setFormData((f) => ({ ...f, supplier_id: supplierId }));
         }
-
-        if (!formData.supplier_id && initialSupplier) {
-          setFormData((f) => ({ ...f, supplier_id: initialSupplier }));
-        }
-
-        await fetchAllAirlines();
       } catch (err: any) {
-        // Se der 400/erro no Lovable, só não bloqueie o fluxo
-        console.warn("Falha ao carregar dados de perfil/suppliers:", err?.message || err);
-        await fetchAllAirlines();
+        console.warn("Falha ao carregar suppliers:", err?.message || err);
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, supplierId]);
 
-  // aplica regra default de CPF ao escolher a cia
+  // Apply default rules when airline is selected
   const handlePickAirline = (airlineId: string) => {
-    const rule = getRule(airlineId);
+    const programSetting = programs.find(p => p.airline_company_id === airlineId);
     setFormData((f) => ({
       ...f,
       airline_company_id: airlineId,
-      cpf_limit: rule ? String(rule.cpf_limit) : f.cpf_limit,
+      cpf_limit: programSetting ? String(programSetting.cpf_limit) : f.cpf_limit,
     }));
   };
 
@@ -179,18 +133,22 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
       return;
     }
 
+    // Calculate cost_per_mile from price_per_thousand
+    const pricePerThousand = parseFloat(formData.price_per_thousand) || 29;
+    const costPerMile = pricePerThousand / 1000;
+
     const { error } = await supabase.from("mileage_accounts").insert([
       {
         user_id: userData.user.id,
         airline_company_id: formData.airline_company_id,
-        supplier_id: formData.supplier_id || null,
+        supplier_id: formData.supplier_id || supplierId,
         account_holder_name: formData.account_holder_name,
         account_holder_cpf: formData.account_holder_cpf.replace(/\D/g, ""),
         password_encrypted: formData.password || null,
         account_number: formData.account_number,
         balance: Number(formData.balance || 0),
-        cost_per_mile: Number(formData.cost_per_mile || 0),
-        cpf_limit: Number(formData.cpf_limit || 0),
+        cost_per_mile: costPerMile,
+        cpf_limit: Number(formData.cpf_limit || 25),
         status: formData.status,
       },
     ]);
@@ -212,13 +170,13 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
     setOpen(false);
     setFormData({
       airline_company_id: "",
-      supplier_id: (profileSupplierId || "").trim(),
+      supplier_id: supplierId || "",
       account_holder_name: "",
       account_holder_cpf: "",
       password: "",
       account_number: "",
       balance: "",
-      cost_per_mile: "0.029",
+      price_per_thousand: "29",
       cpf_limit: "25",
       status: "active",
     });
@@ -239,12 +197,25 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
         <DialogHeader>
           <DialogTitle>Adicionar Conta de Milhagem</DialogTitle>
           <DialogDescription>
-            Escolha a companhia aqui; as regras de CPF (se definidas nas Configurações)
-            serão aplicadas como padrão.
+            Cadastre uma nova conta. Apenas programas configurados em Configurações estarão disponíveis.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {programs.length === 0 && !programsLoading ? (
+          <div className="py-8 text-center space-y-4">
+            <p className="text-muted-foreground">
+              Nenhum programa configurado. Configure os programas que sua agência trabalha primeiro.
+            </p>
+            <Button variant="outline" onClick={() => {
+              setOpen(false);
+              navigate("/settings/programs");
+            }}>
+              <Settings className="h-4 w-4 mr-2" />
+              Configurar Programas
+            </Button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
           {/* Fornecedor (opcional) */}
           <div className="space-y-2">
             <Label htmlFor="supplier">Fornecedor</Label>
@@ -265,31 +236,26 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
             </Select>
           </div>
 
-          {/* Programa de Milhagem (todas as cias) */}
-          <div className="space-y-2">
-            <Label htmlFor="airline">Programa de Milhagem *</Label>
-            <Select
-              value={formData.airline_company_id || ""}
-              onValueChange={handlePickAirline}
-              disabled={loadingAirlines || (airlines?.length ?? 0) === 0}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o programa" />
-              </SelectTrigger>
-              <SelectContent position="popper" className="max-h-60">
-                {airlines.map((airline) => (
-                  <SelectItem key={airline.id} value={airline.id}>
-                    {airline.name} ({airline.code})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {!loadingAirlines && airlines.length === 0 && (
-              <p className="text-sm text-muted-foreground">
-                Nenhuma companhia cadastrada. Fale com o administrador.
-              </p>
-            )}
-          </div>
+            {/* Programa de Milhagem (apenas os configurados) */}
+            <div className="space-y-2">
+              <Label htmlFor="airline">Programa de Milhagem *</Label>
+              <Select
+                value={formData.airline_company_id || ""}
+                onValueChange={handlePickAirline}
+                disabled={programsLoading || programs.length === 0}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o programa" />
+                </SelectTrigger>
+                <SelectContent position="popper" className="max-h-60">
+                  {programs.map((prog) => (
+                    <SelectItem key={prog.id} value={prog.airline_company_id}>
+                      {prog.airline_companies?.name} ({prog.airline_companies?.code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
           {/* Titular / CPF */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -365,18 +331,21 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="cost_per_mile">Custo por milha (R$)</Label>
+              <Label htmlFor="price_per_thousand">Preço por 1.000 milhas (R$)</Label>
               <Input
-                id="cost_per_mile"
+                id="price_per_thousand"
                 type="number"
-                step="0.001"
+                step="0.01"
                 inputMode="decimal"
-                value={formData.cost_per_mile}
+                value={formData.price_per_thousand}
                 onChange={(e) =>
-                  setFormData((f) => ({ ...f, cost_per_mile: e.target.value }))
+                  setFormData((f) => ({ ...f, price_per_thousand: e.target.value }))
                 }
-                placeholder="Ex: 0.029"
+                placeholder="Ex: 29.00"
               />
+              <p className="text-xs text-muted-foreground">
+                Valor acordado por mil milhas
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -423,8 +392,8 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
               type="submit"
               className="flex-1"
               disabled={
-                loadingAirlines ||
-                (airlines?.length ?? 0) === 0 ||
+                programsLoading ||
+                programs.length === 0 ||
                 !formData.airline_company_id ||
                 !formData.account_number ||
                 !formData.account_holder_name ||
@@ -435,6 +404,7 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
             </Button>
           </div>
         </form>
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      agency_program_settings: {
+        Row: {
+          airline_company_id: string
+          cpf_limit: number
+          cpf_period: string
+          created_at: string
+          id: string
+          is_active: boolean
+          supplier_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          airline_company_id: string
+          cpf_limit?: number
+          cpf_period?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          supplier_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          airline_company_id?: string
+          cpf_limit?: number
+          cpf_period?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          supplier_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agency_program_settings_airline_company_id_fkey"
+            columns: ["airline_company_id"]
+            isOneToOne: false
+            referencedRelation: "airline_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agency_program_settings_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       airline_companies: {
         Row: {
           code: string
@@ -429,17 +477,21 @@ export type Database = {
           client_cpf_encrypted: string
           client_name: string
           cost_per_mile: number
+          cost_per_mile_snapshot: number | null
           cpf_used_id: string | null
           created_at: string
           customer_cpf: string | null
           customer_name: string | null
           customer_phone: string | null
           id: string
+          margin_percentage: number | null
+          margin_value: number | null
           mileage_account_id: string | null
           miles_needed: number | null
           miles_used: number
           notes: string | null
           passengers: number | null
+          payment_method: string | null
           price_per_passenger: number | null
           price_total: number | null
           profit: number
@@ -460,17 +512,21 @@ export type Database = {
           client_cpf_encrypted: string
           client_name: string
           cost_per_mile: number
+          cost_per_mile_snapshot?: number | null
           cpf_used_id?: string | null
           created_at?: string
           customer_cpf?: string | null
           customer_name?: string | null
           customer_phone?: string | null
           id?: string
+          margin_percentage?: number | null
+          margin_value?: number | null
           mileage_account_id?: string | null
           miles_needed?: number | null
           miles_used: number
           notes?: string | null
           passengers?: number | null
+          payment_method?: string | null
           price_per_passenger?: number | null
           price_total?: number | null
           profit: number
@@ -491,17 +547,21 @@ export type Database = {
           client_cpf_encrypted?: string
           client_name?: string
           cost_per_mile?: number
+          cost_per_mile_snapshot?: number | null
           cpf_used_id?: string | null
           created_at?: string
           customer_cpf?: string | null
           customer_name?: string | null
           customer_phone?: string | null
           id?: string
+          margin_percentage?: number | null
+          margin_value?: number | null
           mileage_account_id?: string | null
           miles_needed?: number | null
           miles_used?: number
           notes?: string | null
           passengers?: number | null
+          payment_method?: string | null
           price_per_passenger?: number | null
           price_total?: number | null
           profit?: number
@@ -849,6 +909,10 @@ export type Database = {
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_locked: { Args: { _user_id: string }; Returns: boolean }
+      update_account_balance: {
+        Args: { account_id: string; miles_delta: number }
+        Returns: undefined
+      }
     }
     Enums: {
       account_status: "active" | "inactive"

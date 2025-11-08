@@ -7,7 +7,9 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/shared/AppSidebar";
 
 import Index from "./pages/Index";
-import Dashboard from "./pages/Dashboard";
+import DashboardKPIs from "./pages/DashboardKPIs";
+import AdminUsers from "./pages/AdminUsers";
+import Onboarding from "./pages/Onboarding";
 import Auth from "./pages/Auth";
 import NewSaleWizard from "./pages/sales/NewSaleWizard";
 import SalesList from "./pages/sales/SalesList";
@@ -16,7 +18,7 @@ import Accounts from "./pages/Accounts";
 import Suppliers from "./pages/Suppliers";
 import Tickets from "./pages/Tickets";
 import Reports from "./pages/Reports";
-import ProgramRules from "./pages/ProgramRules";         // se estiver em pages/settings, mude para "./pages/settings/ProgramRules"
+import ProgramRules from "./pages/settings/ProgramRules";         // se estiver em pages/settings, mude para "./pages/settings/ProgramRules"
 import MyAirlines from "./pages/MyAirlines";             // idem: "./pages/settings/MyAirlines"
 import Billing from "./pages/Billing";
 import Terms from "./pages/Terms";
@@ -46,7 +48,9 @@ const App = () => (
                   <AppSidebar />
                   <main className="flex-1">
                     <Routes>
-                      <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/dashboard" element={<DashboardKPIs />} />
+            <Route path="/onboarding" element={<Onboarding />} />
+            <Route path="/admin/users" element={<AdminUsers />} />
                       <Route path="/sales/new" element={<NewSaleWizard />} />
                       <Route path="/sales" element={<SalesList />} />
                       <Route path="/accounts/:id" element={<AccountDetail />} />
@@ -57,7 +61,7 @@ const App = () => (
 
                       {/* Settings */}
                       <Route path="/settings/my-airlines" element={<MyAirlines />} />
-                      <Route path="/settings/program-rules" element={<ProgramRules />} />
+                      <Route path="/settings/programs" element={<ProgramRules />} />
                       <Route path="/settings/billing" element={<Billing />} />
 
                       {/* Redirects de compatibilidade (evita 404 em links antigos) */}
