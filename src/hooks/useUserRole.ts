@@ -7,14 +7,14 @@ type UseUserRoleReturn = {
   setSupplierIdLocal: (id: string) => void;
   clearSupplierIdLocal: () => void;
   loading: boolean;
-  role?: string | null;
+  isAdmin: boolean;
 };
 
 const LOCAL_KEY = "hmh:selectedSupplierId";
 
 export function useUserRole(): UseUserRoleReturn {
   const [supplierId, setSupplierId] = useState<string | null>(null);
-  const [role, setRole] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const readLocal = () => {
@@ -29,33 +29,37 @@ export function useUserRole(): UseUserRoleReturn {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      // tentar pegar do perfil; se falhar, usar localStorage
       const { data: userData, error: authErr } = await supabase.auth.getUser();
       if (authErr || !userData?.user?.id) {
         setSupplierId(readLocal());
-        setRole(null);
+        setIsAdmin(false);
         return;
       }
 
+      // Get supplier_id from profile
       const { data, error } = await supabase
         .from("profiles")
-        .select("supplier_id, role")
+        .select("supplier_id")
         .eq("id", userData.user.id)
-        .maybeSingle(); // evita erro se não existir
+        .maybeSingle();
 
       if (error) {
-        // falha REST (ex.: 400 no Lovable)? usar localStorage
         setSupplierId(readLocal());
-        setRole(null);
+        setIsAdmin(false);
         return;
       }
+
+      // Check admin role using RPC function
+      const { data: isAdminData } = await supabase.rpc("is_admin", {
+        _user_id: userData.user.id,
+      });
 
       const supSupplier = (data?.supplier_id as string | null) ?? null;
       setSupplierId(supSupplier ?? readLocal());
-      setRole((data?.role as string | null) ?? null);
+      setIsAdmin(isAdminData || false);
     } catch {
       setSupplierId(readLocal());
-      setRole(null);
+      setIsAdmin(false);
     } finally {
       setLoading(false);
     }
@@ -79,5 +83,5 @@ export function useUserRole(): UseUserRoleReturn {
     setSupplierId(null);
   };
 
-  return { supplierId, setSupplierIdLocal, clearSupplierIdLocal, loading, role };
+  return { supplierId, setSupplierIdLocal, clearSupplierIdLocal, loading, isAdmin };
 }

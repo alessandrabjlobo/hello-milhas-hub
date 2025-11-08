@@ -17,7 +17,6 @@ export default function Suppliers() {
 
   const [editingSupplier, setEditingSupplier] = useState<any>(null);
   const [deletingSupplier, setDeletingSupplier] = useState<any>(null);
-  const [addDialogOpen, setAddDialogOpen] = useState(false);
 
   const getLinkedAccountsCount = (supplierId: string) => {
     return accounts.filter((acc) => (acc as any).supplier_id === supplierId).length;
@@ -48,7 +47,7 @@ export default function Suppliers() {
               {suppliers.length} fornecedor(es) cadastrado(s)
             </p>
           </div>
-          <Button onClick={() => setAddDialogOpen(true)}>Novo fornecedor</Button>
+          <AddSupplierDialog onSupplierAdded={createSupplier} />
         </div>
 
         {suppliers.length === 0 ? (
@@ -58,9 +57,6 @@ export default function Suppliers() {
               title="Nenhum fornecedor cadastrado"
               description="Cadastre fornecedores para gerenciar contas de milhagem e pagamentos."
             />
-            <div className="text-center pb-6">
-              <Button onClick={() => setAddDialogOpen(true)}>Novo fornecedor</Button>
-            </div>
           </Card>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -144,28 +140,21 @@ export default function Suppliers() {
         )}
       </div>
 
-      {/* Dialog controlado para criar fornecedor */}
-      <AddSupplierDialog
-        open={addDialogOpen}
-        onOpenChange={setAddDialogOpen}
-        onSupplierAdded={createSupplier}
-      />
-
-      {/* Dialog de edição */}
       {editingSupplier && (
         <EditSupplierDialog
           supplier={editingSupplier}
           open={true}
           onOpenChange={(open) => !open && setEditingSupplier(null)}
+          onUpdate={updateSupplier}
         />
       )}
 
-      {/* Dialog de exclusão */}
       {deletingSupplier && (
         <DeleteSupplierDialog
-          supplier={deletingSupplier}
           open={true}
           onOpenChange={(open) => !open && setDeletingSupplier(null)}
+          onConfirm={() => deleteSupplier(deletingSupplier.id)}
+          supplierName={deletingSupplier.name}
         />
       )}
     </div>

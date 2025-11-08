@@ -111,9 +111,7 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
 
-  // Deriva isAdmin do role (o hook que te passei expõe "role")
-  const { role } = useUserRole();
-  const isAdmin = role === "admin";
+  const { isAdmin } = useUserRole();
 
   return (
     <Sidebar className={collapsed ? "w-14" : "w-60"}>
