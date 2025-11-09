@@ -1,51 +1,129 @@
+// src/components/airlines/AirlineCombobox.tsx
 import * as React from "react";
-import { Check, ChevronsUpDown, Plus } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Command,
   CommandEmpty,
   CommandGroup,
   CommandInput,
   CommandItem,
+  CommandList,
 } from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ChevronsUpDown, Plus, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type Option = { id: string; label: string };
+export type Airline = {
+  id: string;
+  name: string;
+  code: string;
+};
+
+type Props = {
+  value?: Airline | null;
+  onChange: (airline: Airline | null) => void;
+  className?: string;
+  triggerClassName?: string;
+  placeholder?: string;
+};
 
 export function AirlineCombobox({
-  options,
   value,
   onChange,
-  onCreate,
+  className,
+  triggerClassName,
   placeholder = "Programa/Cia",
-  disabled,
-}: {
-  options: Option[];
-  value?: string;
-  onChange: (id: string) => void;
-  onCreate?: (query: string) => Promise<Option | null>;
-  placeholder?: string;
-  disabled?: boolean;
-}) {
+}: Props) {
+  const { toast } = useToast();
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
-  const selected = options.find((o) => o.id === value)?.label ?? placeholder;
+  const [loading, setLoading] = React.useState(false);
+  const [creating, setCreating] = React.useState(false);
+  const [airlines, setAirlines] = React.useState<Airline[]>([]);
 
-  const filtered =
-    query.trim().length === 0
-      ? options
-      : options.filter((o) => o.label.toLowerCase().includes(query.toLowerCase()));
+  React.useEffect(() => {
+    let active = true;
+    (async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("airline_companies")
+        .select("id, name, code")
+        .order("name", { ascending: true });
 
-  const handleCreate = async () => {
-    if (!onCreate || !query.trim()) return;
-    const created = await onCreate(query.trim());
-    if (created) {
-      onChange(created.id);
-      setOpen(false);
-      setQuery("");
+      if (!active) return;
+      if (error) {
+        toast({
+          title: "Erro ao carregar companhias",
+          description: error.message,
+          variant: "destructive",
+        });
+        setAirlines([]);
+      } else {
+        setAirlines(data ?? []);
+      }
+      setLoading(false);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [toast]);
+
+  const filtered = React.useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return airlines;
+    return airlines.filter(
+      (a) =>
+        a.name.toLowerCase().includes(q) || a.code.toLowerCase().includes(q)
+    );
+  }, [airlines, query]);
+
+  async function handleCreate(raw: string) {
+    const text = raw.trim();
+    if (!text) return;
+
+    // Aceita "LATAM (LA)" ou "Latam" (gera código = 2 primeiras letras)
+    const m = text.match(/^\s*(.+?)\s*(?:\(([\w-]{2,5})\))?\s*$/i);
+    const name = (m?.[1] ?? text).trim();
+    const code = (m?.[2] ?? name.slice(0, 2)).toUpperCase();
+
+    setCreating(true);
+    const { data, error } = await supabase
+      .from("airline_companies")
+      .insert({ name, code })
+      .select("id, name, code")
+      .single();
+
+    setCreating(false);
+
+    if (error) {
+      toast({
+        title: "Não foi possível criar a companhia",
+        description:
+          error.code === "42501"
+            ? "Sem permissão para inserir nesta tabela (RLS)."
+            : error.message,
+        variant: "destructive",
+      });
+      return;
     }
-  };
+
+    setAirlines((prev) =>
+      [...prev, data!].sort((a, b) => a.name.localeCompare(b.name))
+    );
+    onChange(data!);
+    setQuery("");
+    setOpen(false);
+    toast({
+      title: "Companhia adicionada",
+      description: `${data!.name} (${data!.code})`,
+    });
+  }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -55,56 +133,68 @@ export function AirlineCombobox({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between"
-          disabled={disabled}
+          className={cn("w-full justify-between", triggerClassName)}
+          onClick={() => setOpen((o) => !o)}
         >
-          {selected}
+          {value ? `${value.name} (${value.code})` : placeholder}
           <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="p-0 w-[320px]">
+      <PopoverContent className={cn("w-[--radix-popover-trigger-width] p-0", className)}>
         <Command>
           <CommandInput
-            placeholder="Digite nome ou código..."
             value={query}
             onValueChange={setQuery}
+            placeholder="Digite nome ou código..."
           />
-          {filtered.length === 0 ? (
-            <div className="p-2">
-              <CommandEmpty className="py-2 px-2">
-                Nenhuma companhia encontrada.
-              </CommandEmpty>
-              {onCreate && (
-                <Button onClick={handleCreate} className="w-full" size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Adicionar “{query}”
-                </Button>
-              )}
-            </div>
-          ) : (
-            <CommandGroup>
-              {filtered.map((opt) => (
-                <CommandItem
-                  key={opt.id}
-                  value={opt.label}
-                  onSelect={() => {
-                    onChange(opt.id);
-                    setOpen(false);
-                    setQuery("");
-                  }}
-                  className="cursor-pointer"
-                >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      opt.id === value ? "opacity-100" : "opacity-0"
+          <CommandList>
+            {loading ? (
+              <div className="py-6 flex items-center justify-center text-sm text-muted-foreground gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Carregando…
+              </div>
+            ) : (
+              <>
+                <CommandEmpty>Nenhuma companhia encontrada.</CommandEmpty>
+                <CommandGroup>
+                  {filtered.map((a) => (
+                    <CommandItem
+                      key={a.id}
+                      value={`${a.name} (${a.code})`}
+                      onSelect={() => {
+                        onChange(a);
+                        setOpen(false);
+                        setQuery("");
+                      }}
+                    >
+                      {a.name} ({a.code})
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+
+                <div className="p-2 border-t">
+                  <Button
+                    className="w-full"
+                    type="button"
+                    onClick={() => handleCreate(query)}
+                    disabled={!query.trim() || creating}
+                  >
+                    {creating ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Adicionando…
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Adicionar “{query.trim()}”
+                      </>
                     )}
-                  />
-                  {opt.label}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          )}
+                  </Button>
+                </div>
+              </>
+            )}
+          </CommandList>
         </Command>
       </PopoverContent>
     </Popover>
