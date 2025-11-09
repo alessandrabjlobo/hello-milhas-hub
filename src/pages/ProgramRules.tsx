@@ -3,16 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, FileText, Save, Info, Plus } from "lucide-react";
+import { ArrowLeft, Save, Info, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -34,12 +29,54 @@ interface AirlineRule {
   renewal_type: RenewalType;
 }
 
+/* ------------------ OFFLINE HELPERS (localStorage) ------------------ */
+const AIRLINES_KEY = "hm_offline_airlines_v1";
+
+const offline = {
+  readAll(): Airline[] {
+    try {
+      const raw = localStorage.getItem(AIRLINES_KEY);
+      const list = raw ? (JSON.parse(raw) as Airline[]) : [];
+      return list.sort((a, b) => a.name.localeCompare(b.name));
+    } catch {
+      return [];
+    }
+  },
+  writeAll(list: Airline[]) {
+    localStorage.setItem(AIRLINES_KEY, JSON.stringify(list));
+  },
+  create(name: string, code: string): Airline {
+    const id = (crypto as any).randomUUID?.() || `${Date.now()}_${Math.random()}`;
+    const next: Airline = {
+      id,
+      name: name.trim(),
+      code: code.trim().toUpperCase(),
+      cpf_limit: 25,
+      renewal_type: "annual",
+    };
+    const all = this.readAll();
+    all.push(next);
+    this.writeAll(all);
+    return next;
+  },
+  updateRule(id: string, cpf_limit: number, renewal_type: RenewalType) {
+    const all = this.readAll();
+    const ix = all.findIndex((a) => a.id === id);
+    if (ix >= 0) {
+      all[ix] = { ...all[ix], cpf_limit, renewal_type };
+      this.writeAll(all);
+    }
+  },
+};
+/* -------------------------------------------------------------------- */
+
 export default function ProgramRules() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
 
   const [airlines, setAirlines] = useState<Airline[]>([]);
   const [rules, setRules] = useState<Record<string, AirlineRule>>({});
@@ -54,10 +91,20 @@ export default function ProgramRules() {
     void fetchData();
   }, []);
 
+  const normalizeLimit = (v: number | null | undefined) => {
+    const n = Number(v ?? 25);
+    if (!Number.isFinite(n)) return 25;
+    return Math.min(Math.max(Math.round(n), 1), 1000); // 1..1000
+  };
+
+  const normalizeRenewal = (v: RenewalType | null | undefined): RenewalType =>
+    v === "rolling" ? "rolling" : "annual";
+
   const fetchData = async () => {
     try {
       setLoading(true);
 
+      // Tenta buscar do Supabase
       const { data, error } = await supabase
         .from("airline_companies")
         .select("id, name, code, cpf_limit, renewal_type")
@@ -78,53 +125,90 @@ export default function ProgramRules() {
       });
       setRules(initial);
       setOriginalRules(initial);
-    } catch (err: any) {
+      setIsOffline(false);
+    } catch {
+      // Fallback: modo offline
+      const list = offline.readAll();
+      setAirlines(list);
+
+      const initial: Record<string, AirlineRule> = {};
+      list.forEach((airline) => {
+        initial[airline.id] = {
+          airline_company_id: airline.id,
+          cpf_limit: normalizeLimit(airline.cpf_limit),
+          renewal_type: normalizeRenewal(airline.renewal_type),
+        };
+      });
+      setRules(initial);
+      setOriginalRules(initial);
+      setIsOffline(true);
+
       toast({
-        title: "Erro ao carregar dados",
-        description: err?.message ?? "Não foi possível obter as companhias.",
-        variant: "destructive",
+        title: "Sem acesso ao Supabase",
+        description: "Usando modo offline (dados salvos no navegador).",
       });
     } finally {
       setLoading(false);
     }
   };
 
-  const normalizeLimit = (v: number | null | undefined) => {
-    const n = Number(v ?? 25);
-    if (!Number.isFinite(n)) return 25;
-    return Math.min(Math.max(Math.round(n), 1), 1000); // 1..1000
-  };
-
-  const normalizeRenewal = (v: RenewalType | null | undefined): RenewalType =>
-    v === "rolling" ? "rolling" : "annual";
-
   const options = useMemo(
     () => airlines.map((a) => ({ id: a.id, label: `${a.name} (${a.code})` })),
     [airlines]
   );
 
-  // ——— criar companhia (usado pelo combobox e pelo botão) ———
+  // ——— criar companhia (combobox/botão) ———
   const createAirline = async (name: string, code: string) => {
+    if (isOffline) {
+      const created = offline.create(name, code);
+      setAirlines((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+      setRules((prev) => ({
+        ...prev,
+        [created.id]: {
+          airline_company_id: created.id,
+          cpf_limit: 25,
+          renewal_type: "annual",
+        },
+      }));
+      toast({
+        title: "Companhia (offline)",
+        description: `${created.name} (${created.code}) criada localmente.`,
+      });
+      return created;
+    }
+
+    // Online
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) throw new Error("Usuário não autenticado");
 
     const { data, error } = await supabase
       .from("airline_companies")
-      .insert({ 
-        name: name.trim(), 
+      .insert({
+        name: name.trim(),
         code: code.trim().toUpperCase(),
-        user_id: userData.user.id
+        user_id: userData.user.id,
       })
       .select("id, name, code")
       .single();
-    if (error) throw error;
+
+    if (error) {
+      // Se falhar, alterna para offline e tenta local
+      setIsOffline(true);
+      const created = offline.create(name, code);
+      setAirlines((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+      setRules((prev) => ({
+        ...prev,
+        [created.id]: { airline_company_id: created.id, cpf_limit: 25, renewal_type: "annual" },
+      }));
+      toast({
+        title: "Sem acesso ao Supabase",
+        description: "Companhia criada localmente (offline).",
+      });
+      return created;
+    }
 
     const created = data as Airline;
-    setAirlines((prev) => {
-      const next = [...prev, created].sort((a, b) => a.name.localeCompare(b.name));
-      return next;
-    });
-
+    setAirlines((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
     setRules((prev) => ({
       ...prev,
       [created.id]: {
@@ -133,12 +217,10 @@ export default function ProgramRules() {
         renewal_type: "annual",
       },
     }));
-
     toast({
       title: "Companhia adicionada",
       description: `${created.name} (${created.code}) criada com sucesso.`,
     });
-
     return created;
   };
 
@@ -166,10 +248,7 @@ export default function ProgramRules() {
     } catch (err: any) {
       toast({
         title: "Erro ao criar companhia",
-        description:
-          err?.message?.includes("permission") || err?.code === "42501"
-            ? "Sem permissão (RLS) para inserir em airline_companies."
-            : err?.message ?? "Tente novamente.",
+        description: err?.message ?? "Tente novamente.",
         variant: "destructive",
       });
       return null;
@@ -188,10 +267,7 @@ export default function ProgramRules() {
     } catch (err: any) {
       toast({
         title: "Erro ao criar companhia",
-        description:
-          err?.message?.includes("permission") || err?.code === "42501"
-            ? "Sem permissão (RLS) para inserir em airline_companies."
-            : err?.message ?? "Tente novamente.",
+        description: err?.message ?? "Tente novamente.",
         variant: "destructive",
       });
     }
@@ -206,12 +282,20 @@ export default function ProgramRules() {
     const cpfLimit = normalizeLimit(Number(cpfLimitInput));
 
     try {
-      const { error } = await supabase
-        .from("airline_companies")
-        .update({ cpf_limit: cpfLimit, renewal_type: period })
-        .eq("id", airlineId);
+      if (isOffline) {
+        offline.updateRule(airlineId, cpfLimit, period);
+      } else {
+        const { error } = await supabase
+          .from("airline_companies")
+          .update({ cpf_limit: cpfLimit, renewal_type: period })
+          .eq("id", airlineId);
 
-      if (error) throw error;
+        if (error) {
+          // Falhou → alterna para offline e salva localmente
+          setIsOffline(true);
+          offline.updateRule(airlineId, cpfLimit, period);
+        }
+      }
 
       setRules((prev) => ({
         ...prev,
@@ -222,7 +306,10 @@ export default function ProgramRules() {
         },
       }));
 
-      toast({ title: "Regra salva", description: "Configuração aplicada à companhia." });
+      toast({
+        title: "Regra salva",
+        description: isOffline ? "Aplicada localmente (offline)." : "Configuração aplicada.",
+      });
       setAirlineId("");
       setCpfLimitInput("25");
       setPeriod("annual");
@@ -238,8 +325,11 @@ export default function ProgramRules() {
   // ——— edição em massa (lista) ———
   const updateRule = (id: string, field: keyof AirlineRule, value: any) => {
     setRules((prev) => {
-      const curr = prev[id];
-      if (!curr) return prev;
+      const curr = prev[id] ?? {
+        airline_company_id: id,
+        cpf_limit: 25,
+        renewal_type: "annual" as RenewalType,
+      };
       const next: AirlineRule = {
         ...curr,
         [field]:
@@ -270,15 +360,30 @@ export default function ProgramRules() {
     }
     try {
       setSaving(true);
-      for (const row of diffToSave) {
-        const { error } = await supabase
-          .from("airline_companies")
-          .update({ cpf_limit: row.cpf_limit, renewal_type: row.renewal_type })
-          .eq("id", row.id);
-        if (error) throw error;
+
+      if (isOffline) {
+        for (const row of diffToSave) {
+          offline.updateRule(row.id, row.cpf_limit, row.renewal_type);
+        }
+      } else {
+        for (const row of diffToSave) {
+          const { error } = await supabase
+            .from("airline_companies")
+            .update({ cpf_limit: row.cpf_limit, renewal_type: row.renewal_type })
+            .eq("id", row.id);
+          if (error) {
+            // Se falhar, migra pro offline e continua local
+            setIsOffline(true);
+            offline.updateRule(row.id, row.cpf_limit, row.renewal_type);
+          }
+        }
       }
+
       setOriginalRules(rules);
-      toast({ title: "Regras salvas", description: "As configurações foram atualizadas." });
+      toast({
+        title: "Regras salvas",
+        description: isOffline ? "Salvas localmente (offline)." : "Atualizadas no servidor.",
+      });
     } catch (err: any) {
       toast({
         title: "Erro ao salvar regras",
@@ -310,9 +415,11 @@ export default function ProgramRules() {
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
-          <h1 className="text-3xl font-bold">Programas Configurados</h1>
+          <h1 className="text-3xl font-bold">
+            Programas Configurados {isOffline && <span className="text-xs text-yellow-600 ml-2">(offline)</span>}
+          </h1>
           <p className="text-muted-foreground">
-            Selecione quais programas de milhas sua agência trabalha e defina as regras padrão para cada um.
+            Selecione quais programas sua agência trabalha e defina as regras padrão para cada um.
           </p>
         </div>
       </div>
@@ -320,7 +427,8 @@ export default function ProgramRules() {
       <Alert>
         <Info className="h-4 w-4" />
         <AlertDescription>
-          Estas configurações serão aplicadas ao criar <b>novas</b> contas. Contas existentes não mudam automaticamente.
+          Estas configurações serão aplicadas ao criar <b>novas</b> contas.
+          {isOffline && " Em modo offline, os dados ficam salvos apenas neste navegador."}
         </AlertDescription>
       </Alert>
 
@@ -339,7 +447,7 @@ export default function ProgramRules() {
                     options={options}
                     value={airlineId}
                     onChange={setAirlineId}
-                    onCreate={handleComboboxCreate}  // ← habilita “Adicionar “{query}””
+                    onCreate={handleComboboxCreate}  // permite digitar “Nome (COD)” e criar
                     placeholder="Programa/Cia"
                   />
                 </div>
@@ -432,7 +540,13 @@ export default function ProgramRules() {
         </Button>
         <Button onClick={handleSaveAll} disabled={saving || diffToSave.length === 0}>
           <Save className="h-4 w-4 mr-2" />
-          {saving ? "Salvando..." : diffToSave.length === 0 ? "Nada a salvar" : "Salvar Alterações"}
+          {saving
+            ? "Salvando..."
+            : diffToSave.length === 0
+              ? "Nada a salvar"
+              : isOffline
+                ? "Salvar (offline)"
+                : "Salvar Alterações"}
         </Button>
       </div>
     </div>
