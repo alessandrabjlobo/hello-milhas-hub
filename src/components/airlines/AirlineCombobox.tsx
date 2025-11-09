@@ -17,14 +17,14 @@ export function AirlineCombobox({
   options,
   value,
   onChange,
-  onCreate, // 👈 callback para criar quando não existe
+  onCreate,
   placeholder = "Programa/Cia",
   disabled,
 }: {
   options: Option[];
   value?: string;
   onChange: (id: string) => void;
-  onCreate?: (nameOrQuery: string) => Promise<Option | null>;
+  onCreate?: (query: string) => Promise<Option | null>;
   placeholder?: string;
   disabled?: boolean;
 }) {
@@ -35,9 +35,7 @@ export function AirlineCombobox({
   const filtered =
     query.trim().length === 0
       ? options
-      : options.filter((o) =>
-          o.label.toLowerCase().includes(query.toLowerCase())
-        );
+      : options.filter((o) => o.label.toLowerCase().includes(query.toLowerCase()));
 
   const handleCreate = async () => {
     if (!onCreate || !query.trim()) return;
