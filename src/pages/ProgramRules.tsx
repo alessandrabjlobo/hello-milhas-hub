@@ -46,7 +46,6 @@ const offline = {
     localStorage.setItem(AIRLINES_KEY, JSON.stringify(list));
   },
   upsertMany(list: Airline[]) {
-    // sobrescreve por completo (usado após sincronizar do servidor)
     this.writeAll(list);
   },
   create(name: string, code: string): Airline {
@@ -131,10 +130,10 @@ export default function ProgramRules() {
       const serverList = (data ?? []) as Airline[];
       setIsOffline(false);
 
-      // 2) antes de setar UI, sincroniza o que existir offline → online
+      // 2) sincroniza o que existir offline → online
       await syncOfflineToServer(serverList);
 
-      // 3) refetch “oficial” pós-sync (garante que UI reflita servidor)
+      // 3) refetch pós-sync
       const { data: data2, error: err2 } = await supabase
         .from("airline_companies")
         .select("id, name, code, cpf_limit, renewal_type")
@@ -146,7 +145,7 @@ export default function ProgramRules() {
       setRules(buildRulesMap(finalList));
       setOriginalRules(buildRulesMap(finalList));
 
-      // 4) mantém offline como espelho do servidor (para funcionar sem rede)
+      // 4) espelha offline
       offline.upsertMany(finalList);
     } catch {
       // OFFLINE: carrega do cache local
@@ -190,7 +189,6 @@ export default function ProgramRules() {
       );
 
       for (const item of toCreate) {
-        // tenta inserir; se falhar por RLS/duplicidade, ignora e continua
         const { error, data } = await supabase
           .from("airline_companies")
           .insert({
@@ -209,7 +207,6 @@ export default function ProgramRules() {
       }
 
       // 2) aplica regras offline no servidor quando divergirem
-      //    (usamos name+code para mapear a companhia criada/exists)
       for (const loc of local) {
         const key = `${loc.name.toLowerCase()}|${loc.code.toUpperCase()}`;
         const server = serverIndex.get(key);
@@ -233,6 +230,7 @@ export default function ProgramRules() {
     }
   };
 
+  // ✅ DECLARAÇÃO ÚNICA
   const options = useMemo(
     () => airlines.map((a) => ({ id: a.id, label: `${a.name} (${a.code})` })),
     [airlines]
@@ -487,11 +485,6 @@ export default function ProgramRules() {
       </div>
     );
   }
-
-  const options = useMemo(
-    () => airlines.map((a) => ({ id: a.id, label: `${a.name} (${a.code})` })),
-    [airlines]
-  );
 
   return (
     <div className="container max-w-4xl mx-auto p-6 space-y-6">
