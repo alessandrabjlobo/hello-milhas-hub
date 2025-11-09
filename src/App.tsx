@@ -18,7 +18,7 @@ import Accounts from "./pages/Accounts";
 import Suppliers from "./pages/Suppliers";
 import Tickets from "./pages/Tickets";
 import Reports from "./pages/Reports";
-import ProgramRules from "./pages/settings/ProgramRules";         // se estiver em pages/settings, mude para "./pages/settings/ProgramRules"
+import ProgramRules from "./pages/ProgramRules";
 import MyAirlines from "./pages/MyAirlines";             // idem: "./pages/settings/MyAirlines"
 import Billing from "./pages/Billing";
 import Terms from "./pages/Terms";
@@ -66,7 +66,7 @@ const App = () => (
 
                       {/* Redirects de compatibilidade (evita 404 em links antigos) */}
                       <Route path="/my-airlines" element={<Navigate to="/settings/my-airlines" replace />} />
-                      <Route path="/program-rules" element={<Navigate to="/settings/program-rules" replace />} />
+                      <Route path="/program-rules" element={<Navigate to="/settings/programs" replace />} />
 
                       {/* 404 local */}
                       <Route path="*" element={<NotFound />} />

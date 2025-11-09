@@ -8,7 +8,7 @@ export interface AgencyProgramSetting {
   airline_company_id: string;
   is_active: boolean;
   cpf_limit: number;
-  cpf_period: "month" | "day";
+  cpf_period: "calendar_year" | "rolling_year";
   created_at: string;
   updated_at: string;
   airline_companies?: {
@@ -55,7 +55,7 @@ export const useAgencyPrograms = (supplierId: string | null) => {
 
   const createOrUpdateProgram = async (
     airlineId: string,
-    settings: { cpf_limit: number; cpf_period: "month" | "day" }
+    settings: { cpf_limit: number; cpf_period: "calendar_year" | "rolling_year" }
   ) => {
     try {
       const { error } = await supabase

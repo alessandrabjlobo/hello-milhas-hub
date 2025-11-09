@@ -51,7 +51,7 @@ const reportsNavItems = [
 
 const settingsNavItems = [
   { title: "Minhas Companhias", url: "/settings/my-airlines", icon: Plane },
-  { title: "Regras do Programa", url: "/settings/program-rules", icon: FileText },
+  { title: "Regras do Programa", url: "/settings/programs", icon: FileText },
   { title: "Plano & Pagamento", url: "/settings/billing", icon: DollarSign },
 ];
 

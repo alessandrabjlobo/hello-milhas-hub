@@ -105,9 +105,16 @@ export default function ProgramRules() {
 
   // ——— criar companhia (usado pelo combobox e pelo botão) ———
   const createAirline = async (name: string, code: string) => {
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) throw new Error("Usuário não autenticado");
+
     const { data, error } = await supabase
       .from("airline_companies")
-      .insert({ name: name.trim(), code: code.trim().toUpperCase() })
+      .insert({ 
+        name: name.trim(), 
+        code: code.trim().toUpperCase(),
+        user_id: userData.user.id
+      })
       .select("id, name, code")
       .single();
     if (error) throw error;

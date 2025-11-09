@@ -20,6 +20,8 @@ import { useSupplierAirlines } from "@/hooks/useSupplierAirlines";
 import { maskCPF, maskPhone } from "@/lib/input-masks";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { SalesSummaryCard } from "@/components/sales/SaleSummaryCard";
+import { SaleSuccessDialog } from "@/components/sales/SaleSuccessDialog";
+import { MarginCalculator } from "@/components/calculator/MarginCalculator";
 
 const steps = ["Cliente & Voo", "Cálculo", "Confirmar"];
 
@@ -48,8 +50,12 @@ export default function NewSaleWizard() {
   const [pricingType, setPricingType] = useState<"per_passenger" | "total">("total");
   const [pricePerPassenger, setPricePerPassenger] = useState("");
   const [priceTotal, setPriceTotal] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<string>();
+  const [pnr, setPnr] = useState("");
 
   const [saving, setSaving] = useState(false);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [lastSaleData, setLastSaleData] = useState<any>(null);
 
   // Filter accounts by linked airlines
   const linkedAirlineIds = linkedAirlines.map((a) => a.id);
@@ -73,6 +79,10 @@ export default function NewSaleWizard() {
 
   const handleSave = async () => {
     setSaving(true);
+    
+    const selectedAccount = filteredAccounts.find(a => a.id === accountId);
+    const airline = selectedAccount?.airline_companies?.name || "Companhia";
+
     const success = await createSale({
       customer_name: customerName,
       customer_phone: customerPhone,
@@ -89,12 +99,24 @@ export default function NewSaleWizard() {
       boarding_fee: parseFloat(boardingFee) || 0,
       price_per_passenger: parseFloat(pricePerPassenger) || 0,
       price_total: parseFloat(priceTotal) || 0,
+      payment_method: paymentMethod,
       status: "pending",
     });
 
     setSaving(false);
     if (success) {
-      navigate("/sales");
+      setLastSaleData({
+        customerName,
+        routeText,
+        airline,
+        milesNeeded,
+        priceTotal,
+        boardingFee,
+        passengers,
+        paymentMethod,
+        pnr: pnr || undefined,
+      });
+      setShowSuccessDialog(true);
     }
   };
 
@@ -309,8 +331,36 @@ export default function NewSaleWizard() {
                           placeholder="Ex: 3000.00"
                         />
                       </div>
-                    )}
-                  </div>
+                     )}
+                     <div>
+                       <Label htmlFor="paymentMethod">Forma de Pagamento</Label>
+                       <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                         <SelectTrigger id="paymentMethod">
+                           <SelectValue placeholder="Selecione" />
+                         </SelectTrigger>
+                         <SelectContent>
+                           <SelectItem value="pix">PIX</SelectItem>
+                           <SelectItem value="credit_card">Cartão de Crédito</SelectItem>
+                           <SelectItem value="debit_card">Cartão de Débito</SelectItem>
+                           <SelectItem value="bank_transfer">Transferência Bancária</SelectItem>
+                           <SelectItem value="cash">Dinheiro</SelectItem>
+                         </SelectContent>
+                       </Select>
+                     </div>
+                     <div>
+                       <Label htmlFor="pnr">PNR / Localizador (opcional)</Label>
+                       <Input
+                         id="pnr"
+                         value={pnr}
+                         onChange={(e) => setPnr(e.target.value.toUpperCase())}
+                         placeholder="Ex: ABC123"
+                         maxLength={10}
+                       />
+                       <p className="text-xs text-muted-foreground mt-1">
+                         Pode ser preenchido depois, se ainda não disponível
+                       </p>
+                     </div>
+                   </div>
                 </div>
               )}
 
@@ -382,7 +432,7 @@ export default function NewSaleWizard() {
           </div>
 
           {/* Summary Card */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1 space-y-6">
             <SalesSummaryCard
               customerName={customerName}
               routeText={routeText}
@@ -392,9 +442,29 @@ export default function NewSaleWizard() {
               milesNeeded={milesNeeded}
               priceTotal={priceTotal}
             />
+            {currentStep === 1 && (
+              <MarginCalculator
+                costPerMile={
+                  accountId && filteredAccounts.find(a => a.id === accountId)?.cost_per_mile
+                    ? Number(filteredAccounts.find(a => a.id === accountId)?.cost_per_mile)
+                    : 0.029
+                }
+              />
+            )}
           </div>
         </div>
       </div>
+
+      {lastSaleData && (
+        <SaleSuccessDialog
+          open={showSuccessDialog}
+          onClose={() => {
+            setShowSuccessDialog(false);
+            navigate("/sales");
+          }}
+          saleData={lastSaleData}
+        />
+      )}
     </div>
   );
 }
