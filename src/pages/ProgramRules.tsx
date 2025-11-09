@@ -12,10 +12,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, FileText, Save, Info } from "lucide-react";
+import { ArrowLeft, FileText, Save, Info, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AirlineCombobox } from "@/components/airlines/AirlineCombobox";
 
 type RenewalType = "annual" | "rolling";
 
@@ -44,6 +45,11 @@ export default function ProgramRules() {
   const [rules, setRules] = useState<Record<string, AirlineRule>>({});
   const [originalRules, setOriginalRules] = useState<Record<string, AirlineRule>>({});
 
+  // estado do formulário de inclusão de regra
+  const [airlineId, setAirlineId] = useState("");
+  const [cpfLimitInput, setCpfLimitInput] = useState("25");
+  const [period, setPeriod] = useState<RenewalType>("annual");
+
   useEffect(() => {
     void fetchData();
   }, []);
@@ -62,6 +68,7 @@ export default function ProgramRules() {
       const list = (data ?? []) as Airline[];
       setAirlines(list);
 
+      // carrega regras atuais (estes defaults ficam na própria tabela da cia)
       const initial: Record<string, AirlineRule> = {};
       list.forEach((airline) => {
         initial[airline.id] = {
@@ -92,6 +99,147 @@ export default function ProgramRules() {
   const normalizeRenewal = (v: RenewalType | null | undefined): RenewalType =>
     v === "rolling" ? "rolling" : "annual";
 
+  const options = useMemo(
+    () => airlines.map((a) => ({ id: a.id, label: `${a.name} (${a.code})` })),
+    [airlines]
+  );
+
+  // —————————————————————————————————————
+  // CRIAR COMPANHIA (usado pelo combobox e pelo botão "Nova companhia")
+  // —————————————————————————————————————
+  const createAirline = async (name: string, code: string) => {
+    const { data, error } = await supabase
+      .from("airline_companies")
+      .insert({ name: name.trim(), code: code.trim().toUpperCase() })
+      .select("id, name, code")
+      .single();
+    if (error) throw error;
+    const created = data as Airline;
+
+    // atualiza lista local
+    setAirlines((prev) => {
+      const next = [...prev, created].sort((a, b) => a.name.localeCompare(b.name));
+      return next;
+    });
+
+    // cria regra default para edição imediata
+    setRules((prev) => ({
+      ...prev,
+      [created.id]: {
+        airline_company_id: created.id,
+        cpf_limit: 25,
+        renewal_type: "annual",
+      },
+    }));
+
+    toast({
+      title: "Companhia adicionada",
+      description: `${created.name} (${created.code}) criada com sucesso.`,
+    });
+
+    return created;
+  };
+
+  // usado pelo combobox quando o termo digitado não existe
+  const handleComboboxCreate = async (typed: string) => {
+    // permite "Nome (COD)" ou pergunta o código
+    const match = typed.match(/^(.+?)\s*\((\w{1,4})\)\s*$/i);
+    let name = typed.trim();
+    let code = "";
+
+    if (match) {
+      name = match[1].trim();
+      code = match[2].toUpperCase();
+    } else {
+      const promptCode = window.prompt(`Informe o código (ex.: LA para LATAM) para "${typed}":`);
+      if (!promptCode) return null;
+      code = promptCode.toUpperCase().trim();
+    }
+
+    try {
+      const created = await createAirline(name, code);
+      // seleciona no formulário de regra
+      setAirlineId(created.id);
+      return { id: created.id, label: `${created.name} (${created.code})` };
+    } catch (err: any) {
+      toast({
+        title: "Erro ao criar companhia",
+        description:
+          err?.message?.includes("permission") || err?.code === "42501"
+            ? "Sem permissão para inserir em airline_companies (RLS)."
+            : err?.message ?? "Tente novamente.",
+        variant: "destructive",
+      });
+      return null;
+    }
+  };
+
+  // botão lateral “Nova companhia” (caso o botão do combobox não apareça)
+  const handleCreateAirlineViaPrompt = async () => {
+    const name = window.prompt("Nome da companhia (ex.: LATAM):");
+    if (!name) return;
+    const code = window.prompt("Código (ex.: LA):");
+    if (!code) return;
+    try {
+      const created = await createAirline(name, code);
+      setAirlineId(created.id);
+    } catch (err: any) {
+      toast({
+        title: "Erro ao criar companhia",
+        description:
+          err?.message?.includes("permission") || err?.code === "42501"
+            ? "Sem permissão para inserir em airline_companies (RLS)."
+            : err?.message ?? "Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // —————————————————————————————————————
+  // SALVAR REGRA (atualiza na tabela airline_companies)
+  // —————————————————————————————————————
+  const addOrUpdateRule = async () => {
+    if (!airlineId) {
+      toast({ title: "Selecione uma companhia", variant: "destructive" });
+      return;
+    }
+    const cpfLimit = normalizeLimit(Number(cpfLimitInput));
+
+    try {
+      const { error } = await supabase
+        .from("airline_companies")
+        .update({ cpf_limit: cpfLimit, renewal_type: period })
+        .eq("id", airlineId);
+
+      if (error) throw error;
+
+      // reflete no estado
+      setRules((prev) => ({
+        ...prev,
+        [airlineId]: {
+          airline_company_id: airlineId,
+          cpf_limit: cpfLimit,
+          renewal_type: period,
+        },
+      }));
+
+      toast({ title: "Regra salva", description: "Configuração aplicada à companhia." });
+      // limpa seleção
+      setAirlineId("");
+      setCpfLimitInput("25");
+      setPeriod("annual");
+    } catch (err: any) {
+      toast({
+        title: "Erro ao salvar regra",
+        description: err?.message ?? "Verifique sua conexão/RLS e tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // —————————————————————————————————————
+  // EDITAR REGRAS EM MASSA (parte inferior)
+  // —————————————————————————————————————
   const updateRule = (airlineId: string, field: keyof AirlineRule, value: any) => {
     setRules((prev) => {
       const curr = prev[airlineId];
@@ -101,9 +249,7 @@ export default function ProgramRules() {
         [field]:
           field === "cpf_limit"
             ? normalizeLimit(Number(value))
-            : field === "renewal_type"
-            ? (value as RenewalType)
-            : value,
+            : (value as RenewalType),
       };
       return { ...prev, [airlineId]: next };
     });
@@ -121,55 +267,26 @@ export default function ProgramRules() {
     return changes;
   }, [rules, originalRules]);
 
-  const handleSave = async () => {
+  const handleSaveAll = async () => {
     if (diffToSave.length === 0) {
       toast({ title: "Nada para salvar", description: "Nenhuma alteração detectada." });
       return;
     }
     try {
       setSaving(true);
-
-      // Salva em pequenos lotes para evitar timeouts em conexões lentas
-      const chunkSize = 10;
-      for (let i = 0; i < diffToSave.length; i += chunkSize) {
-        const chunk = diffToSave.slice(i, i + chunkSize);
-        const ids = chunk.map((c) => c.id);
-
+      for (const row of diffToSave) {
         const { error } = await supabase
           .from("airline_companies")
-          .update(
-            Object.fromEntries(
-              // PostgREST não aceita "múltiplos values"; então atualizamos por id via "in" com a mesma carga
-              // Para valores distintos por id, teríamos que fazer update por linha (loop).
-              // Como os valores podem variar, fazemos *linha a linha* aqui:
-              []
-            )
-          )
-          .in("id", [] as any); // placeholder para manter a tipagem
-
-        // Como cada linha pode ter valores distintos, fazemos uma a uma:
-        for (const row of chunk) {
-          const { error: rowErr } = await supabase
-            .from("airline_companies")
-            .update({
-              cpf_limit: row.cpf_limit,
-              renewal_type: row.renewal_type,
-            })
-            .eq("id", row.id);
-
-          if (rowErr) throw rowErr;
-        }
+          .update({ cpf_limit: row.cpf_limit, renewal_type: row.renewal_type })
+          .eq("id", row.id);
+        if (error) throw error;
       }
-
       setOriginalRules(rules);
-      toast({
-        title: "Regras salvas",
-        description: "As configurações foram atualizadas com sucesso.",
-      });
+      toast({ title: "Regras salvas", description: "As configurações foram atualizadas." });
     } catch (err: any) {
       toast({
         title: "Erro ao salvar regras",
-        description: err?.message ?? "Verifique sua conexão e tente novamente.",
+        description: err?.message ?? "Verifique sua conexão/RLS e tente novamente.",
         variant: "destructive",
       });
     } finally {
@@ -197,9 +314,9 @@ export default function ProgramRules() {
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
-          <h1 className="text-3xl font-bold">Regras do Programa</h1>
+          <h1 className="text-3xl font-bold">Programas Configurados</h1>
           <p className="text-muted-foreground">
-            Configure limites de CPF e tipos de renovação por companhia.
+            Selecione quais programas de milhas sua agência trabalha e defina as regras padrão para cada um.
           </p>
         </div>
       </div>
@@ -207,80 +324,118 @@ export default function ProgramRules() {
       <Alert>
         <Info className="h-4 w-4" />
         <AlertDescription>
-          Estas configurações serão aplicadas como padrão ao criar <b>novas</b> contas de milhagem.
-          Contas já existentes não são alteradas automaticamente.
+          Estas configurações serão aplicadas ao criar <b>novas</b> contas. Contas existentes não mudam automaticamente.
         </AlertDescription>
       </Alert>
 
-      <div className="space-y-4">
-        {airlines.map((airline) => {
-          const rule = rules[airline.id];
-          return (
-            <Card key={airline.id}>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  {airline.name}
-                </CardTitle>
-                <CardDescription>Código: {airline.code}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor={`cpf-limit-${airline.id}`}>Limite de CPFs</Label>
+      {/* ——— Adicionar/Atualizar regra para UMA companhia ——— */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Adicionar Programa</CardTitle>
+          <CardDescription>Selecione um programa e defina as regras padrão</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid md:grid-cols-3 gap-3 items-start">
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <AirlineCombobox
+                    options={options}
+                    value={airlineId}
+                    onChange={setAirlineId}
+                    onCreate={handleComboboxCreate}   // << criação pelo combobox
+                    placeholder="Programa/Cia"
+                  />
+                </div>
+                <Button variant="secondary" onClick={handleCreateAirlineViaPrompt} title="Nova companhia">
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Dica: você pode digitar “Nome (COD)” e clicar em Adicionar.
+              </p>
+            </div>
+
+            <Input
+              placeholder="Limite por CPF"
+              value={cpfLimitInput}
+              onChange={(e) => setCpfLimitInput(e.target.value)}
+              inputMode="numeric"
+            />
+
+            <Select value={period} onValueChange={(v: RenewalType) => setPeriod(v)}>
+              <SelectTrigger><SelectValue placeholder="Período" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="annual">por ano (vira em 01/jan)</SelectItem>
+                <SelectItem value="rolling">em 1 ano após uso</SelectItem>
+              </SelectContent>
+            </Select>
+
+          </div>
+
+          <Button onClick={addOrUpdateRule} disabled={!airlineId}>
+            Salvar Regra
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* ——— Lista para edição em massa ——— */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Programas Ativos</CardTitle>
+          <CardDescription>Esses programas estarão disponíveis ao cadastrar contas e realizar vendas.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {airlines.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Nenhuma companhia cadastrada. Use “Nova companhia” para criar.
+            </p>
+          ) : (
+            airlines.map((airline) => {
+              const rule = rules[airline.id];
+              return (
+                <div key={airline.id} className="flex items-center justify-between border rounded-md px-3 py-2">
+                  <div className="space-y-0.5">
+                    <div className="font-medium">
+                      {airline.name} ({airline.code})
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Limite por CPF: <b>{rule?.cpf_limit ?? 25}</b> — Período:{" "}
+                      <b>{(rule?.renewal_type ?? "annual") === "rolling" ? "em 1 ano após uso" : "por ano (01/jan)"}</b>
+                    </div>
+                  </div>
+                  <div className="flex gap-3 items-center">
                     <Input
-                      id={`cpf-limit-${airline.id}`}
+                      className="w-24"
                       type="number"
                       min={1}
                       max={1000}
                       value={rule?.cpf_limit ?? 25}
-                      onChange={(e) =>
-                        updateRule(airline.id, "cpf_limit", e.target.value)
-                      }
+                      onChange={(e) => updateRule(airline.id, "cpf_limit", e.target.value)}
                     />
-                    <p className="text-xs text-muted-foreground">
-                      Quantidade máxima de CPFs diferentes por conta.
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor={`renewal-type-${airline.id}`}>Tipo de Renovação</Label>
                     <Select
                       value={rule?.renewal_type ?? "annual"}
-                      onValueChange={(v: RenewalType) =>
-                        updateRule(airline.id, "renewal_type", v)
-                      }
+                      onValueChange={(v: RenewalType) => updateRule(airline.id, "renewal_type", v)}
                     >
-                      <SelectTrigger id={`renewal-type-${airline.id}`}>
-                        <SelectValue />
-                      </SelectTrigger>
+                      <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="annual">
-                          Anual (vira em data fixa, ex.: 01/01)
-                        </SelectItem>
-                        <SelectItem value="rolling">
-                          Rotativo (12 meses após cada uso)
-                        </SelectItem>
+                        <SelectItem value="annual">por ano (01/jan)</SelectItem>
+                        <SelectItem value="rolling">em 1 ano após uso</SelectItem>
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground">
-                      {rule?.renewal_type === "rolling"
-                        ? "Cada CPF renova 12 meses após o uso."
-                        : "Todos os CPFs renovam juntos na data definida (ex.: 01/01)."}
-                    </p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+              );
+            })
+          )}
+        </CardContent>
+      </Card>
 
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={() => navigate("/dashboard")}>
           Cancelar
         </Button>
-        <Button onClick={handleSave} disabled={saving || diffToSave.length === 0}>
+        <Button onClick={handleSaveAll} disabled={saving || diffToSave.length === 0}>
           <Save className="h-4 w-4 mr-2" />
           {saving ? "Salvando..." : diffToSave.length === 0 ? "Nada a salvar" : "Salvar Alterações"}
         </Button>
