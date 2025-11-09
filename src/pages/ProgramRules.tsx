@@ -45,7 +45,7 @@ export default function ProgramRules() {
   const [rules, setRules] = useState<Record<string, AirlineRule>>({});
   const [originalRules, setOriginalRules] = useState<Record<string, AirlineRule>>({});
 
-  // estado do formulário de inclusão de regra
+  // formulário “Adicionar Programa”
   const [airlineId, setAirlineId] = useState("");
   const [cpfLimitInput, setCpfLimitInput] = useState("25");
   const [period, setPeriod] = useState<RenewalType>("annual");
@@ -68,7 +68,6 @@ export default function ProgramRules() {
       const list = (data ?? []) as Airline[];
       setAirlines(list);
 
-      // carrega regras atuais (estes defaults ficam na própria tabela da cia)
       const initial: Record<string, AirlineRule> = {};
       list.forEach((airline) => {
         initial[airline.id] = {
@@ -104,9 +103,7 @@ export default function ProgramRules() {
     [airlines]
   );
 
-  // —————————————————————————————————————
-  // CRIAR COMPANHIA (usado pelo combobox e pelo botão "Nova companhia")
-  // —————————————————————————————————————
+  // ——— criar companhia (usado pelo combobox e pelo botão) ———
   const createAirline = async (name: string, code: string) => {
     const { data, error } = await supabase
       .from("airline_companies")
@@ -114,15 +111,13 @@ export default function ProgramRules() {
       .select("id, name, code")
       .single();
     if (error) throw error;
-    const created = data as Airline;
 
-    // atualiza lista local
+    const created = data as Airline;
     setAirlines((prev) => {
       const next = [...prev, created].sort((a, b) => a.name.localeCompare(b.name));
       return next;
     });
 
-    // cria regra default para edição imediata
     setRules((prev) => ({
       ...prev,
       [created.id]: {
@@ -140,9 +135,8 @@ export default function ProgramRules() {
     return created;
   };
 
-  // usado pelo combobox quando o termo digitado não existe
+  // usado pelo combobox quando não encontra resultados
   const handleComboboxCreate = async (typed: string) => {
-    // permite "Nome (COD)" ou pergunta o código
     const match = typed.match(/^(.+?)\s*\((\w{1,4})\)\s*$/i);
     let name = typed.trim();
     let code = "";
@@ -151,14 +145,15 @@ export default function ProgramRules() {
       name = match[1].trim();
       code = match[2].toUpperCase();
     } else {
-      const promptCode = window.prompt(`Informe o código (ex.: LA para LATAM) para "${typed}":`);
+      const promptCode = window.prompt(
+        `Informe o código (ex.: LA para LATAM) para "${typed}":`
+      );
       if (!promptCode) return null;
       code = promptCode.toUpperCase().trim();
     }
 
     try {
       const created = await createAirline(name, code);
-      // seleciona no formulário de regra
       setAirlineId(created.id);
       return { id: created.id, label: `${created.name} (${created.code})` };
     } catch (err: any) {
@@ -166,7 +161,7 @@ export default function ProgramRules() {
         title: "Erro ao criar companhia",
         description:
           err?.message?.includes("permission") || err?.code === "42501"
-            ? "Sem permissão para inserir em airline_companies (RLS)."
+            ? "Sem permissão (RLS) para inserir em airline_companies."
             : err?.message ?? "Tente novamente.",
         variant: "destructive",
       });
@@ -174,7 +169,7 @@ export default function ProgramRules() {
     }
   };
 
-  // botão lateral “Nova companhia” (caso o botão do combobox não apareça)
+  // botão auxiliar “Nova companhia”
   const handleCreateAirlineViaPrompt = async () => {
     const name = window.prompt("Nome da companhia (ex.: LATAM):");
     if (!name) return;
@@ -188,16 +183,14 @@ export default function ProgramRules() {
         title: "Erro ao criar companhia",
         description:
           err?.message?.includes("permission") || err?.code === "42501"
-            ? "Sem permissão para inserir em airline_companies (RLS)."
+            ? "Sem permissão (RLS) para inserir em airline_companies."
             : err?.message ?? "Tente novamente.",
         variant: "destructive",
       });
     }
   };
 
-  // —————————————————————————————————————
-  // SALVAR REGRA (atualiza na tabela airline_companies)
-  // —————————————————————————————————————
+  // ——— salvar regra para UMA companhia (topo) ———
   const addOrUpdateRule = async () => {
     if (!airlineId) {
       toast({ title: "Selecione uma companhia", variant: "destructive" });
@@ -213,7 +206,6 @@ export default function ProgramRules() {
 
       if (error) throw error;
 
-      // reflete no estado
       setRules((prev) => ({
         ...prev,
         [airlineId]: {
@@ -224,25 +216,22 @@ export default function ProgramRules() {
       }));
 
       toast({ title: "Regra salva", description: "Configuração aplicada à companhia." });
-      // limpa seleção
       setAirlineId("");
       setCpfLimitInput("25");
       setPeriod("annual");
     } catch (err: any) {
       toast({
         title: "Erro ao salvar regra",
-        description: err?.message ?? "Verifique sua conexão/RLS e tente novamente.",
+        description: err?.message ?? "Verifique conexão/RLS e tente novamente.",
         variant: "destructive",
       });
     }
   };
 
-  // —————————————————————————————————————
-  // EDITAR REGRAS EM MASSA (parte inferior)
-  // —————————————————————————————————————
-  const updateRule = (airlineId: string, field: keyof AirlineRule, value: any) => {
+  // ——— edição em massa (lista) ———
+  const updateRule = (id: string, field: keyof AirlineRule, value: any) => {
     setRules((prev) => {
-      const curr = prev[airlineId];
+      const curr = prev[id];
       if (!curr) return prev;
       const next: AirlineRule = {
         ...curr,
@@ -251,7 +240,7 @@ export default function ProgramRules() {
             ? normalizeLimit(Number(value))
             : (value as RenewalType),
       };
-      return { ...prev, [airlineId]: next };
+      return { ...prev, [id]: next };
     });
   };
 
@@ -286,7 +275,7 @@ export default function ProgramRules() {
     } catch (err: any) {
       toast({
         title: "Erro ao salvar regras",
-        description: err?.message ?? "Verifique sua conexão/RLS e tente novamente.",
+        description: err?.message ?? "Verifique conexão/RLS e tente novamente.",
         variant: "destructive",
       });
     } finally {
@@ -328,7 +317,7 @@ export default function ProgramRules() {
         </AlertDescription>
       </Alert>
 
-      {/* ——— Adicionar/Atualizar regra para UMA companhia ——— */}
+      {/* Topo: adicionar/atualizar regra de UMA companhia */}
       <Card>
         <CardHeader>
           <CardTitle>Adicionar Programa</CardTitle>
@@ -343,7 +332,7 @@ export default function ProgramRules() {
                     options={options}
                     value={airlineId}
                     onChange={setAirlineId}
-                    onCreate={handleComboboxCreate}   // << criação pelo combobox
+                    onCreate={handleComboboxCreate}  // ← habilita “Adicionar “{query}””
                     placeholder="Programa/Cia"
                   />
                 </div>
@@ -370,7 +359,6 @@ export default function ProgramRules() {
                 <SelectItem value="rolling">em 1 ano após uso</SelectItem>
               </SelectContent>
             </Select>
-
           </div>
 
           <Button onClick={addOrUpdateRule} disabled={!airlineId}>
@@ -379,7 +367,7 @@ export default function ProgramRules() {
         </CardContent>
       </Card>
 
-      {/* ——— Lista para edição em massa ——— */}
+      {/* Lista e edição em massa */}
       <Card>
         <CardHeader>
           <CardTitle>Programas Ativos</CardTitle>
