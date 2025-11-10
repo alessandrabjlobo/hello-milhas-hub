@@ -1,71 +1,45 @@
-// Regras guardadas em localStorage por (scope -> airlineId)
-// scope = supplierId atual (quando houver) ou "global".
-// Estrutura no localStorage:
-// { [scope: string]: { [airlineId: string]: { cpf_limit: number, period: "mes" | "dia" } } }
+import { useEffect, useState, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { getSupplierId } from "@/lib/getSupplierId";
 
-import { useEffect, useState } from "react";
+type Rule = {
+  airline_id: string;
+  cpf_limit: number;
+  renewal_type: "annual" | "rolling";
+};
 
-export type Rule = { cpf_limit: number; period: "mes" | "dia" };
-type RulesBlob = Record<string, Record<string, Rule>>;
+export function useProgramRules(selectedAirlineId?: string) {
+  const [rules, setRules] = useState<Rule | null>(null);
+  const [loading, setLoading] = useState(false);
 
-const LS_KEY = "hmh:program_rules";
+  const load = useCallback(async () => {
+    if (!selectedAirlineId) return;
+    setLoading(true);
+    try {
+      const { supplierId } = await getSupplierId();
+      const { data, error } = await supabase
+        .from("program_rules")
+        .select("airline_id, cpf_limit, renewal_type")
+        .eq("supplier_id", supplierId)
+        .eq("airline_id", selectedAirlineId)
+        .maybeSingle();
 
-function readFromLS(): RulesBlob {
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
-function writeToLS(v: RulesBlob) {
-  localStorage.setItem(LS_KEY, JSON.stringify(v));
-}
+      if (error && (error as any).code !== "PGRST116") throw error; // not found
+      setRules(
+        data 
+          ? {
+              airline_id: data.airline_id,
+              cpf_limit: data.cpf_limit,
+              renewal_type: data.renewal_type as "annual" | "rolling"
+            }
+          : { airline_id: selectedAirlineId, cpf_limit: 25, renewal_type: "annual" }
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedAirlineId]);
 
-export function useProgramRules(scope: string) {
-  const [blob, setBlob] = useState<RulesBlob>(() => readFromLS());
+  useEffect(() => { load(); }, [load]);
 
-  // sincroniza entre abas
-  useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === LS_KEY) setBlob(readFromLS());
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, []);
-
-  const getRule = (airlineId: string): Rule | null => {
-    const bucket = blob[scope] || {};
-    return bucket[airlineId] || null;
-  };
-
-  const setRule = (airlineId: string, rule: Rule) => {
-    setBlob(prev => {
-      const next = { ...prev };
-      const bucket = { ...(next[scope] || {}) };
-      bucket[airlineId] = rule;
-      next[scope] = bucket;
-      writeToLS(next);
-      return next;
-    });
-  };
-
-  const deleteRule = (airlineId: string) => {
-    setBlob(prev => {
-      const next = { ...prev };
-      const bucket = { ...(next[scope] || {}) };
-      delete bucket[airlineId];
-      next[scope] = bucket;
-      writeToLS(next);
-      return next;
-    });
-  };
-
-  // lista amigável pra UI
-  const list = Object.entries(blob[scope] || {}).map(([airlineId, rule]) => ({
-    airlineId,
-    ...rule,
-  }));
-
-  return { getRule, setRule, deleteRule, list };
+  return { rules, setRules, load, loading };
 }

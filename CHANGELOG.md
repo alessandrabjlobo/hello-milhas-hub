@@ -1,6 +1,57 @@
 # Changelog - Product Flow Simplification
 
-## [Latest Update] - 2025-01-10 (Integration Audit)
+## [Latest Update] - 2025-01-10 (Supabase-Backed Program Rules)
+
+### Summary ✅
+Replaced localStorage-based program rules with Supabase persistence, scoped by supplier_id with proper RLS policies.
+
+#### Database Changes
+- **New table**: `program_rules` with unique constraint on (supplier_id, airline_id)
+- **RLS policies**: SELECT, INSERT, UPDATE, DELETE scoped by user's supplier_id
+- **Upsert support**: Conflict resolution on (supplier_id, airline_id)
+
+#### New Files Created
+- `src/lib/getSupplierId.ts`: Utility to fetch user's supplier_id and user_id
+- `src/actions/saveProgramRule.ts`: Upsert action for program rules
+- `src/hooks/useProgramRules.ts`: Replaced localStorage version with Supabase queries
+
+#### Files Refactored
+- `src/pages/ProgramRules.tsx`: Complete rewrite
+  - Removed all localStorage/offline fallback logic
+  - All operations now use Supabase with proper error handling
+  - Simplified to pure online mode
+  - Quick-add form and bulk edit list both persist to database
+
+#### Migration Details
+```sql
+-- program_rules table with RLS
+create table program_rules (
+  id uuid primary key default gen_random_uuid(),
+  supplier_id uuid not null,
+  airline_id uuid not null,
+  cpf_limit int not null default 25,
+  renewal_type text not null check (renewal_type in ('annual','rolling')),
+  updated_by uuid not null,
+  updated_at timestamptz not null default now(),
+  unique (supplier_id, airline_id)
+);
+```
+
+#### Acceptance Criteria Met ✅
+- ✅ Rules persist to Supabase with supplier_id scope
+- ✅ Upsert with (supplier_id, airline_id) conflict target
+- ✅ No localStorage writes (removed offline mode)
+- ✅ Data survives page reload and navigation
+- ✅ No 403 errors with proper RLS policies
+- ✅ All network calls use supabase-js (no REST fetch)
+
+#### Security Linter Note ⚠️
+Pre-existing warning (unrelated to this migration):
+- WARN: Leaked password protection disabled (auth config, not program_rules)
+
+---
+
+## [Previous Update] - 2025-01-10 (Integration Audit)
 
 ### Status Report ✅
 All integration requirements verified and documented:

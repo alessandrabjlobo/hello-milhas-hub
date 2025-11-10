@@ -407,6 +407,36 @@ export type Database = {
           },
         ]
       }
+      program_rules: {
+        Row: {
+          airline_id: string
+          cpf_limit: number
+          id: string
+          renewal_type: string
+          supplier_id: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          airline_id: string
+          cpf_limit?: number
+          id?: string
+          renewal_type: string
+          supplier_id: string
+          updated_at?: string
+          updated_by: string
+        }
+        Update: {
+          airline_id?: string
+          cpf_limit?: number
+          id?: string
+          renewal_type?: string
+          supplier_id?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: []
+      }
       quotes: {
         Row: {
           boarding_fee: number | null
