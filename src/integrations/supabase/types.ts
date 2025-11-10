@@ -72,7 +72,7 @@ export type Database = {
           name: string
           renewal_config: Json | null
           renewal_type: Database["public"]["Enums"]["renewal_type"]
-          supplier_id: string | null
+          supplier_id: string
           updated_at: string
           user_id: string
         }
@@ -85,7 +85,7 @@ export type Database = {
           name: string
           renewal_config?: Json | null
           renewal_type?: Database["public"]["Enums"]["renewal_type"]
-          supplier_id?: string | null
+          supplier_id: string
           updated_at?: string
           user_id: string
         }
@@ -98,7 +98,7 @@ export type Database = {
           name?: string
           renewal_config?: Json | null
           renewal_type?: Database["public"]["Enums"]["renewal_type"]
-          supplier_id?: string | null
+          supplier_id?: string
           updated_at?: string
           user_id?: string
         }
@@ -386,7 +386,7 @@ export type Database = {
           email: string | null
           full_name: string | null
           id: string
-          supplier_id: string | null
+          supplier_id: string
           updated_at: string
         }
         Insert: {
@@ -395,7 +395,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id: string
-          supplier_id?: string | null
+          supplier_id: string
           updated_at?: string
         }
         Update: {
@@ -404,7 +404,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
-          supplier_id?: string | null
+          supplier_id?: string
           updated_at?: string
         }
         Relationships: [
