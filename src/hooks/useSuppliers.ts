@@ -66,9 +66,10 @@ export const useSuppliers = () => {
       await fetchSuppliers();
       return true;
     } catch (error: any) {
+      console.error('Erro completo ao criar fornecedor:', error);
       toast({
         title: "Erro ao criar fornecedor",
-        description: error.message,
+        description: `${error.message}${error.code ? ' (' + error.code + ')' : ''}${error.details ? ' - ' + error.details : ''}${error.hint ? ' Dica: ' + error.hint : ''}`,
         variant: "destructive",
       });
       return false;
@@ -95,9 +96,10 @@ export const useSuppliers = () => {
       await fetchSuppliers();
       return true;
     } catch (error: any) {
+      console.error('Erro completo ao atualizar fornecedor:', error);
       toast({
         title: "Erro ao atualizar fornecedor",
-        description: error.message,
+        description: `${error.message}${error.code ? ' (' + error.code + ')' : ''}${error.details ? ' - ' + error.details : ''}${error.hint ? ' Dica: ' + error.hint : ''}`,
         variant: "destructive",
       });
       return false;
@@ -121,9 +123,10 @@ export const useSuppliers = () => {
       await fetchSuppliers();
       return true;
     } catch (error: any) {
+      console.error('Erro completo ao deletar fornecedor:', error);
       toast({
-        title: "Erro ao remover fornecedor",
-        description: error.message,
+        title: "Erro ao deletar fornecedor",
+        description: `${error.message}${error.code ? ' (' + error.code + ')' : ''}${error.details ? ' - ' + error.details : ''}${error.hint ? ' Dica: ' + error.hint : ''}`,
         variant: "destructive",
       });
       return false;
