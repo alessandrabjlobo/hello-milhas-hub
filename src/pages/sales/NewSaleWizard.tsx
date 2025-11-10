@@ -260,7 +260,7 @@ export default function NewSaleWizard() {
       interestRate = result.interestRate;
     }
 
-    // FASE 1: Buscar CPF disponível para vincular à venda
+    // FASE 1: Buscar CPF disponível para vincular à venda usando a view com status computado
     let cpfUsedId = null;
     if (saleSource === "internal_account" && accountId && passengerCpfs.length > 0) {
       // Primeiro buscar a airline_company_id da conta
@@ -272,10 +272,10 @@ export default function NewSaleWizard() {
       
       if (accountData) {
         const { data: availableCPF } = await supabase
-          .from('cpf_registry')
+          .from('cpf_registry_with_status')
           .select('id')
           .eq('airline_company_id', accountData.airline_company_id)
-          .eq('status', 'available')
+          .eq('computed_status', 'available')
           .order('usage_count', { ascending: true })
           .limit(1)
           .maybeSingle();

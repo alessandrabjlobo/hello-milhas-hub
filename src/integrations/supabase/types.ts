@@ -211,6 +211,7 @@ export type Database = {
           blocked_until: string | null
           cpf_encrypted: string
           created_at: string
+          first_use_date: string | null
           full_name: string
           id: string
           last_used_at: string | null
@@ -224,6 +225,7 @@ export type Database = {
           blocked_until?: string | null
           cpf_encrypted: string
           created_at?: string
+          first_use_date?: string | null
           full_name: string
           id?: string
           last_used_at?: string | null
@@ -237,6 +239,7 @@ export type Database = {
           blocked_until?: string | null
           cpf_encrypted?: string
           created_at?: string
+          first_use_date?: string | null
           full_name?: string
           id?: string
           last_used_at?: string | null
@@ -878,6 +881,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "sales_cpf_used_id_fkey"
+            columns: ["cpf_used_id"]
+            isOneToOne: false
+            referencedRelation: "cpf_registry_with_status"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "sales_mileage_account_id_fkey"
             columns: ["mileage_account_id"]
             isOneToOne: false
@@ -1191,7 +1201,72 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      cpf_registry_with_status: {
+        Row: {
+          airline_company_id: string | null
+          blocked_until: string | null
+          computed_status: Database["public"]["Enums"]["cpf_status"] | null
+          cpf_encrypted: string | null
+          created_at: string | null
+          first_use_date: string | null
+          full_name: string | null
+          id: string | null
+          last_used_at: string | null
+          renewal_near: boolean | null
+          status: Database["public"]["Enums"]["cpf_status"] | null
+          updated_at: string | null
+          usage_count: number | null
+          user_id: string | null
+        }
+        Insert: {
+          airline_company_id?: string | null
+          blocked_until?: string | null
+          computed_status?: never
+          cpf_encrypted?: string | null
+          created_at?: string | null
+          first_use_date?: string | null
+          full_name?: string | null
+          id?: string | null
+          last_used_at?: string | null
+          renewal_near?: never
+          status?: Database["public"]["Enums"]["cpf_status"] | null
+          updated_at?: string | null
+          usage_count?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          airline_company_id?: string | null
+          blocked_until?: string | null
+          computed_status?: never
+          cpf_encrypted?: string | null
+          created_at?: string | null
+          first_use_date?: string | null
+          full_name?: string | null
+          id?: string | null
+          last_used_at?: string | null
+          renewal_near?: never
+          status?: Database["public"]["Enums"]["cpf_status"] | null
+          updated_at?: string | null
+          usage_count?: number | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cpf_registry_airline_company_id_fkey"
+            columns: ["airline_company_id"]
+            isOneToOne: false
+            referencedRelation: "airline_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cpf_registry_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       decrypt_cpf: { Args: { cpf_encrypted: string }; Returns: string }

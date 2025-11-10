@@ -24,6 +24,14 @@ interface CPFRegistryEntry {
   status: string;
   blocked_until: string | null;
   created_at: string;
+  computed_status?: string;
+  renewal_near?: boolean;
+  first_use_date?: string | null;
+}
+
+interface ProgramRule {
+  cpf_limit: number;
+  renewal_type: string;
 }
 
 interface CPFsUsedTableProps {
@@ -35,6 +43,7 @@ export function CPFsUsedTable({ accountId, cpfLimit }: CPFsUsedTableProps) {
   const [cpfs, setCpfs] = useState<CPFRegistryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [airlineCompanyId, setAirlineCompanyId] = useState<string>("");
+  const [programRule, setProgramRule] = useState<ProgramRule | null>(null);
 
   useEffect(() => {
     fetchAccountAndCPFs();
@@ -44,19 +53,29 @@ export function CPFsUsedTable({ accountId, cpfLimit }: CPFsUsedTableProps) {
     try {
       setLoading(true);
       
-      // Buscar airline_company_id da conta
+      // Buscar airline_company_id e supplier_id da conta
       const { data: accountData } = await supabase
         .from("mileage_accounts")
-        .select("airline_company_id")
+        .select("airline_company_id, supplier_id")
         .eq("id", accountId)
         .single();
       
       if (accountData) {
         setAirlineCompanyId(accountData.airline_company_id);
         
-        // Buscar CPFs usando airline_company_id
+        // Buscar regra do programa para esta companhia aérea
+        const { data: ruleData } = await supabase
+          .from("program_rules")
+          .select("cpf_limit, renewal_type")
+          .eq("airline_id", accountData.airline_company_id)
+          .eq("supplier_id", accountData.supplier_id)
+          .maybeSingle();
+        
+        setProgramRule(ruleData || { cpf_limit: cpfLimit, renewal_type: "annual" });
+        
+        // Buscar CPFs usando a view com status computado
         const { data, error } = await supabase
-          .from("cpf_registry")
+          .from("cpf_registry_with_status")
           .select("*")
           .eq("airline_company_id", accountData.airline_company_id)
           .order("usage_count", { ascending: false });
@@ -112,8 +131,15 @@ export function CPFsUsedTable({ accountId, cpfLimit }: CPFsUsedTableProps) {
     <Card>
       <CardContent className="p-6">
         <div className="mb-4 flex items-center justify-between">
-          <div className="text-sm text-muted-foreground">
-            {cpfs.length} CPF(s) cadastrado(s) - Limite: {cpfLimit} usos por CPF/ano
+          <div className="space-y-1">
+            <div className="text-sm text-muted-foreground">
+              {cpfs.length} CPF(s) cadastrado(s) - Limite: {programRule?.cpf_limit || cpfLimit} usos por CPF
+            </div>
+            <div className="text-xs text-muted-foreground flex items-center gap-2">
+              <Badge variant="outline" className="text-xs">
+                {programRule?.renewal_type === "rolling" ? "Renovação Contínua (1 ano do 1º uso)" : "Renovação Anual (1º Janeiro)"}
+              </Badge>
+            </div>
           </div>
           {airlineCompanyId && (
             <AddCPFDialog
@@ -132,46 +158,58 @@ export function CPFsUsedTable({ accountId, cpfLimit }: CPFsUsedTableProps) {
                 <TableHead className="text-center">Usos</TableHead>
                 <TableHead className="text-center">Último Uso</TableHead>
                 <TableHead className="text-center">Status</TableHead>
-                <TableHead className="text-center">Zerado?</TableHead>
+                <TableHead className="text-center">Disponível Em</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {cpfs.map((cpf) => (
-                <TableRow key={cpf.id}>
-                  <TableCell className="font-medium">{cpf.full_name}</TableCell>
-                  <TableCell className="font-mono text-sm">
-                    {maskCPF(cpf.cpf_encrypted)}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Badge
-                      variant={
-                        cpf.usage_count >= cpfLimit ? "destructive" : "default"
-                      }
-                    >
-                      {cpf.usage_count} / {cpfLimit}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-center text-sm">
-                    {formatDate(cpf.last_used_at)}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Badge
-                      variant={cpf.status === "available" ? "default" : "secondary"}
-                    >
-                      {cpf.status === "available" ? "Disponível" : "Bloqueado"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-center text-sm">
-                    {cpf.usage_count >= cpfLimit && cpf.blocked_until ? (
-                      <Badge variant="outline">
-                        Até {formatDate(cpf.blocked_until)}
+              {cpfs.map((cpf) => {
+                const effectiveLimit = programRule?.cpf_limit || cpfLimit;
+                const isBlocked = (cpf.computed_status || cpf.status) === "blocked";
+                
+                return (
+                  <TableRow key={cpf.id}>
+                    <TableCell className="font-medium">{cpf.full_name}</TableCell>
+                    <TableCell className="font-mono text-sm">
+                      {maskCPF(cpf.cpf_encrypted)}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge
+                        variant={
+                          cpf.usage_count >= effectiveLimit ? "destructive" : "default"
+                        }
+                      >
+                        {cpf.usage_count} / {effectiveLimit}
                       </Badge>
-                    ) : (
-                      "-"
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
+                    </TableCell>
+                    <TableCell className="text-center text-sm">
+                      {formatDate(cpf.last_used_at)}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge
+                        variant={!isBlocked ? "default" : "secondary"}
+                      >
+                        {!isBlocked ? "Disponível" : "Bloqueado"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-center text-sm">
+                      {cpf.blocked_until ? (
+                        <div className="flex items-center justify-center gap-1">
+                          <Badge variant={cpf.renewal_near ? "default" : "outline"}>
+                            {formatDate(cpf.blocked_until)}
+                          </Badge>
+                          {cpf.renewal_near && (
+                            <Badge variant="secondary" className="text-xs">
+                              Em breve
+                            </Badge>
+                          )}
+                        </div>
+                      ) : (
+                        "-"
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>

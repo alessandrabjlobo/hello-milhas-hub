@@ -16,6 +16,7 @@ import { AuditLogsTable } from "@/components/audit/AuditLogsTable";
 import { AccountSalesTable } from "@/components/accounts/AccountSalesTable";
 import { EditAccountDialog } from "@/components/accounts/EditAccountDialog";
 import { CPFsUsedTable } from "@/components/accounts/CPFsUsedTable";
+import { CPFRenewalCalendar } from "@/components/accounts/CPFRenewalCalendar";
 import { exportToCSV } from "@/lib/csv-export";
 
 interface AccountDetails {
@@ -27,6 +28,7 @@ interface AccountDetails {
   cpf_limit: number;
   cpf_count: number;
   account_holder_name: string | null;
+  airline_company_id: string;
   airline_companies: {
     name: string;
     code: string;
@@ -59,6 +61,7 @@ export default function AccountDetail() {
         .from("mileage_accounts")
         .select(`
           *,
+          airline_company_id,
           airline_companies(name, code),
           suppliers(name)
         `)
@@ -242,6 +245,11 @@ export default function AccountDetail() {
         <TabsContent value="cpfs" className="space-y-4">
           <h3 className="text-lg font-semibold">CPFs Cadastrados Nesta Conta</h3>
           <CPFsUsedTable accountId={id!} cpfLimit={account.cpf_limit} />
+          
+          <div className="mt-6">
+            <h3 className="text-lg font-semibold mb-4">Calendário de Renovações</h3>
+            <CPFRenewalCalendar airlineCompanyId={account.airline_company_id} />
+          </div>
         </TabsContent>
       </Tabs>
 
