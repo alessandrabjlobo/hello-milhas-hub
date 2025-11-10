@@ -20,11 +20,10 @@ import {
 import { Eye, EyeOff, Plus, Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useUserRole } from "@/hooks/useUserRole";
-import { useAgencyPrograms } from "@/hooks/useAgencyPrograms";
 import { useNavigate } from "react-router-dom";
 import { getSupplierId } from "@/lib/getSupplierId";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useSupplierProgramRules } from "@/hooks/useSupplierProgramRules";
 
 type AirlineCompany = { id: string; name: string; code: string };
 type Supplier = { id: string; name: string };
@@ -39,8 +38,7 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
 
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
 
-  const { supplierId, loading } = useUserRole();
-  const { programs, loading: programsLoading } = useAgencyPrograms(supplierId);
+  const { programs, loading: programsLoading, supplierId } = useSupplierProgramRules();
   const [showPassword, setShowPassword] = useState(false);
 
   const { toast } = useToast();
@@ -100,7 +98,7 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
 
   // Apply default rules when airline is selected
   const handlePickAirline = (airlineId: string) => {
-    const programSetting = programs.find(p => p.airline_company_id === airlineId);
+    const programSetting = programs.find(p => p.airline_id === airlineId);
     setFormData((f) => ({
       ...f,
       airline_company_id: airlineId,
@@ -220,7 +218,7 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
           </DialogDescription>
         </DialogHeader>
 
-        {loading ? (
+        {programsLoading ? (
           <div className="py-8 text-center">
             <p className="text-muted-foreground">Carregando informações...</p>
           </div>
@@ -230,7 +228,7 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
               Sua conta não está configurada corretamente. Por favor, faça logout e login novamente.
             </AlertDescription>
           </Alert>
-        ) : programs.length === 0 && !programsLoading ? (
+        ) : programs.length === 0 ? (
           <div className="py-8 text-center space-y-4">
             <p className="text-muted-foreground">
               Nenhum programa configurado. Configure os programas que sua agência trabalha primeiro.
@@ -278,7 +276,7 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
                 </SelectTrigger>
                 <SelectContent position="popper" className="max-h-60">
                   {programs.map((prog) => (
-                    <SelectItem key={prog.id} value={prog.airline_company_id}>
+                    <SelectItem key={prog.airline_id} value={prog.airline_id}>
                       {prog.airline_companies?.name} ({prog.airline_companies?.code})
                     </SelectItem>
                   ))}
@@ -421,9 +419,8 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
               type="submit"
               className="flex-1"
               disabled={
-                loading ||
-                !supplierId ||
                 programsLoading ||
+                !supplierId ||
                 programs.length === 0 ||
                 !formData.airline_company_id ||
                 !formData.account_number ||
