@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { PlusCircle, Ticket as TicketIcon, FileText, Calendar, MoreHorizontal, Edit, Trash2 } from "lucide-react";
+import { PlusCircle, Eye, Calendar, FileText, MoreHorizontal, Edit, Trash2, Ticket as TicketIcon } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +24,7 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { RegisterTicketDialog } from "@/components/tickets/RegisterTicketDialog";
 import { EditTicketDialog } from "@/components/tickets/EditTicketDialog";
 import { DeleteTicketDialog } from "@/components/tickets/DeleteTicketDialog";
+import { TicketDetailDialog } from "@/components/tickets/TicketDetailDialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -33,6 +34,7 @@ export default function Tickets() {
   const [registerDialogOpen, setRegisterDialogOpen] = useState(false);
   const [editingTicket, setEditingTicket] = useState<typeof tickets[0] | null>(null);
   const [deletingTicket, setDeletingTicket] = useState<typeof tickets[0] | null>(null);
+  const [detailTicket, setDetailTicket] = useState<typeof tickets[0] | null>(null);
   const { toast } = useToast();
 
   const getStatusBadge = (status: string) => {
@@ -208,6 +210,10 @@ export default function Tickets() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => setDetailTicket(ticket)}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            Ver Detalhes
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => setEditingTicket(ticket)}>
                             <Edit className="h-4 w-4 mr-2" />
                             Editar
@@ -247,6 +253,12 @@ export default function Tickets() {
         onOpenChange={(open) => !open && setDeletingTicket(null)}
         onConfirm={handleDeleteTicket}
         ticketInfo={deletingTicket?.passenger_name || ""}
+      />
+
+      <TicketDetailDialog
+        ticket={detailTicket}
+        open={!!detailTicket}
+        onOpenChange={(open) => !open && setDetailTicket(null)}
       />
     </div>
   );

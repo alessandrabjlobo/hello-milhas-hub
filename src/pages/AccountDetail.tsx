@@ -15,6 +15,7 @@ import { MovementsTable } from "@/components/movements/MovementsTable";
 import { AuditLogsTable } from "@/components/audit/AuditLogsTable";
 import { AccountSalesTable } from "@/components/accounts/AccountSalesTable";
 import { EditAccountDialog } from "@/components/accounts/EditAccountDialog";
+import { CPFsUsedTable } from "@/components/accounts/CPFsUsedTable";
 import { exportToCSV } from "@/lib/csv-export";
 
 interface AccountDetails {
@@ -177,10 +178,11 @@ export default function AccountDetail() {
       </div>
 
       <Tabs defaultValue="summary" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="summary">Resumo</TabsTrigger>
           <TabsTrigger value="movements">Movimentações</TabsTrigger>
           <TabsTrigger value="sales">Vendas</TabsTrigger>
+          <TabsTrigger value="cpfs">CPFs</TabsTrigger>
           <TabsTrigger value="history">Histórico</TabsTrigger>
         </TabsList>
 
@@ -234,6 +236,12 @@ export default function AccountDetail() {
         <TabsContent value="history" className="space-y-4">
           <h3 className="text-lg font-semibold">Histórico de Alterações</h3>
           <AuditLogsTable logs={auditLogs} loading={auditLoading} />
+        </TabsContent>
+
+        {/* FASE 2: Aba de CPFs Utilizados */}
+        <TabsContent value="cpfs" className="space-y-4">
+          <h3 className="text-lg font-semibold">CPFs Cadastrados Nesta Conta</h3>
+          <CPFsUsedTable accountId={id!} cpfLimit={account.cpf_limit} />
         </TabsContent>
       </Tabs>
 

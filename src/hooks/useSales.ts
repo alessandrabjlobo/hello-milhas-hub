@@ -121,12 +121,19 @@ export const useSales = () => {
         marginPercentage = priceTotal > 0 ? (marginValue / priceTotal) * 100 : 0;
       }
 
+      // FASE 1: Garantir route_text
+      const routeText = (saleData as any).flight_segments
+        ? (saleData as any).flight_segments.map((s: any) => `${s.from} → ${s.to}`).join(" / ")
+        : "N/A";
+
       const { data: newSale, error } = await supabase.from("sales").insert({
         ...saleData,
         user_id: userData.user.id,
         supplier_id: profile?.supplier_id,
         client_name: saleData.customer_name || "",
         client_cpf_encrypted: saleData.customer_cpf || "",
+        client_contact: saleData.customer_phone || "",
+        route_text: routeText,
         miles_used: milesUsed,
         cost_per_mile_snapshot: saleSource === 'internal_account' ? costPerMileSnapshot : null,
         counter_cost_per_thousand: saleSource === 'mileage_counter' ? Number((saleData as any).counter_cost_per_thousand) : null,

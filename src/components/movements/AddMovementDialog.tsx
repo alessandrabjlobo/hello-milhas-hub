@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import { Plus } from "lucide-react";
 import { useMovements } from "@/hooks/useMovements";
+import { supabase } from "@/integrations/supabase/client";
 
 interface AddMovementDialogProps {
   accountId: string;
@@ -32,10 +33,37 @@ export const AddMovementDialog = ({ accountId, onMovementAdded }: AddMovementDia
     type: "credit" as "credit" | "debit",
     amount: "",
     note: "",
+    cost: "", // FASE 3: Campo de custo
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // FASE 3: Atualizar custo médio se fornecido
+    if (formData.type === 'credit' && formData.cost) {
+      try {
+        const { data: account } = await supabase
+          .from('mileage_accounts')
+          .select('balance, cost_per_mile')
+          .eq('id', accountId)
+          .single();
+        
+        if (account) {
+          const currentTotalCost = account.balance * account.cost_per_mile;
+          const newMiles = parseInt(formData.amount);
+          const newCost = parseFloat(formData.cost);
+          const newBalance = account.balance + newMiles;
+          const newAvgCost = (currentTotalCost + newCost) / newBalance;
+          
+          await supabase
+            .from('mileage_accounts')
+            .update({ cost_per_mile: newAvgCost })
+            .eq('id', accountId);
+        }
+      } catch (error) {
+        console.error('Failed to update average cost:', error);
+      }
+    }
     
     const success = await createMovement({
       account_id: accountId,
@@ -45,7 +73,7 @@ export const AddMovementDialog = ({ accountId, onMovementAdded }: AddMovementDia
     });
 
     if (success) {
-      setFormData({ type: "credit", amount: "", note: "" });
+      setFormData({ type: "credit", amount: "", note: "", cost: "" });
       setOpen(false);
       onMovementAdded();
     }
@@ -94,6 +122,27 @@ export const AddMovementDialog = ({ accountId, onMovementAdded }: AddMovementDia
               placeholder="Ex: 10000"
             />
           </div>
+
+          {/* FASE 3: Campo de custo para crédito */}
+          {formData.type === "credit" && (
+            <div className="space-y-2">
+              <Label htmlFor="cost">Custo Total (R$)</Label>
+              <Input
+                id="cost"
+                type="number"
+                step="0.01"
+                min="0"
+                value={formData.cost}
+                onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
+                placeholder="Ex: 1450.00"
+              />
+              {formData.amount && formData.cost && (
+                <p className="text-xs text-muted-foreground">
+                  Custo por milha: R$ {(parseFloat(formData.cost) / parseInt(formData.amount)).toFixed(4)}
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="note">Observação (opcional)</Label>

@@ -163,6 +163,8 @@ export default function NewSaleWizard() {
         airline,
         status: 'pending' as const,
         ticket_code: `TKT${Date.now()}${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
+        pnr: pnr || null, // FASE 1: Adicionar PNR
+        issued_at: pnr ? new Date().toISOString() : null, // FASE 1: Marcar como emitido se tem PNR
       }));
       
       const { error } = await supabase
@@ -258,6 +260,21 @@ export default function NewSaleWizard() {
       interestRate = result.interestRate;
     }
 
+    // FASE 1: Buscar CPF disponível para vincular à venda
+    let cpfUsedId = null;
+    if (saleSource === "internal_account" && accountId && passengerCpfs.length > 0) {
+      const { data: availableCPF } = await supabase
+        .from('cpf_registry')
+        .select('id')
+        .eq('airline_company_id', accountId)
+        .eq('status', 'available')
+        .order('usage_count', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      
+      cpfUsedId = availableCPF?.id || null;
+    }
+
     const saleId = await createSale({
       sale_source: saleSource,
       counter_seller_name: saleSource === "mileage_counter" ? counterSellerName : undefined,
@@ -273,6 +290,7 @@ export default function NewSaleWizard() {
       passengers,
       notes,
       mileage_account_id: saleSource === "internal_account" ? accountId : undefined,
+      cpf_used_id: cpfUsedId, // FASE 1: Vincular CPF usado
       miles_needed: parseFloat(milesNeeded) || 0,
       boarding_fee: parseFloat(boardingFee) || 0,
       price_per_passenger: parseFloat(pricePerPassenger) || 0,
@@ -755,9 +773,73 @@ export default function NewSaleWizard() {
                         placeholder="Ex: 3000.00"
                       />
                     </div>
-                  )}
+                   )}
 
-                  {/* Payment Method */}
+                   {/* FASE 2: Card de Lucro em Tempo Real */}
+                   {priceTotal && milesNeeded && (saleSource === "internal_account" && accountId || saleSource === "mileage_counter" && counterCostPerThousand) && (
+                     <Card className="p-4 bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800">
+                       <div className="space-y-2">
+                         <h3 className="font-semibold text-green-900 dark:text-green-100 flex items-center gap-2">
+                           💰 Resumo Financeiro
+                         </h3>
+                         <div className="grid grid-cols-3 gap-4 text-sm">
+                           <div>
+                             <p className="text-muted-foreground">Custo</p>
+                             <p className="font-semibold">
+                               R$ {(() => {
+                                 const miles = parseFloat(milesNeeded) || 0;
+                                 if (saleSource === 'internal_account' && accountId) {
+                                   const account = filteredAccounts.find(a => a.id === accountId);
+                                   return (miles * (account?.cost_per_mile || 0.029)).toFixed(2);
+                                 } else if (saleSource === 'mileage_counter' && counterCostPerThousand) {
+                                   return ((miles / 1000) * parseFloat(counterCostPerThousand)).toFixed(2);
+                                 }
+                                 return '0.00';
+                               })()}
+                             </p>
+                           </div>
+                           <div>
+                             <p className="text-muted-foreground">Lucro</p>
+                             <p className="font-semibold text-green-600 dark:text-green-400">
+                               R$ {(() => {
+                                 const total = parseFloat(priceTotal) || 0;
+                                 const miles = parseFloat(milesNeeded) || 0;
+                                 let cost = 0;
+                                 if (saleSource === 'internal_account' && accountId) {
+                                   const account = filteredAccounts.find(a => a.id === accountId);
+                                   cost = miles * (account?.cost_per_mile || 0.029);
+                                 } else if (saleSource === 'mileage_counter' && counterCostPerThousand) {
+                                   cost = (miles / 1000) * parseFloat(counterCostPerThousand);
+                                 }
+                                 return (total - cost).toFixed(2);
+                               })()}
+                             </p>
+                           </div>
+                           <div>
+                             <p className="text-muted-foreground">Margem</p>
+                             <p className="font-semibold">
+                               {(() => {
+                                 const total = parseFloat(priceTotal) || 0;
+                                 const miles = parseFloat(milesNeeded) || 0;
+                                 let cost = 0;
+                                 if (saleSource === 'internal_account' && accountId) {
+                                   const account = filteredAccounts.find(a => a.id === accountId);
+                                   cost = miles * (account?.cost_per_mile || 0.029);
+                                 } else if (saleSource === 'mileage_counter' && counterCostPerThousand) {
+                                   cost = (miles / 1000) * parseFloat(counterCostPerThousand);
+                                 }
+                                 const profit = total - cost;
+                                 const margin = total > 0 ? (profit / total) * 100 : 0;
+                                 return `${margin.toFixed(1)}%`;
+                               })()}
+                             </p>
+                           </div>
+                         </div>
+                       </div>
+                     </Card>
+                   )}
+
+                   {/* Payment Method */}
                   <div>
                     <Label htmlFor="paymentMethod">Forma de Pagamento *</Label>
                     <Select value={paymentMethod} onValueChange={(v) => {

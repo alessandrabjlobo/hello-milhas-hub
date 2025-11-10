@@ -303,6 +303,56 @@ export type Database = {
           },
         ]
       }
+      customers: {
+        Row: {
+          cpf_encrypted: string
+          created_at: string | null
+          email: string | null
+          id: string
+          last_purchase_at: string | null
+          name: string
+          phone: string | null
+          supplier_id: string
+          total_purchases: number | null
+          total_spent: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          cpf_encrypted: string
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          last_purchase_at?: string | null
+          name: string
+          phone?: string | null
+          supplier_id: string
+          total_purchases?: number | null
+          total_spent?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          cpf_encrypted?: string
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          last_purchase_at?: string | null
+          name?: string
+          phone?: string | null
+          supplier_id?: string
+          total_purchases?: number | null
+          total_spent?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customers_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mileage_accounts: {
         Row: {
           account_holder_cpf: string | null
@@ -915,33 +965,42 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          last_purchase_at: string | null
           name: string
           notes: string | null
           payment_type: string
           phone: string
           pix_key: string | null
+          total_cost: number | null
+          total_purchases: number | null
           updated_at: string
           user_id: string
         }
         Insert: {
           created_at?: string
           id?: string
+          last_purchase_at?: string | null
           name: string
           notes?: string | null
           payment_type?: string
           phone: string
           pix_key?: string | null
+          total_cost?: number | null
+          total_purchases?: number | null
           updated_at?: string
           user_id: string
         }
         Update: {
           created_at?: string
           id?: string
+          last_purchase_at?: string | null
           name?: string
           notes?: string | null
           payment_type?: string
           phone?: string
           pix_key?: string | null
+          total_cost?: number | null
+          total_purchases?: number | null
           updated_at?: string
           user_id?: string
         }

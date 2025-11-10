@@ -27,6 +27,7 @@ import Billing from "./pages/Billing";
 import PaymentInterestSettings from "./pages/settings/PaymentInterestSettings";
 import PaymentSettings from "./pages/settings/PaymentSettings";
 import QuoteHistory from "./pages/QuoteHistory";
+import Customers from "./pages/Customers";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import NotFound from "./pages/NotFound";
@@ -67,6 +68,7 @@ const App = () => (
                       <Route path="/reports" element={<Reports />} />
                       <Route path="/calculator" element={<Calculator />} />
                       <Route path="/quotes" element={<QuoteHistory />} />
+                      <Route path="/customers" element={<Customers />} />
 
                       {/* Settings */}
                       <Route path="/settings/my-airlines" element={<MyAirlines />} />
