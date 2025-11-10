@@ -7,13 +7,14 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Save, Info, Plus } from "lucide-react";
+import { ArrowLeft, Save, Info, Plus, Lock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AirlineCombobox } from "@/components/airlines/AirlineCombobox";
 import { getSupplierId } from "@/lib/getSupplierId";
 import { saveProgramRule } from "@/actions/saveProgramRule";
+import { useUserRole } from "@/hooks/useUserRole";
 
 type RenewalType = "annual" | "rolling";
 
@@ -32,6 +33,7 @@ interface ProgramRule {
 export default function ProgramRules() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { isAdmin, loading: roleLoading } = useUserRole();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -340,7 +342,7 @@ export default function ProgramRules() {
     }
   };
 
-  if (loading) {
+  if (loading || roleLoading) {
     return (
       <div className="container max-w-4xl mx-auto p-6 space-y-6">
         <Skeleton className="h-12 w-full" />
@@ -374,10 +376,24 @@ export default function ProgramRules() {
         </AlertDescription>
       </Alert>
 
+      {!isAdmin && (
+        <Alert>
+          <Lock className="h-4 w-4" />
+          <AlertDescription>
+            Apenas administradores podem criar novas companhias aéreas. Entre em contato com um administrador se precisar adicionar programas.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Quick-add form */}
       <Card>
         <CardHeader>
           <CardTitle>Adicionar Programa</CardTitle>
+          {!isAdmin && (
+            <CardDescription className="text-muted-foreground">
+              Criação de companhias requer permissões de administrador
+            </CardDescription>
+          )}
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid md:grid-cols-3 gap-3 items-start">
@@ -388,17 +404,28 @@ export default function ProgramRules() {
                     options={options}
                     value={airlineId}
                     onChange={setAirlineId}
-                    onCreate={handleComboboxCreate}
+                    onCreate={isAdmin ? handleComboboxCreate : undefined}
                     placeholder="Programa/Companhia Aérea"
                   />
                 </div>
-                <Button variant="secondary" onClick={handleCreateAirlineViaPrompt} title="Nova companhia aérea">
+                <Button 
+                  variant="secondary" 
+                  onClick={handleCreateAirlineViaPrompt} 
+                  title={isAdmin ? "Nova companhia aérea" : "Requer permissão de administrador"}
+                  disabled={!isAdmin}
+                >
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Dica: digite "Nome (CÓDIGO)" e clique em Adicionar.
-              </p>
+              {isAdmin ? (
+                <p className="text-xs text-muted-foreground">
+                  Dica: digite "Nome (CÓDIGO)" e clique em Adicionar.
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Selecione uma companhia existente. Apenas admins podem criar novas.
+                </p>
+              )}
             </div>
 
             <Input
