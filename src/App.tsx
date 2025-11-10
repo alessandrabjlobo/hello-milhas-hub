@@ -19,6 +19,7 @@ import Accounts from "./pages/Accounts";
 import Suppliers from "./pages/Suppliers";
 import Tickets from "./pages/Tickets";
 import Reports from "./pages/Reports";
+import Calculator from "./pages/Calculator";
 import ProgramRules from "./pages/ProgramRules";
 import MyAirlines from "./pages/MyAirlines";
 import Billing from "./pages/Billing";
@@ -59,6 +60,7 @@ const App = () => (
                       <Route path="/suppliers" element={<Suppliers />} />
                       <Route path="/tickets" element={<Tickets />} />
                       <Route path="/reports" element={<Reports />} />
+                      <Route path="/calculator" element={<Calculator />} />
 
                       {/* Settings */}
                       <Route path="/settings/my-airlines" element={<MyAirlines />} />

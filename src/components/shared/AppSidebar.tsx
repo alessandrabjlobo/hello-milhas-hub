@@ -15,6 +15,7 @@ import {
   FileText,
   DollarSign,
   Shield,
+  Calculator,
 } from "lucide-react";
 import {
   Sidebar,
@@ -43,6 +44,10 @@ const operationsNavItems = [
   { title: "Passagens", url: "/tickets", icon: Ticket },
   { title: "Contas", url: "/accounts", icon: CreditCard },
   { title: "Fornecedores", url: "/suppliers", icon: Building2 },
+];
+
+const toolsNavItems = [
+  { title: "Calculadora", url: "/calculator", icon: Calculator },
 ];
 
 const reportsNavItems = [
@@ -160,6 +165,24 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {operationsNavItems.map((item) => (
+                <ItemLink
+                  key={item.url}
+                  to={item.url}
+                  icon={item.icon}
+                  title={item.title}
+                  collapsed={collapsed}
+                />
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Ferramentas */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Ferramentas</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {toolsNavItems.map((item) => (
                 <ItemLink
                   key={item.url}
                   to={item.url}

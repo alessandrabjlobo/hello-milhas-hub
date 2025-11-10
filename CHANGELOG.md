@@ -1,5 +1,36 @@
 # Changelog - Product Flow Simplification
 
+## [Latest Update] - 2025-01-10
+
+### Fixed ✅
+- **Duplicate identifier error**: Removed duplicate `const options` declaration in `ProgramRules.tsx` that caused "Identifier 'options' has already been declared" syntax error
+- **Navigation**: Added Calculator to sidebar under "Ferramentas" section
+- **Routing**: Calculator now accessible at `/calculator` with dedicated page
+
+### Added ✅
+- **Calculator page** (`src/pages/Calculator.tsx`): Standalone page with tabbed interface
+  - Tab 1: Profit Calculator
+  - Tab 2: Margin Analysis (live what-if scenarios)
+  - Tab 3: Quote Generator
+- **Program rules form hook** (`src/hooks/useProgramRulesForm.ts`): Extracted validation and submission logic
+- **Sidebar Tools section**: New "Ferramentas" group with Calculator link
+- **Setup documentation** (`README_SETUP.md`): Complete navigation structure and configuration guide
+
+### Changed ✅
+- **Sidebar structure**: Added Tools section between Operations and Reports
+- **App routing**: Registered `/calculator` route
+- **Error handling**: Enhanced 403/RLS error messages with retry suggestions
+
+### Verified ✅
+- ✅ No duplicate `const options` declarations (only one at line 234)
+- ✅ Calculator accessible via sidebar and direct URL
+- ✅ All routes working without 404 errors
+- ✅ RLS policies correct for `airline_companies`
+- ✅ Data persistence to Supabase working correctly
+- ✅ Offline mode fallback functional
+
+---
+
 ## Summary
 Complete overhaul of program management, account creation, and sales flow with enhanced UX, margin calculation, and buyer messaging.
 
