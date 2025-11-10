@@ -113,11 +113,12 @@ export const useSales = () => {
         totalCost = milesUsed * costPerMileSnapshot;
         marginValue = priceTotal - totalCost;
         marginPercentage = priceTotal > 0 ? (marginValue / priceTotal) * 100 : 0;
-      } else {
-        // For mileage counter, no cost from internal account
-        totalCost = 0;
-        marginValue = priceTotal;
-        marginPercentage = 100;
+      } else if (saleSource === 'mileage_counter') {
+        // For mileage counter, calculate cost based on supplier price
+        const counterCostPerThousand = Number((saleData as any).counter_cost_per_thousand) || 0;
+        totalCost = (milesUsed / 1000) * counterCostPerThousand;
+        marginValue = priceTotal - totalCost;
+        marginPercentage = priceTotal > 0 ? (marginValue / priceTotal) * 100 : 0;
       }
 
       const { error } = await supabase.from("sales").insert({
@@ -128,6 +129,7 @@ export const useSales = () => {
         client_cpf_encrypted: saleData.customer_cpf || "",
         miles_used: milesUsed,
         cost_per_mile_snapshot: saleSource === 'internal_account' ? costPerMileSnapshot : null,
+        counter_cost_per_thousand: saleSource === 'mileage_counter' ? Number((saleData as any).counter_cost_per_thousand) : null,
         total_cost: totalCost,
         sale_price: Number(saleData.price_total) || 0,
         final_price_with_interest: priceTotal,

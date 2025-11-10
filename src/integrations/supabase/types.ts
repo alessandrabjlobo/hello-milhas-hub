@@ -569,6 +569,7 @@ export type Database = {
           cost_per_mile: number | null
           cost_per_mile_snapshot: number | null
           counter_airline_program: string | null
+          counter_cost_per_thousand: number | null
           counter_seller_contact: string | null
           counter_seller_name: string | null
           cpf_used_id: string | null
@@ -614,6 +615,7 @@ export type Database = {
           cost_per_mile?: number | null
           cost_per_mile_snapshot?: number | null
           counter_airline_program?: string | null
+          counter_cost_per_thousand?: number | null
           counter_seller_contact?: string | null
           counter_seller_name?: string | null
           cpf_used_id?: string | null
@@ -659,6 +661,7 @@ export type Database = {
           cost_per_mile?: number | null
           cost_per_mile_snapshot?: number | null
           counter_airline_program?: string | null
+          counter_cost_per_thousand?: number | null
           counter_seller_contact?: string | null
           counter_seller_name?: string | null
           cpf_used_id?: string | null

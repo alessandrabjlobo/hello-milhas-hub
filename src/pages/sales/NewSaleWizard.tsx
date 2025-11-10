@@ -43,6 +43,7 @@ export default function NewSaleWizard() {
   const [counterSellerName, setCounterSellerName] = useState("");
   const [counterSellerContact, setCounterSellerContact] = useState("");
   const [counterAirlineProgram, setCounterAirlineProgram] = useState("");
+  const [counterCostPerThousand, setCounterCostPerThousand] = useState("");
 
   // Step 1 - Client & Flight
   const [customerName, setCustomerName] = useState("");
@@ -72,12 +73,9 @@ export default function NewSaleWizard() {
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [lastSaleData, setLastSaleData] = useState<any>(null);
 
-  // Filter accounts by linked airlines
-  const linkedAirlineIds = linkedAirlines.map((a) => a.id);
+  // Filter accounts - show all active accounts
   const filteredAccounts = accounts.filter(
-    (acc) =>
-      acc.status === "active" &&
-      linkedAirlineIds.includes(acc.airline_company_id)
+    (acc) => acc.status === "active"
   );
 
   // Update flight segments based on trip type
@@ -151,6 +149,7 @@ export default function NewSaleWizard() {
       counter_seller_name: saleSource === "mileage_counter" ? counterSellerName : undefined,
       counter_seller_contact: saleSource === "mileage_counter" ? counterSellerContact : undefined,
       counter_airline_program: saleSource === "mileage_counter" ? counterAirlineProgram : undefined,
+      counter_cost_per_thousand: saleSource === "mileage_counter" ? parseFloat(counterCostPerThousand) : undefined,
       customer_name: customerName,
       customer_phone: customerPhone,
       customer_cpf: customerCpf,
@@ -191,7 +190,7 @@ export default function NewSaleWizard() {
   // Validation
   const canProceedStep0 =
     saleSource === "internal_account" ||
-    (saleSource === "mileage_counter" && counterSellerName && counterAirlineProgram);
+    (saleSource === "mileage_counter" && counterSellerName && counterAirlineProgram && counterCostPerThousand);
 
   const canProceedStep1 =
     customerName &&
@@ -307,6 +306,22 @@ export default function NewSaleWizard() {
                           value={counterAirlineProgram}
                           onChange={(e) => setCounterAirlineProgram(e.target.value)}
                           placeholder="Ex: LATAM Pass, Smiles, etc"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="counterCostPerThousand">
+                          Custo do Milheiro (R$/1000 milhas) *
+                          <span className="text-xs text-muted-foreground ml-2">
+                            Quanto você pagou ao fornecedor
+                          </span>
+                        </Label>
+                        <Input
+                          id="counterCostPerThousand"
+                          type="number"
+                          step="0.01"
+                          value={counterCostPerThousand}
+                          onChange={(e) => setCounterCostPerThousand(e.target.value)}
+                          placeholder="Ex: 25.00"
                         />
                       </div>
                     </div>
