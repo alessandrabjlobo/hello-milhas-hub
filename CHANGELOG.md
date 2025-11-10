@@ -1,6 +1,45 @@
-# Changelog - Product Flow Simplification
+# Changelog
 
-## [Latest Update] - 2025-01-10 (Supabase-Backed Program Rules)
+All notable changes to this project will be documented in this file.
+
+## [2025-01-10] - Program Rules Supabase Integration & 403 Fix
+
+### Added
+- **Complete RLS Setup**: Created comprehensive migration for `program_rules` and `airline_companies` with proper policies
+- **Supplier Setup Guard**: New `SupplierSetupGuard` component to handle missing `supplier_id`
+- **Supplier Setup Hook**: `useSupplierSetup` hook to check and manage supplier configuration
+- **Enhanced Error Handling**: Detailed error messages with error codes in Program Rules page
+- **Unit Tests**: Added comprehensive tests for `getSupplierId` and `saveProgramRule`
+- **Test Infrastructure**: Set up Vitest with React Testing Library
+- **Database Trigger**: Auto-update `updated_at` timestamp on program rules changes
+
+### Fixed
+- **403 Errors**: Resolved Forbidden errors on `airline_companies` and `program_rules` tables
+- **Missing supplier_id**: Added graceful handling and UI flow for users without supplier association
+- **RLS Policies**: Corrected policies to properly scope data by `supplier_id`
+- **Permissions**: Added proper GRANT statements for authenticated users
+- **Error Messages**: Enhanced error reporting with specific error codes and messages
+
+### Changed
+- **Program Rules Page**: Improved error handling and user feedback
+- **Airline Companies Access**: Changed admin-only INSERT to allow authenticated users with proper checks
+- **Data Persistence**: All program rules now save to Supabase with proper upsert logic
+- **Supplier Context**: Enhanced supplier_id checking with detailed error states
+
+### Database
+- Table: `program_rules` with columns: `id`, `supplier_id`, `airline_id`, `cpf_limit`, `renewal_type`, `updated_by`, `updated_at`
+- RLS Policies: SELECT, INSERT, UPDATE, DELETE scoped by supplier_id
+- Grants: Proper permissions for authenticated role
+- Trigger: `update_program_rules_updated_at` for automatic timestamp updates
+
+### Testing
+- Unit tests for supplier ID retrieval
+- Integration tests for program rule upsert operations
+- Test setup with Vitest and React Testing Library
+
+---
+
+## [Previous Update] - 2025-01-10 (Supabase-Backed Program Rules)
 
 ### Summary ✅
 Replaced localStorage-based program rules with Supabase persistence, scoped by supplier_id with proper RLS policies.

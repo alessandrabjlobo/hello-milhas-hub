@@ -32,6 +32,7 @@ interface ProgramRule {
 export default function ProgramRules() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [supplierError, setSupplierError] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -61,6 +62,7 @@ export default function ProgramRules() {
   const fetchData = async () => {
     try {
       setLoading(true);
+      setSupplierError(false);
 
       // Fetch airlines
       const { data: airlinesData, error: airlinesError } = await supabase
@@ -68,19 +70,49 @@ export default function ProgramRules() {
         .select("id, name, code")
         .order("name");
 
-      if (airlinesError) throw airlinesError;
+      if (airlinesError) {
+        console.error("Airlines fetch error:", airlinesError);
+        toast({
+          title: "Error loading airlines",
+          description: `${airlinesError.message} (Code: ${airlinesError.code})`,
+          variant: "destructive",
+        });
+        throw airlinesError;
+      }
 
       const airlineList = (airlinesData ?? []) as Airline[];
       setAirlines(airlineList);
 
       // Fetch program rules for user's supplier
-      const { supplierId } = await getSupplierId();
+      let supplierId: string;
+      try {
+        const result = await getSupplierId();
+        supplierId = result.supplierId;
+      } catch (error: any) {
+        console.error("Supplier ID error:", error);
+        setSupplierError(true);
+        toast({
+          title: "Supplier setup required",
+          description: "Please set your supplier in Settings to use program rules.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const { data: rulesData, error: rulesError } = await supabase
         .from("program_rules")
         .select("airline_id, cpf_limit, renewal_type")
         .eq("supplier_id", supplierId);
 
-      if (rulesError) throw rulesError;
+      if (rulesError) {
+        console.error("Rules fetch error:", rulesError);
+        toast({
+          title: "Error loading rules",
+          description: `${rulesError.message} (Code: ${rulesError.code})`,
+          variant: "destructive",
+        });
+        throw rulesError;
+      }
 
       // Build rules map with defaults for airlines without rules
       const rulesMap: Record<string, ProgramRule> = {};
@@ -102,11 +134,14 @@ export default function ProgramRules() {
       setRules(rulesMap);
       setOriginalRules(JSON.parse(JSON.stringify(rulesMap)));
     } catch (err: any) {
-      toast({
-        title: "Error loading data",
-        description: err?.message ?? "Check your connection and try again",
-        variant: "destructive",
-      });
+      console.error("Fetch data error:", err);
+      if (!supplierError) {
+        toast({
+          title: "Error loading data",
+          description: err?.message ?? "Check your connection and try again",
+          variant: "destructive",
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -209,11 +244,13 @@ export default function ProgramRules() {
     const cpfLimit = normalizeLimit(Number(cpfLimitInput));
 
     try {
-      await saveProgramRule({
+      const result = await saveProgramRule({
         airline_id: airlineId,
         cpf_limit: cpfLimit,
         renewal_type: period,
       });
+      
+      console.log("Save result:", result);
 
       setRules((prev) => ({
         ...prev,
@@ -241,9 +278,12 @@ export default function ProgramRules() {
       setCpfLimitInput("25");
       setPeriod("annual");
     } catch (err: any) {
+      console.error("Save error:", err);
+      const errorMsg = err?.message || "Unknown error";
+      const errorCode = err?.code || "";
       toast({
         title: "Error saving rule",
-        description: err?.message ?? "Check connection/RLS and try again.",
+        description: `${errorMsg}${errorCode ? ` (${errorCode})` : ""}`,
         variant: "destructive",
       });
     }
@@ -304,9 +344,12 @@ export default function ProgramRules() {
         description: "All changes saved successfully.",
       });
     } catch (err: any) {
+      console.error("Bulk save error:", err);
+      const errorMsg = err?.message || "Unknown error";
+      const errorCode = err?.code || "";
       toast({
         title: "Error saving rules",
-        description: err?.message ?? "Check connection/RLS and try again.",
+        description: `${errorMsg}${errorCode ? ` (${errorCode})` : ""}`,
         variant: "destructive",
       });
     } finally {
@@ -329,6 +372,13 @@ export default function ProgramRules() {
 
   return (
     <div className="container max-w-4xl mx-auto p-6 space-y-6">
+      {supplierError && (
+        <Alert variant="destructive">
+          <AlertDescription>
+            Supplier setup required. Please contact an administrator to set your supplier_id.
+          </AlertDescription>
+        </Alert>
+      )}
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
           <ArrowLeft className="h-5 w-5" />
