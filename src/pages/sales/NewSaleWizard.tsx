@@ -27,6 +27,8 @@ import { PassengerCPFDialog } from "@/components/sales/PassengerCPFDialog";
 import { FlightSegmentForm } from "@/components/sales/FlightSegmentForm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AccountCombobox } from "@/components/sales/AccountCombobox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Calculator } from "lucide-react";
 
 const steps = ["Origem", "Cliente & Voo", "Cálculo", "Confirmar"];
 
@@ -73,6 +75,7 @@ export default function NewSaleWizard() {
   const [saving, setSaving] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [lastSaleData, setLastSaleData] = useState<any>(null);
+  const [showCalculatorDialog, setShowCalculatorDialog] = useState(false);
 
   // Filter accounts - show all active accounts
   const filteredAccounts = accounts.filter(
@@ -858,13 +861,26 @@ export default function NewSaleWizard() {
               priceTotal={installmentDetails?.finalPrice.toFixed(2) || priceTotal}
             />
             {currentStep === 2 && saleSource === "internal_account" && accountId && (
-              <MarginCalculator
-                costPerMile={
-                  filteredAccounts.find(a => a.id === accountId)?.cost_per_mile
-                    ? Number(filteredAccounts.find(a => a.id === accountId)?.cost_per_mile)
-                    : 0.029
-                }
-              />
+              <Dialog open={showCalculatorDialog} onOpenChange={setShowCalculatorDialog}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="w-full">
+                    <Calculator className="h-4 w-4 mr-2" />
+                    Simulador de Lucro
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Simulador de Margem de Lucro</DialogTitle>
+                  </DialogHeader>
+                  <MarginCalculator
+                    costPerMile={
+                      filteredAccounts.find(a => a.id === accountId)?.cost_per_mile
+                        ? Number(filteredAccounts.find(a => a.id === accountId)?.cost_per_mile)
+                        : 0.029
+                    }
+                  />
+                </DialogContent>
+              </Dialog>
             )}
           </div>
         </div>
