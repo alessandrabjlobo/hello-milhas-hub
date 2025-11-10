@@ -10,16 +10,56 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle, Eye, ShoppingCart } from "lucide-react";
+import { PlusCircle, Eye, ShoppingCart, MoreHorizontal } from "lucide-react";
 import { useSales } from "@/hooks/useSales";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { exportToCSV } from "@/lib/csv-export";
 import { PaymentStatusBadge } from "@/components/sales/PaymentStatusBadge";
+import { EditSaleDialog } from "@/components/sales/EditSaleDialog";
+import { DeleteSaleDialog } from "@/components/sales/DeleteSaleDialog";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function SalesList() {
-  const { sales, loading } = useSales();
+  const { sales, loading, fetchSales } = useSales();
+  const { toast } = useToast();
+  const [editingSale, setEditingSale] = useState<typeof sales[0] | null>(null);
+  const [deletingSale, setDeletingSale] = useState<typeof sales[0] | null>(null);
+
+  const handleDeleteSale = async () => {
+    if (!deletingSale) return;
+
+    try {
+      const { error } = await supabase
+        .from("sales")
+        .delete()
+        .eq("id", deletingSale.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Venda excluída",
+        description: "A venda foi removida com sucesso.",
+      });
+
+      fetchSales();
+      setDeletingSale(null);
+    } catch (error: any) {
+      toast({
+        title: "Erro ao excluir",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleExportCSV = () => {
     const data = sales.map((sale) => ({
@@ -106,8 +146,9 @@ export default function SalesList() {
                   <TableHead>Companhia</TableHead>
                   <TableHead>Valor</TableHead>
                   <TableHead>Pagamento</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Ações</TableHead>
+              <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -140,6 +181,26 @@ export default function SalesList() {
                         </Link>
                       </Button>
                     </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => setEditingSale(sale)}>
+                            Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => setDeletingSale(sale)}
+                          >
+                            Excluir
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -147,6 +208,21 @@ export default function SalesList() {
           )}
         </Card>
       </div>
+
+      <EditSaleDialog
+        sale={editingSale}
+        open={!!editingSale}
+        onOpenChange={(open) => !open && setEditingSale(null)}
+        onSuccess={fetchSales}
+      />
+
+      <DeleteSaleDialog
+        open={!!deletingSale}
+        onOpenChange={(open) => !open && setDeletingSale(null)}
+        onConfirm={handleDeleteSale}
+        customerName={deletingSale?.customer_name || deletingSale?.client_name || ""}
+        hasTickets={false}
+      />
     </div>
   );
 }

@@ -6,9 +6,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Plane, User, CreditCard, DollarSign } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ArrowLeft, Plane, User, CreditCard, DollarSign, MoreVertical } from "lucide-react";
 import { PaymentDialog } from "@/components/sales/PaymentDialog";
 import { PaymentStatusBadge } from "@/components/sales/PaymentStatusBadge";
+import { EditSaleDialog } from "@/components/sales/EditSaleDialog";
+import { DeleteSaleDialog } from "@/components/sales/DeleteSaleDialog";
 import type { Database } from "@/integrations/supabase/types";
 
 type Sale = Database["public"]["Tables"]["sales"]["Row"] & {
@@ -30,6 +38,8 @@ export default function SaleDetail() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const fetchSaleDetails = async () => {
     if (!id) return;
@@ -107,6 +117,29 @@ export default function SaleDetail() {
     return <Badge variant={variants[status]}>{labels[status] || status}</Badge>;
   };
 
+  const handleDeleteSale = async () => {
+    if (!sale) return;
+
+    try {
+      const { error } = await supabase.from("sales").delete().eq("id", sale.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Venda excluída",
+        description: "A venda foi removida com sucesso.",
+      });
+
+      navigate("/sales");
+    } catch (error: any) {
+      toast({
+        title: "Erro ao excluir",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -121,7 +154,27 @@ export default function SaleDetail() {
             </p>
           </div>
         </div>
-        {getStatusBadge(sale.status)}
+        <div className="flex items-center gap-2">
+          {getStatusBadge(sale.status)}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setEditDialogOpen(true)}>
+                Editar Venda
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-destructive"
+                onClick={() => setDeleteDialogOpen(true)}
+              >
+                Excluir Venda
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
@@ -269,6 +322,21 @@ export default function SaleDetail() {
         totalAmount={sale.sale_price || 0}
         currentPaidAmount={sale.paid_amount || 0}
         onSuccess={fetchSaleDetails}
+      />
+
+      <EditSaleDialog
+        sale={sale}
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        onSuccess={fetchSaleDetails}
+      />
+
+      <DeleteSaleDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDeleteSale}
+        customerName={sale.customer_name || sale.client_name || ""}
+        hasTickets={tickets.length > 0}
       />
     </div>
   );

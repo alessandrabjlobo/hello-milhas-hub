@@ -158,7 +158,7 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
       {
         user_id: userData.user.id,
         airline_company_id: formData.airline_company_id,
-        supplier_id: currentSupplierId,
+        supplier_id: formData.supplier_id || currentSupplierId,
         account_holder_name: formData.account_holder_name,
         account_holder_cpf: formData.account_holder_cpf.replace(/\D/g, ""),
         password_encrypted: formData.password || null,

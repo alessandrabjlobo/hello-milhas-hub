@@ -3,12 +3,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Building2, Phone, CreditCard, Link as LinkIcon } from "lucide-react";
+import { Building2, Phone, CreditCard, Link as LinkIcon, LayoutGrid, List } from "lucide-react";
 import { useSuppliers } from "@/hooks/useSuppliers";
 import { useMileageAccounts } from "@/hooks/useMileageAccounts";
 import { AddSupplierDialog } from "@/components/suppliers/AddSupplierDialog";
 import { EditSupplierDialog } from "@/components/suppliers/EditSupplierDialog";
 import { DeleteSupplierDialog } from "@/components/suppliers/DeleteSupplierDialog";
+import { SuppliersTable } from "@/components/suppliers/SuppliersTable";
 import { EmptyState } from "@/components/shared/EmptyState";
 
 export default function Suppliers() {
@@ -17,6 +18,7 @@ export default function Suppliers() {
 
   const [editingSupplier, setEditingSupplier] = useState<any>(null);
   const [deletingSupplier, setDeletingSupplier] = useState<any>(null);
+  const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
 
   const getLinkedAccountsCount = (supplierId: string) => {
     return accounts.filter((acc) => (acc as any).supplier_id === supplierId).length;
@@ -47,7 +49,29 @@ export default function Suppliers() {
               {suppliers.length} fornecedor(es) cadastrado(s)
             </p>
           </div>
-          <AddSupplierDialog onSupplierAdded={createSupplier} />
+          <div className="flex items-center gap-2">
+            <div className="flex border rounded-lg overflow-hidden">
+              <Button
+                variant={viewMode === "cards" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("cards")}
+                className="rounded-none"
+              >
+                <LayoutGrid className="h-4 w-4 mr-2" />
+                Cards
+              </Button>
+              <Button
+                variant={viewMode === "list" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("list")}
+                className="rounded-none"
+              >
+                <List className="h-4 w-4 mr-2" />
+                Lista
+              </Button>
+            </div>
+            <AddSupplierDialog onSupplierAdded={createSupplier} />
+          </div>
         </div>
 
         {suppliers.length === 0 ? (
@@ -58,6 +82,8 @@ export default function Suppliers() {
               description="Cadastre fornecedores para gerenciar contas de milhagem e pagamentos."
             />
           </Card>
+        ) : viewMode === "list" ? (
+          <SuppliersTable />
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {suppliers.map((supplier) => (

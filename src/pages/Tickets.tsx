@@ -22,11 +22,18 @@ import {
 import { useTickets } from "@/hooks/useTickets";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { RegisterTicketDialog } from "@/components/tickets/RegisterTicketDialog";
+import { EditTicketDialog } from "@/components/tickets/EditTicketDialog";
+import { DeleteTicketDialog } from "@/components/tickets/DeleteTicketDialog";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Tickets() {
   const navigate = useNavigate();
-  const { tickets, loading } = useTickets();
+  const { tickets, loading, fetchTickets } = useTickets();
   const [registerDialogOpen, setRegisterDialogOpen] = useState(false);
+  const [editingTicket, setEditingTicket] = useState<typeof tickets[0] | null>(null);
+  const [deletingTicket, setDeletingTicket] = useState<typeof tickets[0] | null>(null);
+  const { toast } = useToast();
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive"> = {
@@ -46,6 +53,33 @@ export default function Tickets() {
         {labels[status] || status}
       </Badge>
     );
+  };
+
+  const handleDeleteTicket = async () => {
+    if (!deletingTicket) return;
+
+    try {
+      const { error } = await supabase
+        .from("tickets")
+        .delete()
+        .eq("id", deletingTicket.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Passagem excluída",
+        description: "A passagem foi removida com sucesso.",
+      });
+
+      fetchTickets();
+      setDeletingTicket(null);
+    } catch (error: any) {
+      toast({
+        title: "Erro ao excluir",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
   const getVerificationBadge = (status: string | null) => {
@@ -174,11 +208,14 @@ export default function Tickets() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setEditingTicket(ticket)}>
                             <Edit className="h-4 w-4 mr-2" />
                             Editar
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive">
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => setDeletingTicket(ticket)}
+                          >
                             <Trash2 className="h-4 w-4 mr-2" />
                             Excluir
                           </DropdownMenuItem>
@@ -196,6 +233,20 @@ export default function Tickets() {
       <RegisterTicketDialog
         open={registerDialogOpen}
         onOpenChange={setRegisterDialogOpen}
+      />
+
+      <EditTicketDialog
+        ticket={editingTicket}
+        open={!!editingTicket}
+        onOpenChange={(open) => !open && setEditingTicket(null)}
+        onSuccess={fetchTickets}
+      />
+
+      <DeleteTicketDialog
+        open={!!deletingTicket}
+        onOpenChange={(open) => !open && setDeletingTicket(null)}
+        onConfirm={handleDeleteTicket}
+        ticketInfo={deletingTicket?.passenger_name || ""}
       />
     </div>
   );
