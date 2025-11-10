@@ -3,10 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, User, MapPin, DollarSign, FileText, ExternalLink, CheckCircle2 } from "lucide-react";
+import { Calendar, MapPin, DollarSign, FileText, ExternalLink, CheckCircle2, LayoutGrid, List } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect } from "react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface Quote {
   id: string;
@@ -27,6 +28,7 @@ const QuoteHistory = () => {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "pending" | "converted">("all");
+  const [viewMode, setViewMode] = useState<"cards" | "list">("list");
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -96,25 +98,46 @@ const QuoteHistory = () => {
         </Button>
       </div>
 
-      <div className="flex gap-2">
-        <Button
-          variant={filter === "all" ? "default" : "outline"}
-          onClick={() => setFilter("all")}
-        >
-          Todos ({quotes.length})
-        </Button>
-        <Button
-          variant={filter === "pending" ? "default" : "outline"}
-          onClick={() => setFilter("pending")}
-        >
-          Pendentes
-        </Button>
-        <Button
-          variant={filter === "converted" ? "default" : "outline"}
-          onClick={() => setFilter("converted")}
-        >
-          Convertidos
-        </Button>
+      <div className="flex items-center justify-between">
+        <div className="flex gap-2">
+          <Button
+            variant={filter === "all" ? "default" : "outline"}
+            onClick={() => setFilter("all")}
+          >
+            Todos
+          </Button>
+          <Button
+            variant={filter === "pending" ? "default" : "outline"}
+            onClick={() => setFilter("pending")}
+          >
+            Pendentes
+          </Button>
+          <Button
+            variant={filter === "converted" ? "default" : "outline"}
+            onClick={() => setFilter("converted")}
+          >
+            Convertidos
+          </Button>
+        </div>
+
+        <div className="flex gap-2">
+          <Button
+            variant={viewMode === "cards" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setViewMode("cards")}
+          >
+            <LayoutGrid className="h-4 w-4 mr-2" />
+            Cards
+          </Button>
+          <Button
+            variant={viewMode === "list" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setViewMode("list")}
+          >
+            <List className="h-4 w-4 mr-2" />
+            Lista
+          </Button>
+        </div>
       </div>
 
       {loading ? (
@@ -137,6 +160,79 @@ const QuoteHistory = () => {
               Crie seu primeiro orçamento na calculadora.
             </p>
           </CardContent>
+        </Card>
+      ) : viewMode === "list" ? (
+        <Card>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Data</TableHead>
+                <TableHead>Cliente</TableHead>
+                <TableHead>Telefone</TableHead>
+                <TableHead>Rota</TableHead>
+                <TableHead>Data Viagem</TableHead>
+                <TableHead>Valor</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Anexos</TableHead>
+                <TableHead>Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {quotes.map((quote) => (
+                <TableRow key={quote.id}>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {new Date(quote.created_at).toLocaleDateString("pt-BR")}
+                  </TableCell>
+                  <TableCell>
+                    <div>
+                      <p className="font-medium">{quote.client_name}</p>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    {quote.client_phone || "-"}
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    {quote.route || "-"}
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    {quote.departure_date 
+                      ? new Date(quote.departure_date).toLocaleDateString("pt-BR")
+                      : "-"}
+                  </TableCell>
+                  <TableCell className="font-semibold text-primary">
+                    R$ {quote.total_price.toFixed(2)}
+                  </TableCell>
+                  <TableCell>{getStatusBadge(quote)}</TableCell>
+                  <TableCell>
+                    {quote.attachments && Array.isArray(quote.attachments) && quote.attachments.length > 0 ? (
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                        <ExternalLink className="h-3 w-3" />
+                        {quote.attachments.length}
+                      </div>
+                    ) : "-"}
+                  </TableCell>
+                  <TableCell>
+                    {!quote.converted_to_sale_id ? (
+                      <Button
+                        size="sm"
+                        onClick={() => handleConvert(quote.id)}
+                      >
+                        Converter
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`/sales/${quote.converted_to_sale_id}`)}
+                      >
+                        Ver Venda
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

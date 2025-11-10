@@ -17,6 +17,7 @@ import {
   Shield,
   Calculator,
   LogOut,
+  Percent,
 } from "lucide-react";
 import {
   Sidebar,
@@ -59,6 +60,7 @@ const reportsNavItems = [
 const settingsNavItems = [
   { title: "Regras de Programas", url: "/settings/programs", icon: Plane },
   { title: "Formas de Pagamento", url: "/settings/payment-methods", icon: CreditCard },
+  { title: "Juros do Cartão", url: "/settings/credit", icon: Percent },
   { title: "Plano & Pagamento", url: "/settings/billing", icon: DollarSign },
 ];
 

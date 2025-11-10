@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Check, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useCreditInterestConfig } from "@/hooks/useCreditInterestConfig";
+import { usePaymentMethods } from "@/hooks/usePaymentMethods";
 
 interface SaleSuccessDialogProps {
   open: boolean;
@@ -37,12 +39,57 @@ export function SaleSuccessDialog({
   const { toast } = useToast();
   const [copiedFull, setCopiedFull] = useState(false);
   const [copiedShort, setCopiedShort] = useState(false);
+  const { configs, calculateInstallmentValue } = useCreditInterestConfig();
+  const { activeMethods } = usePaymentMethods();
 
-  const pricePerK = saleData.milesNeeded
-    ? ((parseFloat(saleData.priceTotal) / parseFloat(saleData.milesNeeded)) * 1000).toFixed(2)
-    : "0";
+  const totalPrice = parseFloat(saleData.priceTotal);
 
-  const totalFees = (parseFloat(saleData.boardingFee || "0") * saleData.passengers).toFixed(2);
+  // Build payment methods sections
+  const buildPaymentMethodsSection = () => {
+    if (activeMethods.length === 0) {
+      return "\n⚠️ Configure formas de pagamento em Configurações > Formas de Pagamento";
+    }
+
+    let sections: string[] = [];
+
+    activeMethods.forEach((method) => {
+      if (method.method_type === "pix") {
+        sections.push(
+          `📱 PIX (Aprovação Imediata)\n• Chave: ${method.additional_info?.pix_key || "A configurar"}\n• Titular: ${method.additional_info?.holder_name || "A configurar"}`
+        );
+      }
+
+      if (method.method_type === "credit") {
+        let creditSection = "💳 Cartão de Crédito";
+        
+        if (configs.length === 0) {
+          creditSection += "\n• À vista: R$ " + totalPrice.toFixed(2);
+        } else {
+          configs.forEach((config) => {
+            const result = calculateInstallmentValue(totalPrice, config.installments);
+            if (config.interest_rate === 0) {
+              creditSection += `\n• ${config.installments}x de R$ ${result.installmentValue.toFixed(2)} (sem juros)`;
+            } else {
+              creditSection += `\n• ${config.installments}x de R$ ${result.installmentValue.toFixed(2)} - Total: R$ ${result.finalPrice.toFixed(2)} (${config.interest_rate}%)`;
+            }
+          });
+        }
+        sections.push(creditSection);
+      }
+
+      if (method.method_type === "boleto") {
+        sections.push(`🎫 Boleto Bancário\n• ${method.description || "Pagamento via boleto"}`);
+      }
+
+      if (method.method_type === "transfer") {
+        sections.push(
+          `🏦 Transferência Bancária\n• Banco: ${method.additional_info?.bank_name || "A configurar"}\n• Agência: ${method.additional_info?.agency || "A configurar"}\n• Conta: ${method.additional_info?.account_number || "A configurar"}\n• Titular: ${method.additional_info?.holder_name || "A configurar"}`
+        );
+      }
+    });
+
+    return "\n\n" + sections.join("\n\n");
+  };
 
   const fullMessage = `✅ Sua passagem está pronta!
 
@@ -51,18 +98,19 @@ Companhia: ${saleData.airline}
 Passageiro(s): ${saleData.customerName}${saleData.passengers > 1 ? ` +${saleData.passengers - 1}` : ""}
 Rota: ${saleData.routeText}
 
-💰 Valores:
-Total: R$ ${parseFloat(saleData.priceTotal).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-• Milhas: ${parseInt(saleData.milesNeeded).toLocaleString("pt-BR")} (R$ ${pricePerK}/mil)
-• Taxas/Embarque: R$ ${parseFloat(totalFees).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+💰 Valor Total: R$ ${totalPrice.toFixed(2)}
 
-${saleData.paymentMethod ? `Forma de pagamento: ${saleData.paymentMethod}` : ""}
+━━━━━━━━━━━━━━━━━━━━━━━━
 
-Qualquer dúvida, estamos à disposição!`;
+💳 FORMAS DE PAGAMENTO DISPONÍVEIS${buildPaymentMethodsSection()}
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+Qualquer dúvida, estamos à disposição! 😊`;
 
   const shortMessage = saleData.pnr
-    ? `PNR ${saleData.pnr} • Total R$ ${parseFloat(saleData.priceTotal).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
-    : `Venda confirmada • Total R$ ${parseFloat(saleData.priceTotal).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} • PNR em breve`;
+    ? `PNR ${saleData.pnr} • Total R$ ${totalPrice.toFixed(2)}`
+    : `Venda confirmada • Total R$ ${totalPrice.toFixed(2)} • PNR em breve`;
 
   const copyToClipboard = async (text: string, type: "full" | "short") => {
     try {
