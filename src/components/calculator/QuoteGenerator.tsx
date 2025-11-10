@@ -21,6 +21,7 @@ export function QuoteGenerator() {
   const [passengers, setPassengers] = useState("1");
   const [totalPrice, setTotalPrice] = useState("");
   const [costPerThousand, setCostPerThousand] = useState("");
+  const [boardingFee, setBoardingFee] = useState("");
   
   // Novos campos de voo
   const [departureTime, setDepartureTime] = useState("");
@@ -102,6 +103,7 @@ export function QuoteGenerator() {
 
   const generateQuoteText = () => {
     const pricePerPassenger = passengers ? (parseFloat(totalPrice) / parseInt(passengers)).toFixed(2) : totalPrice;
+    const totalBoardingFee = boardingFee ? (parseFloat(boardingFee) * parseInt(passengers || "1")).toFixed(2) : "0.00";
     
     let text = `*✈️ ORÇAMENTO DE PASSAGEM AÉREA*\n\n`;
     text += `*👤 DADOS DO CLIENTE*\n`;
@@ -125,6 +127,10 @@ export function QuoteGenerator() {
     text += `\n*💰 VALORES*\n`;
     text += `Passageiros: ${passengers}\n`;
     text += `Milhas necessárias: ${parseInt(milesNeeded).toLocaleString('pt-BR')}\n`;
+    if (boardingFee && parseFloat(boardingFee) > 0) {
+      text += `Taxa de embarque: R$ ${parseFloat(boardingFee).toFixed(2)} por passageiro\n`;
+      text += `Total taxas: R$ ${totalBoardingFee}\n`;
+    }
     if (parseInt(passengers) > 1) {
       text += `Valor por pessoa: R$ ${pricePerPassenger}\n`;
     }
@@ -366,6 +372,38 @@ export function QuoteGenerator() {
                     className="h-11"
                   />
                 </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4 mt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="boarding-fee">Taxa de Embarque por Passageiro (R$)</Label>
+                  <Input
+                    id="boarding-fee"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={boardingFee}
+                    onChange={(e) => setBoardingFee(e.target.value)}
+                    className="h-11"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Taxa cobrada por passageiro (ex: R$ 35,00)
+                  </p>
+                </div>
+
+                {boardingFee && parseFloat(boardingFee) > 0 && (
+                  <div className="space-y-2">
+                    <Label>Total das Taxas de Embarque</Label>
+                    <div className="h-11 px-3 flex items-center rounded-md border bg-muted/50">
+                      <span className="font-semibold">
+                        R$ {(parseFloat(boardingFee) * parseInt(passengers || "1")).toFixed(2)}
+                      </span>
+                      <span className="text-xs text-muted-foreground ml-2">
+                        ({passengers} passageiro{parseInt(passengers) > 1 ? "s" : ""})
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {parseInt(passengers) > 1 && totalPrice && (
