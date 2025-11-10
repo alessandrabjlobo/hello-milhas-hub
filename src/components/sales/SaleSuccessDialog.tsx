@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Check, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useCreditInterestConfig } from "@/hooks/useCreditInterestConfig";
+import { usePaymentInterestConfig } from "@/hooks/usePaymentInterestConfig";
 import { usePaymentMethods } from "@/hooks/usePaymentMethods";
 
 interface SaleSuccessDialogProps {
@@ -39,7 +39,7 @@ export function SaleSuccessDialog({
   const { toast } = useToast();
   const [copiedFull, setCopiedFull] = useState(false);
   const [copiedShort, setCopiedShort] = useState(false);
-  const { configs, calculateInstallmentValue } = useCreditInterestConfig();
+  const { configs, calculateInstallmentValue, getDebitRate, getCreditConfigs } = usePaymentInterestConfig();
   const { activeMethods } = usePaymentMethods();
 
   const totalPrice = parseFloat(saleData.priceTotal);
@@ -59,13 +59,31 @@ export function SaleSuccessDialog({
         );
       }
 
+      if (method.method_type === "debit") {
+        const debitRate = getDebitRate();
+        let debitSection = "💳 Cartão de Débito";
+        
+        if (debitRate) {
+          const result = calculateInstallmentValue(totalPrice, 1);
+          if (debitRate.interest_rate === 0) {
+            debitSection += `\n• À vista: R$ ${totalPrice.toFixed(2)}`;
+          } else {
+            debitSection += `\n• À vista com taxa: R$ ${result.finalPrice.toFixed(2)} (${debitRate.interest_rate}% de juros)`;
+          }
+        } else {
+          debitSection += `\n• À vista: R$ ${totalPrice.toFixed(2)}`;
+        }
+        sections.push(debitSection);
+      }
+
       if (method.method_type === "credit") {
+        const creditConfigs = getCreditConfigs();
         let creditSection = "💳 Cartão de Crédito";
         
-        if (configs.length === 0) {
+        if (creditConfigs.length === 0) {
           creditSection += "\n• À vista: R$ " + totalPrice.toFixed(2);
         } else {
-          configs.forEach((config) => {
+          creditConfigs.forEach((config) => {
             const result = calculateInstallmentValue(totalPrice, config.installments);
             if (config.interest_rate === 0) {
               creditSection += `\n• ${config.installments}x de R$ ${result.installmentValue.toFixed(2)} (sem juros)`;

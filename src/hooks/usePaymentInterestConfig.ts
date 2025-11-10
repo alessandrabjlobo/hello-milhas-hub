@@ -3,18 +3,19 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { getSupplierId } from "@/lib/getSupplierId";
 
-export interface CreditInterestConfig {
+export interface PaymentInterestConfig {
   id: string;
   supplier_id: string;
   installments: number;
   interest_rate: number;
   is_active: boolean;
+  payment_type: 'debit' | 'credit';
   created_at: string;
   updated_at: string;
 }
 
-export const useCreditInterestConfig = () => {
-  const [configs, setConfigs] = useState<CreditInterestConfig[]>([]);
+export const usePaymentInterestConfig = () => {
+  const [configs, setConfigs] = useState<PaymentInterestConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -43,7 +44,15 @@ export const useCreditInterestConfig = () => {
     }
   };
 
-  const createConfig = async (data: { installments: number; interest_rate: number }) => {
+  const getDebitRate = () => {
+    return configs.find(c => c.payment_type === 'debit' && c.is_active);
+  };
+
+  const getCreditConfigs = () => {
+    return configs.filter(c => c.payment_type === 'credit' && c.is_active);
+  };
+
+  const createConfig = async (data: { installments: number; interest_rate: number; payment_type: 'debit' | 'credit' }) => {
     try {
       const { supplierId } = await getSupplierId();
 
@@ -51,6 +60,7 @@ export const useCreditInterestConfig = () => {
         supplier_id: supplierId,
         installments: data.installments,
         interest_rate: data.interest_rate,
+        payment_type: data.payment_type,
         is_active: true,
       } as any);
 
@@ -162,5 +172,7 @@ export const useCreditInterestConfig = () => {
     updateConfig,
     deleteConfig,
     calculateInstallmentValue,
+    getDebitRate,
+    getCreditConfigs,
   };
 };

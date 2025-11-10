@@ -121,7 +121,7 @@ export const useSales = () => {
         marginPercentage = priceTotal > 0 ? (marginValue / priceTotal) * 100 : 0;
       }
 
-      const { error } = await supabase.from("sales").insert({
+      const { data: newSale, error } = await supabase.from("sales").insert({
         ...saleData,
         user_id: userData.user.id,
         supplier_id: profile?.supplier_id,
@@ -137,7 +137,9 @@ export const useSales = () => {
         margin_percentage: marginPercentage,
         profit: marginValue,
         profit_margin: marginPercentage,
-      } as SaleInsert);
+      } as SaleInsert)
+      .select()
+      .single();
 
       if (error) throw error;
 
@@ -159,7 +161,7 @@ export const useSales = () => {
       });
 
       await fetchSales();
-      return true;
+      return newSale?.id || true;
     } catch (error: any) {
       toast({
         title: "Erro ao criar venda",

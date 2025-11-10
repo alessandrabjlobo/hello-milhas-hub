@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +17,7 @@ import { useSales, type FlightSegment, type PassengerCPF } from "@/hooks/useSale
 import { useMileageAccounts } from "@/hooks/useMileageAccounts";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useSupplierAirlines } from "@/hooks/useSupplierAirlines";
-import { useCreditInterestConfig } from "@/hooks/useCreditInterestConfig";
+import { usePaymentInterestConfig } from "@/hooks/usePaymentInterestConfig";
 import { maskCPF, maskPhone } from "@/lib/input-masks";
 import { ArrowLeft, ArrowRight, Check, Plus, Users, Building2, AlertCircle } from "lucide-react";
 import { SalesSummaryCard } from "@/components/sales/SaleSummaryCard";
@@ -30,17 +30,31 @@ import { AccountCombobox } from "@/components/sales/AccountCombobox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Calculator } from "lucide-react";
 import { RegisterTicketDialog } from "@/components/tickets/RegisterTicketDialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const steps = ["Origem", "Cliente & Voo", "Cálculo", "Confirmar"];
 
 export default function NewSaleWizard() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const quoteId = searchParams.get('quoteId');
+  const { toast } = useToast();
+  
   const [currentStep, setCurrentStep] = useState(0);
   const { createSale } = useSales();
   const { accounts } = useMileageAccounts();
   const { supplierId } = useUserRole();
   const { linkedAirlines } = useSupplierAirlines(supplierId);
-  const { configs, calculateInstallmentValue } = useCreditInterestConfig();
+  const { configs, calculateInstallmentValue } = usePaymentInterestConfig();
+
+  // Fase 2: Quote conversion
+  const [isConvertingQuote, setIsConvertingQuote] = useState(false);
+  const [sourceQuote, setSourceQuote] = useState<any>(null);
+  
+  // Fase 3: Auto ticket creation
+  const [autoCreateTickets, setAutoCreateTickets] = useState(false);
 
   // Step 0 - Sale Source
   const [saleSource, setSaleSource] = useState<"internal_account" | "mileage_counter">("internal_account");
@@ -78,6 +92,100 @@ export default function NewSaleWizard() {
   const [lastSaleData, setLastSaleData] = useState<any>(null);
   const [showCalculatorDialog, setShowCalculatorDialog] = useState(false);
   const [showRegisterTicket, setShowRegisterTicket] = useState(false);
+
+  // Fase 2: Fetch quote and prefill
+  useEffect(() => {
+    if (quoteId) {
+      fetchAndPrefillQuote(quoteId);
+    }
+  }, [quoteId]);
+
+  const fetchAndPrefillQuote = async (id: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('quotes')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (error) throw error;
+      
+      if (data) {
+        setSourceQuote(data);
+        setIsConvertingQuote(true);
+        
+        // Pré-preencher campos
+        setCustomerName(data.client_name || '');
+        setCustomerPhone(data.client_phone || '');
+        setTripType((data.trip_type as 'one_way' | 'round_trip' | 'multi_city') || 'round_trip');
+        setPassengers(data.passengers || 1);
+        
+        if (data.flight_segments && Array.isArray(data.flight_segments)) {
+          setFlightSegments(data.flight_segments as unknown as FlightSegment[]);
+        }
+        
+        setMilesNeeded(data.miles_needed?.toString() || '');
+        setBoardingFee(data.boarding_fee?.toString() || '');
+        setPriceTotal(data.total_price?.toString() || '');
+        
+        if (data.installments) {
+          setInstallments(data.installments);
+        }
+        
+        toast({
+          title: "Orçamento carregado!",
+          description: `Pré-preenchendo com dados do orçamento de ${data.client_name}`,
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Erro ao carregar orçamento",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Fase 3: Create tickets for passengers
+  const createTicketsForPassengers = async (saleId: string) => {
+    try {
+      const route = flightSegments.map(s => `${s.from} → ${s.to}`).join(" / ");
+      const selectedAccount = filteredAccounts.find(a => a.id === accountId);
+      const airline = selectedAccount?.airline_companies?.name || counterAirlineProgram || "Companhia";
+      
+      const ticketsToInsert = passengerCpfs.map((passenger) => ({
+        sale_id: saleId,
+        passenger_name: passenger.name,
+        passenger_cpf_encrypted: passenger.cpf,
+        route,
+        departure_date: flightSegments[0]?.date || new Date().toISOString().split('T')[0],
+        return_date: flightSegments[1]?.date || null,
+        airline,
+        status: 'pending' as const,
+        ticket_code: `TKT${Date.now()}${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
+      }));
+      
+      const { error } = await supabase
+        .from('tickets')
+        .insert(ticketsToInsert);
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Passagens criadas!",
+        description: `${ticketsToInsert.length} passagem(ns) registrada(s) com sucesso.`,
+      });
+      
+      return true;
+    } catch (error: any) {
+      toast({
+        title: "Erro ao criar passagens",
+        description: error.message,
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
 
   // Filter accounts - show all active accounts
   const filteredAccounts = accounts.filter(
@@ -150,7 +258,7 @@ export default function NewSaleWizard() {
       interestRate = result.interestRate;
     }
 
-    const success = await createSale({
+    const saleId = await createSale({
       sale_source: saleSource,
       counter_seller_name: saleSource === "mileage_counter" ? counterSellerName : undefined,
       counter_seller_contact: saleSource === "mileage_counter" ? counterSellerContact : undefined,
@@ -177,7 +285,28 @@ export default function NewSaleWizard() {
     } as any);
 
     setSaving(false);
-    if (success) {
+    
+    // Fase 2: Atualizar quote como convertido
+    if (saleId && typeof saleId === 'string' && quoteId) {
+      try {
+        await supabase
+          .from('quotes')
+          .update({
+            converted_to_sale_id: saleId,
+            converted_at: new Date().toISOString(),
+          })
+          .eq('id', quoteId);
+      } catch (error) {
+        console.error('Failed to update quote:', error);
+      }
+    }
+    
+    // Fase 3: Criar passagens automaticamente se checkbox marcado
+    if (saleId && typeof saleId === 'string') {
+      if (autoCreateTickets) {
+        await createTicketsForPassengers(saleId);
+      }
+      
       setLastSaleData({
         customerName,
         routeText: flightSegments.map(s => `${s.from} → ${s.to}`).join(" / "),
@@ -188,6 +317,8 @@ export default function NewSaleWizard() {
         passengers,
         paymentMethod,
         pnr: pnr || undefined,
+        ticketsCreated: autoCreateTickets,
+        saleId: saleId,
       });
       setShowSuccessDialog(true);
     }
@@ -232,6 +363,17 @@ export default function NewSaleWizard() {
             </p>
           </div>
         </div>
+
+        {/* Fase 2: Banner de conversão de orçamento */}
+        {isConvertingQuote && sourceQuote && (
+          <Alert className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              📋 Convertendo orçamento #{sourceQuote.id.slice(0,8)} de {sourceQuote.client_name} 
+              criado em {new Date(sourceQuote.created_at).toLocaleDateString()}
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Progress Bar */}
         <div className="flex gap-2 mb-8">
@@ -720,6 +862,25 @@ export default function NewSaleWizard() {
               {currentStep === 3 && (
                 <div className="space-y-6">
                   <h2 className="text-xl font-semibold">Confirmar</h2>
+                  
+                  {/* Fase 3: Checkbox para criar passagens automaticamente */}
+                  <div className="flex items-center space-x-2 border p-4 rounded-lg bg-muted/30">
+                    <Checkbox
+                      id="auto-create-tickets"
+                      checked={autoCreateTickets}
+                      onCheckedChange={(checked) => setAutoCreateTickets(checked as boolean)}
+                    />
+                    <label
+                      htmlFor="auto-create-tickets"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                    >
+                      ✈️ Emitir passagens automaticamente após salvar
+                      <p className="text-xs text-muted-foreground mt-1 font-normal">
+                        Cria {passengerCpfs.length} passagem(ns) com status "Pendente"
+                      </p>
+                    </label>
+                  </div>
+
                   <div className="space-y-4 text-sm">
                     {/* Sale Source */}
                     <div>
@@ -918,7 +1079,7 @@ export default function NewSaleWizard() {
             setShowSuccessDialog(false);
             navigate("/sales");
           }}
-          onRegisterTicket={() => {
+          onRegisterTicket={lastSaleData?.ticketsCreated ? undefined : () => {
             setShowSuccessDialog(false);
             setShowRegisterTicket(true);
           }}

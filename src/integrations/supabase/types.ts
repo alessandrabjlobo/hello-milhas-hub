@@ -269,6 +269,7 @@ export type Database = {
           installments: number
           interest_rate: number
           is_active: boolean | null
+          payment_type: string
           supplier_id: string
           updated_at: string | null
         }
@@ -278,6 +279,7 @@ export type Database = {
           installments: number
           interest_rate: number
           is_active?: boolean | null
+          payment_type?: string
           supplier_id: string
           updated_at?: string | null
         }
@@ -287,6 +289,7 @@ export type Database = {
           installments?: number
           interest_rate?: number
           is_active?: boolean | null
+          payment_type?: string
           supplier_id?: string
           updated_at?: string | null
         }

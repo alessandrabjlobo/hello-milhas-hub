@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Table,
   TableBody,
@@ -20,15 +21,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Plus, Pencil, Trash2, CreditCard, Calculator } from "lucide-react";
-import { useCreditInterestConfig } from "@/hooks/useCreditInterestConfig";
+import { usePaymentInterestConfig } from "@/hooks/usePaymentInterestConfig";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export default function CreditSettings() {
+export default function PaymentInterestSettings() {
   const { configs, loading, createConfig, updateConfig, deleteConfig, calculateInstallmentValue } =
-    useCreditInterestConfig();
+    usePaymentInterestConfig();
 
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingConfig, setEditingConfig] = useState<{ id: string; installments: number; interest_rate: number } | null>(null);
+  const [editingConfig, setEditingConfig] = useState<{ id: string; installments: number; interest_rate: number; payment_type: 'debit' | 'credit' } | null>(null);
+  const [paymentType, setPaymentType] = useState<'debit' | 'credit'>('credit');
   const [installments, setInstallments] = useState("");
   const [interestRate, setInterestRate] = useState("");
   
@@ -38,10 +40,12 @@ export default function CreditSettings() {
   const handleOpenDialog = (config?: typeof editingConfig) => {
     if (config) {
       setEditingConfig(config);
+      setPaymentType(config.payment_type || 'credit');
       setInstallments(config.installments.toString());
       setInterestRate(config.interest_rate.toString());
     } else {
       setEditingConfig(null);
+      setPaymentType('credit');
       setInstallments("");
       setInterestRate("");
     }
@@ -51,6 +55,11 @@ export default function CreditSettings() {
   const handleSave = async () => {
     const installmentsNum = parseInt(installments);
     const interestRateNum = parseFloat(interestRate);
+
+    // Validação: débito deve ter 1 parcela
+    if (paymentType === 'debit' && installmentsNum !== 1) {
+      return;
+    }
 
     if (!installmentsNum || installmentsNum < 1 || installmentsNum > 24) {
       return;
@@ -70,6 +79,7 @@ export default function CreditSettings() {
       success = await createConfig({
         installments: installmentsNum,
         interest_rate: interestRateNum,
+        payment_type: paymentType,
       });
     }
 
@@ -91,9 +101,9 @@ export default function CreditSettings() {
     <div className="container max-w-6xl mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Configurações de Crédito</h1>
+          <h1 className="text-3xl font-bold">Configurações de Juros</h1>
           <p className="text-muted-foreground">
-            Configure as taxas de juros para parcelamento no cartão de crédito
+            Configure as taxas para débito e crédito parcelado
           </p>
         </div>
         <Button onClick={() => handleOpenDialog()}>
@@ -131,6 +141,7 @@ export default function CreditSettings() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Tipo</TableHead>
                     <TableHead>Parcelas</TableHead>
                     <TableHead>Taxa (%)</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
@@ -139,8 +150,11 @@ export default function CreditSettings() {
                 <TableBody>
                   {configs.map((config) => (
                     <TableRow key={config.id}>
+                      <TableCell className="capitalize">
+                        {config.payment_type === 'debit' ? 'Débito' : 'Crédito'}
+                      </TableCell>
                       <TableCell className="font-medium">{config.installments}x</TableCell>
-                      <TableCell>{config.interest_rate.toFixed(2)}%</TableCell>
+                      <TableCell>{config.interest_rate.toFixed(3)}%</TableCell>
                       <TableCell className="text-right space-x-2">
                         <Button
                           variant="ghost"
@@ -149,6 +163,7 @@ export default function CreditSettings() {
                             id: config.id,
                             installments: config.installments,
                             interest_rate: config.interest_rate,
+                            payment_type: config.payment_type,
                           })}
                         >
                           <Pencil className="h-4 w-4" />
@@ -210,7 +225,9 @@ export default function CreditSettings() {
                       return (
                         <div key={config.id} className="p-3 space-y-1">
                           <div className="flex items-center justify-between">
-                            <span className="font-semibold">{config.installments}x</span>
+                            <span className="font-semibold">
+                              {config.payment_type === 'debit' ? 'Débito' : `${config.installments}x`}
+                            </span>
                             <span className="text-sm text-muted-foreground">
                               Taxa: {config.interest_rate}%
                             </span>
@@ -246,38 +263,68 @@ export default function CreditSettings() {
               {editingConfig ? "Editar Configuração" : "Nova Configuração"}
             </DialogTitle>
             <DialogDescription>
-              Configure a taxa de juros para um número específico de parcelas
+              Configure a taxa de juros para débito ou crédito
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
+            {!editingConfig && (
+              <div className="space-y-2">
+                <Label>Tipo de Pagamento</Label>
+                <RadioGroup value={paymentType} onValueChange={(v) => {
+                  setPaymentType(v as 'debit' | 'credit');
+                  if (v === 'debit') {
+                    setInstallments('1');
+                  }
+                }}>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="debit" id="debit" />
+                    <Label htmlFor="debit" className="cursor-pointer">Débito</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="credit" id="credit" />
+                    <Label htmlFor="credit" className="cursor-pointer">Crédito</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+            )}
+
             <div className="space-y-2">
-              <Label htmlFor="installments">Número de Parcelas *</Label>
+              <Label htmlFor="installments">
+                {paymentType === 'debit' ? 'Parcelas (fixo em 1)' : 'Número de Parcelas *'}
+              </Label>
               <Input
                 id="installments"
                 type="number"
                 min="1"
-                max="24"
+                max={paymentType === 'debit' ? '1' : '24'}
                 placeholder="12"
                 value={installments}
                 onChange={(e) => setInstallments(e.target.value)}
+                disabled={paymentType === 'debit'}
               />
-              <p className="text-xs text-muted-foreground">Entre 1 e 24 parcelas</p>
+              <p className="text-xs text-muted-foreground">
+                {paymentType === 'debit' ? 'Débito sempre em 1 parcela' : 'Entre 1 e 24 parcelas'}
+              </p>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="interest-rate">Taxa de Juros (%) *</Label>
+              <Label htmlFor="interest-rate">
+                {paymentType === 'debit' ? 'Taxa de Débito (%) *' : 'Taxa de Juros (%) *'}
+              </Label>
               <Input
                 id="interest-rate"
                 type="number"
-                step="0.01"
+                step="0.001"
                 min="0"
-                placeholder="5.50"
+                placeholder={paymentType === 'debit' ? "4.160" : "6.750"}
                 value={interestRate}
                 onChange={(e) => setInterestRate(e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                Use 0 para parcelamento sem juros
+                {paymentType === 'debit' 
+                  ? 'Taxa aplicada para pagamento no débito'
+                  : 'Taxa total aplicada para este número de parcelas (não proporcional)'}
               </p>
             </div>
           </div>
