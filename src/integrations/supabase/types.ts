@@ -262,6 +262,44 @@ export type Database = {
           },
         ]
       }
+      credit_interest_config: {
+        Row: {
+          created_at: string | null
+          id: string
+          installments: number
+          interest_rate: number
+          is_active: boolean | null
+          supplier_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          installments: number
+          interest_rate: number
+          is_active?: boolean | null
+          supplier_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          installments?: number
+          interest_rate?: number
+          is_active?: boolean | null
+          supplier_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_interest_config_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mileage_accounts: {
         Row: {
           account_holder_cpf: string | null
@@ -455,8 +493,12 @@ export type Database = {
           company_name: string | null
           created_at: string
           departure_date: string | null
+          final_price_with_interest: number | null
           flight_details: Json | null
+          flight_segments: Json | null
           id: string
+          installments: number | null
+          interest_rate: number | null
           miles_needed: number
           passengers: number | null
           payment_methods: string[] | null
@@ -475,8 +517,12 @@ export type Database = {
           company_name?: string | null
           created_at?: string
           departure_date?: string | null
+          final_price_with_interest?: number | null
           flight_details?: Json | null
+          flight_segments?: Json | null
           id?: string
+          installments?: number | null
+          interest_rate?: number | null
           miles_needed: number
           passengers?: number | null
           payment_methods?: string[] | null
@@ -495,8 +541,12 @@ export type Database = {
           company_name?: string | null
           created_at?: string
           departure_date?: string | null
+          final_price_with_interest?: number | null
           flight_details?: Json | null
+          flight_segments?: Json | null
           id?: string
+          installments?: number | null
+          interest_rate?: number | null
           miles_needed?: number
           passengers?: number | null
           payment_methods?: string[] | null
@@ -516,20 +566,28 @@ export type Database = {
           client_contact: string | null
           client_cpf_encrypted: string
           client_name: string
-          cost_per_mile: number
+          cost_per_mile: number | null
           cost_per_mile_snapshot: number | null
+          counter_airline_program: string | null
+          counter_seller_contact: string | null
+          counter_seller_name: string | null
           cpf_used_id: string | null
           created_at: string
           customer_cpf: string | null
           customer_name: string | null
           customer_phone: string | null
+          final_price_with_interest: number | null
+          flight_segments: Json | null
           id: string
+          installments: number | null
+          interest_rate: number | null
           margin_percentage: number | null
           margin_value: number | null
           mileage_account_id: string | null
           miles_needed: number | null
           miles_used: number
           notes: string | null
+          passenger_cpfs: Json | null
           passengers: number | null
           payment_method: string | null
           price_per_passenger: number | null
@@ -539,10 +597,12 @@ export type Database = {
           profit_margin: number
           route_text: string | null
           sale_price: number
+          sale_source: string | null
           status: Database["public"]["Enums"]["sale_status"]
           supplier_id: string | null
           total_cost: number
           travel_dates: Json | null
+          trip_type: string | null
           updated_at: string
           user_id: string
         }
@@ -551,20 +611,28 @@ export type Database = {
           client_contact?: string | null
           client_cpf_encrypted: string
           client_name: string
-          cost_per_mile: number
+          cost_per_mile?: number | null
           cost_per_mile_snapshot?: number | null
+          counter_airline_program?: string | null
+          counter_seller_contact?: string | null
+          counter_seller_name?: string | null
           cpf_used_id?: string | null
           created_at?: string
           customer_cpf?: string | null
           customer_name?: string | null
           customer_phone?: string | null
+          final_price_with_interest?: number | null
+          flight_segments?: Json | null
           id?: string
+          installments?: number | null
+          interest_rate?: number | null
           margin_percentage?: number | null
           margin_value?: number | null
           mileage_account_id?: string | null
           miles_needed?: number | null
           miles_used: number
           notes?: string | null
+          passenger_cpfs?: Json | null
           passengers?: number | null
           payment_method?: string | null
           price_per_passenger?: number | null
@@ -574,10 +642,12 @@ export type Database = {
           profit_margin: number
           route_text?: string | null
           sale_price: number
+          sale_source?: string | null
           status?: Database["public"]["Enums"]["sale_status"]
           supplier_id?: string | null
           total_cost: number
           travel_dates?: Json | null
+          trip_type?: string | null
           updated_at?: string
           user_id: string
         }
@@ -586,20 +656,28 @@ export type Database = {
           client_contact?: string | null
           client_cpf_encrypted?: string
           client_name?: string
-          cost_per_mile?: number
+          cost_per_mile?: number | null
           cost_per_mile_snapshot?: number | null
+          counter_airline_program?: string | null
+          counter_seller_contact?: string | null
+          counter_seller_name?: string | null
           cpf_used_id?: string | null
           created_at?: string
           customer_cpf?: string | null
           customer_name?: string | null
           customer_phone?: string | null
+          final_price_with_interest?: number | null
+          flight_segments?: Json | null
           id?: string
+          installments?: number | null
+          interest_rate?: number | null
           margin_percentage?: number | null
           margin_value?: number | null
           mileage_account_id?: string | null
           miles_needed?: number | null
           miles_used?: number
           notes?: string | null
+          passenger_cpfs?: Json | null
           passengers?: number | null
           payment_method?: string | null
           price_per_passenger?: number | null
@@ -609,10 +687,12 @@ export type Database = {
           profit_margin?: number
           route_text?: string | null
           sale_price?: number
+          sale_source?: string | null
           status?: Database["public"]["Enums"]["sale_status"]
           supplier_id?: string | null
           total_cost?: number
           travel_dates?: Json | null
+          trip_type?: string | null
           updated_at?: string
           user_id?: string
         }
