@@ -293,9 +293,9 @@ export default function NewSaleWizard() {
                           <Alert>
                             <AlertCircle className="h-4 w-4" />
                             <AlertDescription>
-                              Nenhuma conta disponível. Cadastre em{" "}
-                              <Button variant="link" className="p-0 h-auto" onClick={() => navigate("/settings/my-airlines")}>
-                                Minhas Companhias
+                              Nenhuma conta disponível. Configure seus programas em{" "}
+                              <Button variant="link" className="p-0 h-auto" onClick={() => navigate("/settings/programs")}>
+                                Regras de Programas
                               </Button>
                             </AlertDescription>
                           </Alert>
@@ -517,13 +517,13 @@ export default function NewSaleWizard() {
                         <Alert>
                           <AlertCircle className="h-4 w-4" />
                           <AlertDescription>
-                            Nenhuma conta disponível. Configure suas companhias aéreas em{" "}
+                            Nenhuma conta disponível. Configure seus programas em{" "}
                             <Button
                               variant="link"
                               className="p-0 h-auto"
-                              onClick={() => navigate("/settings/my-airlines")}
+                              onClick={() => navigate("/settings/programs")}
                             >
-                              Minhas Companhias
+                              Regras de Programas
                             </Button>
                           </AlertDescription>
                         </Alert>

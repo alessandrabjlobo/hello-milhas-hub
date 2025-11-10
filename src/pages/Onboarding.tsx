@@ -28,11 +28,11 @@ export default function Onboarding() {
       buttonText: suppliers.length > 0 ? "Ver Fornecedores" : "Criar Fornecedor",
     },
     {
-      title: "2. Vincular Companhias Aéreas",
-      description: "Selecione as companhias aéreas que você trabalha",
+      title: "2. Configurar Programas",
+      description: "Configure os programas de fidelidade que você trabalha",
       completed: linkedAirlines.length > 0,
-      action: () => navigate("/my-airlines"),
-      buttonText: linkedAirlines.length > 0 ? "Gerenciar Companhias" : "Vincular Companhias",
+      action: () => navigate("/settings/programs"),
+      buttonText: linkedAirlines.length > 0 ? "Gerenciar Programas" : "Configurar Programas",
       disabled: !supplierId,
     },
     {

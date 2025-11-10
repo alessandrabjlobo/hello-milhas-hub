@@ -394,7 +394,7 @@ export default function ProgramRules() {
         <div>
           <h1 className="text-3xl font-bold">Regras de Programas</h1>
           <p className="text-muted-foreground">
-            Configure quais programas sua agência trabalha e defina regras padrão para cada um.
+            Configure os programas de fidelidade da sua agência. Programas configurados aqui ficam disponíveis para criar contas e vendas.
           </p>
         </div>
       </div>
@@ -411,7 +411,7 @@ export default function ProgramRules() {
         <CardHeader>
           <CardTitle>Adicionar Programa</CardTitle>
           <CardDescription>
-            Adicione programas de fidelidade e configure as regras padrão
+            Configure um novo programa de fidelidade para usar em contas e vendas
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
