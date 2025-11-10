@@ -8,6 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { FileText } from "lucide-react";
+import type { Database } from "@/integrations/supabase/types";
+
+type Json = Database["public"]["Tables"]["tickets"]["Row"]["attachments"];
 
 interface Ticket {
   id: string;
@@ -23,7 +26,7 @@ interface Ticket {
   issued_at: string | null;
   verification_status: string | null;
   status: string;
-  attachments: any[];
+  attachments: Json;
 }
 
 interface TicketDetailDialogProps {
@@ -160,7 +163,7 @@ export function TicketDetailDialog({
             </div>
           </div>
           
-          {ticket.attachments && ticket.attachments.length > 0 && (
+          {ticket.attachments && Array.isArray(ticket.attachments) && ticket.attachments.length > 0 && (
             <>
               <Separator />
               <div>
