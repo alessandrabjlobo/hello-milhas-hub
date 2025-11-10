@@ -37,24 +37,24 @@ export default function Tickets() {
   const [detailTicket, setDetailTicket] = useState<typeof tickets[0] | null>(null);
   const { toast } = useToast();
 
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, "default" | "secondary" | "destructive"> = {
-      pending: "secondary",
-      confirmed: "default",
-      cancelled: "destructive",
-    };
-
-    const labels: Record<string, string> = {
-      pending: "Aguardando Emissão",
-      confirmed: "Confirmado",
-      cancelled: "Cancelado",
-    };
-
-    return (
-      <Badge variant={variants[status] || "default"}>
-        {labels[status] || status}
-      </Badge>
-    );
+  const getFlightStatus = (ticket: typeof tickets[0]) => {
+    if (!ticket.departure_date) {
+      return <Badge variant="secondary">Sem Data</Badge>;
+    }
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const flightDate = new Date(ticket.departure_date);
+    flightDate.setHours(0, 0, 0, 0);
+    
+    if (flightDate < today) {
+      return <Badge variant="outline">✓ Já Voado</Badge>;
+    } else if (flightDate.getTime() === today.getTime()) {
+      return <Badge variant="default">✈️ Voa Hoje</Badge>;
+    } else {
+      return <Badge variant="secondary">📅 Próximo Voo</Badge>;
+    }
   };
 
   const handleDeleteTicket = async () => {
@@ -201,7 +201,7 @@ export default function Tickets() {
                       {ticket.ticket_number || "-"}
                     </TableCell>
                     <TableCell>{getVerificationBadge(ticket.verification_status)}</TableCell>
-                    <TableCell>{getStatusBadge(ticket.status)}</TableCell>
+                    <TableCell>{getFlightStatus(ticket)}</TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>

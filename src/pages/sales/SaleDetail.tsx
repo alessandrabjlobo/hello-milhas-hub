@@ -105,18 +105,38 @@ export default function SaleDetail() {
     return null;
   }
 
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, "default" | "secondary" | "destructive"> = {
-      pending: "secondary",
-      completed: "default",
-      cancelled: "destructive",
-    };
-    const labels: Record<string, string> = {
-      pending: "Aguardando",
-      completed: "Concluída",
-      cancelled: "Cancelada",
-    };
-    return <Badge variant={variants[status]}>{labels[status] || status}</Badge>;
+  const getFlightStatus = () => {
+    if (!sale) return <Badge variant="secondary">Sem Data</Badge>;
+    
+    // Tentar extrair a data do voo de flight_segments ou travel_dates
+    let departureDate: Date | null = null;
+    
+    if (sale.flight_segments && Array.isArray(sale.flight_segments) && sale.flight_segments.length > 0) {
+      const firstSegment = sale.flight_segments[0] as { date?: string };
+      if (firstSegment.date) {
+        departureDate = new Date(firstSegment.date);
+      }
+    } else if (sale.travel_dates) {
+      departureDate = new Date(String(sale.travel_dates));
+    }
+    
+    if (!departureDate || isNaN(departureDate.getTime())) {
+      return <Badge variant="secondary">Sem Data</Badge>;
+    }
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const flightDate = new Date(departureDate);
+    flightDate.setHours(0, 0, 0, 0);
+    
+    if (flightDate < today) {
+      return <Badge variant="outline">✓ Já Voado</Badge>;
+    } else if (flightDate.getTime() === today.getTime()) {
+      return <Badge variant="default">✈️ Voa Hoje</Badge>;
+    } else {
+      return <Badge variant="secondary">📅 Próximo Voo</Badge>;
+    }
   };
 
   const handleDeleteSale = async () => {
@@ -157,7 +177,7 @@ export default function SaleDetail() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {getStatusBadge(sale.status)}
+          {getFlightStatus()}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon">

@@ -74,18 +74,36 @@ export default function SalesList() {
     exportToCSV(data, `vendas-${new Date().toISOString().split("T")[0]}`);
   };
 
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, "default" | "secondary" | "destructive"> = {
-      pending: "secondary",
-      completed: "default",
-      cancelled: "destructive",
-    };
-    const labels: Record<string, string> = {
-      pending: "Aguardando",
-      completed: "Concluída",
-      cancelled: "Cancelada",
-    };
-    return <Badge variant={variants[status] || "default"}>{labels[status] || status}</Badge>;
+  const getFlightStatus = (sale: typeof sales[0]) => {
+    // Tentar extrair a data do voo de flight_segments ou travel_dates
+    let departureDate: Date | null = null;
+    
+    if (sale.flight_segments && Array.isArray(sale.flight_segments) && sale.flight_segments.length > 0) {
+      const firstSegment = sale.flight_segments[0] as { date?: string };
+      if (firstSegment.date) {
+        departureDate = new Date(firstSegment.date);
+      }
+    } else if (sale.travel_dates) {
+      departureDate = new Date(String(sale.travel_dates));
+    }
+    
+    if (!departureDate || isNaN(departureDate.getTime())) {
+      return <Badge variant="secondary">Sem Data</Badge>;
+    }
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const flightDate = new Date(departureDate);
+    flightDate.setHours(0, 0, 0, 0);
+    
+    if (flightDate < today) {
+      return <Badge variant="outline">✓ Já Voado</Badge>;
+    } else if (flightDate.getTime() === today.getTime()) {
+      return <Badge variant="default">✈️ Voa Hoje</Badge>;
+    } else {
+      return <Badge variant="secondary">📅 Próximo Voo</Badge>;
+    }
   };
 
   if (loading) {
@@ -176,7 +194,7 @@ export default function SalesList() {
                         totalAmount={sale.sale_price || 0}
                       />
                     </TableCell>
-                    <TableCell>{getStatusBadge(sale.status)}</TableCell>
+                    <TableCell>{getFlightStatus(sale)}</TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon" asChild>
                         <Link to={`/sales/${sale.id}`}>
