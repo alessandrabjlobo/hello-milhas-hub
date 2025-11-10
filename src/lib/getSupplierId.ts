@@ -1,16 +1,16 @@
 import { supabase } from "@/integrations/supabase/client";
 
 export async function getSupplierId() {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
+  const { data: { user }, error: authErr } = await supabase.auth.getUser();
+  if (authErr || !user) throw new Error("Não autenticado");
 
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("supplier_id")
-    .eq("id", user.id)
-    .single();
+  // Call RPC to auto-provision supplier if needed
+  const { data, error } = await supabase.rpc("ensure_profile_and_supplier", {
+    p_user_id: user.id,
+  });
 
   if (error) throw error;
-  if (!data?.supplier_id) throw new Error("supplier_id missing in profile");
-  return { supplierId: data.supplier_id as string, userId: user.id };
+  if (!data) throw new Error("Falha ao obter supplier_id");
+
+  return { supplierId: data as string, userId: user.id };
 }

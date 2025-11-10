@@ -929,6 +929,10 @@ export type Database = {
       }
       encrypt_cpf: { Args: { cpf_text: string }; Returns: string }
       encrypt_password: { Args: { password_text: string }; Returns: string }
+      ensure_profile_and_supplier: {
+        Args: { p_user_id: string }
+        Returns: string
+      }
       get_user_supplier_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {

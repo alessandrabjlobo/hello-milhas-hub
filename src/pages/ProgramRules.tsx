@@ -32,7 +32,6 @@ interface ProgramRule {
 export default function ProgramRules() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [supplierError, setSupplierError] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -62,7 +61,6 @@ export default function ProgramRules() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      setSupplierError(false);
 
       // Fetch airlines
       const { data: airlinesData, error: airlinesError } = await supabase
@@ -71,10 +69,10 @@ export default function ProgramRules() {
         .order("name");
 
       if (airlinesError) {
-        console.error("Airlines fetch error:", airlinesError);
+        console.error("Erro ao carregar companhias aéreas:", airlinesError);
         toast({
-          title: "Error loading airlines",
-          description: `${airlinesError.message} (Code: ${airlinesError.code})`,
+          title: "Erro ao carregar companhias aéreas",
+          description: `${airlinesError.message} (Código: ${airlinesError.code})`,
           variant: "destructive",
         });
         throw airlinesError;
@@ -83,21 +81,8 @@ export default function ProgramRules() {
       const airlineList = (airlinesData ?? []) as Airline[];
       setAirlines(airlineList);
 
-      // Fetch program rules for user's supplier
-      let supplierId: string;
-      try {
-        const result = await getSupplierId();
-        supplierId = result.supplierId;
-      } catch (error: any) {
-        console.error("Supplier ID error:", error);
-        setSupplierError(true);
-        toast({
-          title: "Supplier setup required",
-          description: "Please set your supplier in Settings to use program rules.",
-          variant: "destructive",
-        });
-        return;
-      }
+      // Fetch program rules for user's supplier (auto-provisioned)
+      const { supplierId } = await getSupplierId();
 
       const { data: rulesData, error: rulesError } = await supabase
         .from("program_rules")
@@ -105,10 +90,10 @@ export default function ProgramRules() {
         .eq("supplier_id", supplierId);
 
       if (rulesError) {
-        console.error("Rules fetch error:", rulesError);
+        console.error("Erro ao carregar regras:", rulesError);
         toast({
-          title: "Error loading rules",
-          description: `${rulesError.message} (Code: ${rulesError.code})`,
+          title: "Erro ao carregar regras",
+          description: `${rulesError.message} (Código: ${rulesError.code})`,
           variant: "destructive",
         });
         throw rulesError;
@@ -134,14 +119,12 @@ export default function ProgramRules() {
       setRules(rulesMap);
       setOriginalRules(JSON.parse(JSON.stringify(rulesMap)));
     } catch (err: any) {
-      console.error("Fetch data error:", err);
-      if (!supplierError) {
-        toast({
-          title: "Error loading data",
-          description: err?.message ?? "Check your connection and try again",
-          variant: "destructive",
-        });
-      }
+      console.error("Erro ao carregar dados:", err);
+      toast({
+        title: "Erro ao carregar dados",
+        description: err?.message ?? "Verifique sua conexão e tente novamente",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -180,8 +163,8 @@ export default function ProgramRules() {
       },
     }));
     toast({
-      title: "Airline added",
-      description: `${created.name} (${created.code}) created successfully.`,
+      title: "Companhia aérea adicionada",
+      description: `${created.name} (${created.code}) criada com sucesso.`,
     });
     return created;
   };
@@ -209,8 +192,8 @@ export default function ProgramRules() {
       return { id: created.id, label: `${created.name} (${created.code})` };
     } catch (err: any) {
       toast({
-        title: "Error creating airline",
-        description: err?.message ?? "Try again.",
+        title: "Erro ao criar companhia aérea",
+        description: err?.message ?? "Tente novamente.",
         variant: "destructive",
       });
       return null;
@@ -219,17 +202,17 @@ export default function ProgramRules() {
 
   // Button to create airline via prompt
   const handleCreateAirlineViaPrompt = async () => {
-    const name = window.prompt("Airline name (e.g., LATAM):");
+    const name = window.prompt("Nome da companhia aérea (ex: LATAM):");
     if (!name) return;
-    const code = window.prompt("Code (e.g., LA):");
+    const code = window.prompt("Código (ex: LA):");
     if (!code) return;
     try {
       const created = await createAirline(name, code);
       setAirlineId(created.id);
     } catch (err: any) {
       toast({
-        title: "Error creating airline",
-        description: err?.message ?? "Try again.",
+        title: "Erro ao criar companhia aérea",
+        description: err?.message ?? "Tente novamente.",
         variant: "destructive",
       });
     }
@@ -238,7 +221,7 @@ export default function ProgramRules() {
   // Quick-add: save rule for selected airline
   const addOrUpdateRule = async () => {
     if (!airlineId) {
-      toast({ title: "Select an airline", variant: "destructive" });
+      toast({ title: "Selecione uma companhia aérea", variant: "destructive" });
       return;
     }
     const cpfLimit = normalizeLimit(Number(cpfLimitInput));
@@ -271,18 +254,18 @@ export default function ProgramRules() {
       }));
 
       toast({
-        title: "Rule saved",
-        description: "Configuration applied successfully.",
+        title: "Regra salva",
+        description: "Configuração aplicada com sucesso.",
       });
       setAirlineId("");
       setCpfLimitInput("25");
       setPeriod("annual");
     } catch (err: any) {
-      console.error("Save error:", err);
-      const errorMsg = err?.message || "Unknown error";
+      console.error("Erro ao salvar:", err);
+      const errorMsg = err?.message || "Erro desconhecido";
       const errorCode = err?.code || "";
       toast({
-        title: "Error saving rule",
+        title: "Erro ao salvar regra",
         description: `${errorMsg}${errorCode ? ` (${errorCode})` : ""}`,
         variant: "destructive",
       });
@@ -324,7 +307,7 @@ export default function ProgramRules() {
   // Save all changes
   const handleSaveAll = async () => {
     if (diffToSave.length === 0) {
-      toast({ title: "Nothing to save", description: "No changes detected." });
+      toast({ title: "Nada para salvar", description: "Nenhuma alteração detectada." });
       return;
     }
     try {
@@ -340,15 +323,15 @@ export default function ProgramRules() {
 
       setOriginalRules(JSON.parse(JSON.stringify(rules)));
       toast({
-        title: "Rules saved",
-        description: "All changes saved successfully.",
+        title: "Regras salvas",
+        description: "Todas as alterações salvas com sucesso.",
       });
     } catch (err: any) {
-      console.error("Bulk save error:", err);
-      const errorMsg = err?.message || "Unknown error";
+      console.error("Erro ao salvar em lote:", err);
+      const errorMsg = err?.message || "Erro desconhecido";
       const errorCode = err?.code || "";
       toast({
-        title: "Error saving rules",
+        title: "Erro ao salvar regras",
         description: `${errorMsg}${errorCode ? ` (${errorCode})` : ""}`,
         variant: "destructive",
       });
@@ -372,21 +355,14 @@ export default function ProgramRules() {
 
   return (
     <div className="container max-w-4xl mx-auto p-6 space-y-6">
-      {supplierError && (
-        <Alert variant="destructive">
-          <AlertDescription>
-            Supplier setup required. Please contact an administrator to set your supplier_id.
-          </AlertDescription>
-        </Alert>
-      )}
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
-          <h1 className="text-3xl font-bold">Program Rules</h1>
+          <h1 className="text-3xl font-bold">Regras de Programas</h1>
           <p className="text-muted-foreground">
-            Configure which programs your agency works with and set default rules for each.
+            Configure quais programas sua agência trabalha e defina regras padrão para cada um.
           </p>
         </div>
       </div>
@@ -394,14 +370,14 @@ export default function ProgramRules() {
       <Alert>
         <Info className="h-4 w-4" />
         <AlertDescription>
-          These settings will be applied when creating <b>new</b> accounts.
+          Estas configurações serão aplicadas ao criar <b>novas</b> contas.
         </AlertDescription>
       </Alert>
 
       {/* Quick-add form */}
       <Card>
         <CardHeader>
-          <CardTitle>Add Program</CardTitle>
+          <CardTitle>Adicionar Programa</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid md:grid-cols-3 gap-3 items-start">
@@ -413,36 +389,36 @@ export default function ProgramRules() {
                     value={airlineId}
                     onChange={setAirlineId}
                     onCreate={handleComboboxCreate}
-                    placeholder="Program/Airline"
+                    placeholder="Programa/Companhia Aérea"
                   />
                 </div>
-                <Button variant="secondary" onClick={handleCreateAirlineViaPrompt} title="New airline">
+                <Button variant="secondary" onClick={handleCreateAirlineViaPrompt} title="Nova companhia aérea">
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Tip: type "Name (CODE)" and click Add.
+                Dica: digite "Nome (CÓDIGO)" e clique em Adicionar.
               </p>
             </div>
 
             <Input
-              placeholder="CPF Limit"
+              placeholder="Limite de CPF"
               value={cpfLimitInput}
               onChange={(e) => setCpfLimitInput(e.target.value)}
               inputMode="numeric"
             />
 
             <Select value={period} onValueChange={(v: RenewalType) => setPeriod(v)}>
-              <SelectTrigger><SelectValue placeholder="Period" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Período" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="annual">Annual (resets Jan 1)</SelectItem>
-                <SelectItem value="rolling">Rolling (1 year from use)</SelectItem>
+                <SelectItem value="annual">Anual (renova 1º jan)</SelectItem>
+                <SelectItem value="rolling">Contínuo (1 ano do uso)</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <Button onClick={addOrUpdateRule} disabled={!airlineId}>
-            Save Rule
+            Salvar Regra
           </Button>
         </CardContent>
       </Card>
@@ -450,13 +426,13 @@ export default function ProgramRules() {
       {/* Bulk edit list */}
       <Card>
         <CardHeader>
-          <CardTitle>Active Programs</CardTitle>
-          <CardDescription>These programs will be available when creating accounts and sales.</CardDescription>
+          <CardTitle>Programas Ativos</CardTitle>
+          <CardDescription>Estes programas estarão disponíveis ao criar contas e vendas.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
           {airlines.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No airlines registered. Use "New airline" to create one.
+              Nenhuma companhia aérea cadastrada. Use "Nova companhia aérea" para criar uma.
             </p>
           ) : (
             airlines.map((airline) => {
@@ -468,8 +444,8 @@ export default function ProgramRules() {
                       {airline.name} ({airline.code})
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      CPF Limit: <b>{rule?.cpf_limit ?? 25}</b> — Period:{" "}
-                      <b>{(rule?.renewal_type ?? "annual") === "rolling" ? "Rolling (1 year)" : "Annual (Jan 1)"}</b>
+                      Limite CPF: <b>{rule?.cpf_limit ?? 25}</b> — Período:{" "}
+                      <b>{(rule?.renewal_type ?? "annual") === "rolling" ? "Contínuo (1 ano)" : "Anual (1º jan)"}</b>
                     </div>
                   </div>
                   <div className="flex gap-3 items-center">
@@ -487,8 +463,8 @@ export default function ProgramRules() {
                     >
                       <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="annual">Annual (Jan 1)</SelectItem>
-                        <SelectItem value="rolling">Rolling (1 year)</SelectItem>
+                        <SelectItem value="annual">Anual (1º jan)</SelectItem>
+                        <SelectItem value="rolling">Contínuo (1 ano)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -501,15 +477,15 @@ export default function ProgramRules() {
 
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={() => navigate("/dashboard")}>
-          Cancel
+          Cancelar
         </Button>
         <Button onClick={handleSaveAll} disabled={saving || diffToSave.length === 0}>
           <Save className="h-4 w-4 mr-2" />
           {saving
-            ? "Saving..."
+            ? "Salvando..."
             : diffToSave.length === 0
-              ? "No changes"
-              : "Save Changes"}
+              ? "Sem alterações"
+              : "Salvar Alterações"}
         </Button>
       </div>
     </div>
