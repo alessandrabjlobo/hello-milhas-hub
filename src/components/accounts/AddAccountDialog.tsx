@@ -23,6 +23,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useAgencyPrograms } from "@/hooks/useAgencyPrograms";
 import { useNavigate } from "react-router-dom";
+import { getSupplierId } from "@/lib/getSupplierId";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 type AirlineCompany = { id: string; name: string; code: string };
 type Supplier = { id: string; name: string };
@@ -37,7 +39,7 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
 
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
 
-  const { supplierId } = useUserRole();
+  const { supplierId, loading } = useUserRole();
   const { programs, loading: programsLoading } = useAgencyPrograms(supplierId);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -123,6 +125,23 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
       return;
     }
 
+    // Ensure supplier_id exists before creating account
+    let currentSupplierId = supplierId;
+    
+    if (!currentSupplierId) {
+      try {
+        const { supplierId: provisionedId } = await getSupplierId();
+        currentSupplierId = provisionedId;
+      } catch (error: any) {
+        toast({
+          title: "Erro de configuração",
+          description: "Não foi possível identificar sua organização. Tente fazer logout e login novamente.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     const { data: userData } = await supabase.auth.getUser();
     if (!userData?.user) {
       toast({
@@ -141,7 +160,7 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
       {
         user_id: userData.user.id,
         airline_company_id: formData.airline_company_id,
-        supplier_id: formData.supplier_id || supplierId,
+        supplier_id: currentSupplierId,
         account_holder_name: formData.account_holder_name,
         account_holder_cpf: formData.account_holder_cpf.replace(/\D/g, ""),
         password_encrypted: formData.password || null,
@@ -201,7 +220,17 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
           </DialogDescription>
         </DialogHeader>
 
-        {programs.length === 0 && !programsLoading ? (
+        {loading ? (
+          <div className="py-8 text-center">
+            <p className="text-muted-foreground">Carregando informações...</p>
+          </div>
+        ) : !supplierId ? (
+          <Alert variant="destructive">
+            <AlertDescription>
+              Sua conta não está configurada corretamente. Por favor, faça logout e login novamente.
+            </AlertDescription>
+          </Alert>
+        ) : programs.length === 0 && !programsLoading ? (
           <div className="py-8 text-center space-y-4">
             <p className="text-muted-foreground">
               Nenhum programa configurado. Configure os programas que sua agência trabalha primeiro.
@@ -392,6 +421,8 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
               type="submit"
               className="flex-1"
               disabled={
+                loading ||
+                !supplierId ||
                 programsLoading ||
                 programs.length === 0 ||
                 !formData.airline_company_id ||
