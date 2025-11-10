@@ -279,6 +279,33 @@ export default function NewSaleWizard() {
                     </Card>
                   </RadioGroup>
 
+                  {saleSource === "internal_account" && (
+                    <div className="grid gap-4 p-4 border rounded-lg bg-muted/30">
+                      <p className="text-sm font-medium">Selecionar Conta</p>
+                      <div>
+                        <Label htmlFor="account">Conta de Milhagem *</Label>
+                        {filteredAccounts.length === 0 ? (
+                          <Alert>
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertDescription>
+                              Nenhuma conta disponível. Cadastre em{" "}
+                              <Button variant="link" className="p-0 h-auto" onClick={() => navigate("/settings/my-airlines")}>
+                                Minhas Companhias
+                              </Button>
+                            </AlertDescription>
+                          </Alert>
+                        ) : (
+                          <AccountCombobox
+                            accounts={filteredAccounts}
+                            value={accountId}
+                            onChange={setAccountId}
+                            placeholder="Busque por companhia ou número da conta..."
+                          />
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {saleSource === "mileage_counter" && (
                     <div className="grid gap-4 p-4 border rounded-lg bg-muted/30">
                       <p className="text-sm font-medium">Informações do Fornecedor</p>
