@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 interface SaleSuccessDialogProps {
   open: boolean;
   onClose: () => void;
+  onRegisterTicket?: () => void;
   saleData: {
     customerName: string;
     routeText: string;
@@ -30,6 +31,7 @@ interface SaleSuccessDialogProps {
 export function SaleSuccessDialog({
   open,
   onClose,
+  onRegisterTicket,
   saleData,
 }: SaleSuccessDialogProps) {
   const { toast } = useToast();
@@ -152,6 +154,11 @@ Qualquer dúvida, estamos à disposição!`;
         </Tabs>
 
         <div className="flex justify-end gap-2 pt-4">
+          {onRegisterTicket && (
+            <Button onClick={onRegisterTicket}>
+              Registrar Passagem
+            </Button>
+          )}
           <Button variant="outline" onClick={onClose}>
             Fechar
           </Button>

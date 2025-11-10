@@ -42,6 +42,13 @@ export function AccountCombobox({
     return `${airline} - ${account.account_number} - ${balance}k milhas`;
   };
 
+  // Formatar CPF parcial para busca segura
+  const formatCpfPartial = (cpf?: string | null) => {
+    if (!cpf) return "";
+    // Mostra apenas últimos 4 dígitos
+    return cpf.slice(-4);
+  };
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -66,7 +73,7 @@ export function AccountCombobox({
       <PopoverContent className="w-[500px] p-0" align="start">
         <Command>
           <CommandInput 
-            placeholder="Digite nome da companhia ou número da conta..." 
+            placeholder="Busque por companhia, conta, titular ou CPF..." 
           />
           <CommandEmpty>
             {accounts.length === 0 
@@ -78,7 +85,7 @@ export function AccountCombobox({
             {accounts.map((account) => (
               <CommandItem
                 key={account.id}
-                value={`${account.airline_companies?.name} ${account.airline_companies?.code} ${account.account_number}`}
+                value={`${account.airline_companies?.name} ${account.airline_companies?.code} ${account.account_number} ${account.account_holder_name || ""} ${formatCpfPartial(account.account_holder_cpf)}`}
                 onSelect={() => {
                   onChange(account.id);
                   setOpen(false);
@@ -96,11 +103,17 @@ export function AccountCombobox({
                       {account.airline_companies?.name || "Companhia"}
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      Custo: R$ {account.cost_per_mile.toFixed(3)}/milha
+                      {account.account_holder_name || "Sem titular"}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-sm text-muted-foreground">
                     <span>Conta: {account.account_number}</span>
+                    {account.account_holder_cpf && (
+                      <span className="text-xs">CPF: ***{formatCpfPartial(account.account_holder_cpf)}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-muted-foreground mt-1">
+                    <span>R$ {account.cost_per_mile.toFixed(3)}/milha</span>
                     <span className="font-medium text-green-600">
                       {(account.balance / 1000).toFixed(0)}k milhas
                     </span>

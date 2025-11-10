@@ -36,6 +36,7 @@ import { useTickets } from "@/hooks/useTickets";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { TicketPDFUpload } from "./TicketPDFUpload";
 
 const formSchema = z.object({
   sale_id: z.string().min(1, "Selecione uma venda"),
@@ -58,6 +59,7 @@ export function RegisterTicketDialog({ open, onOpenChange }: RegisterTicketDialo
   const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
   const [cpfWarning, setCpfWarning] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<any[]>([]);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -124,7 +126,7 @@ export function RegisterTicketDialog({ open, onOpenChange }: RegisterTicketDialo
       const sale = sales.find(s => s.id === data.sale_id);
       if (!sale) throw new Error("Venda não encontrada");
 
-      // Create ticket
+      // Create ticket with attachments
       const travelDates = typeof sale.travel_dates === 'object' && sale.travel_dates !== null ? sale.travel_dates as any : {};
       const success = await createTicket({
         sale_id: data.sale_id,
@@ -134,11 +136,12 @@ export function RegisterTicketDialog({ open, onOpenChange }: RegisterTicketDialo
         issued_at: data.issued_at?.toISOString() || null,
         verification_status: data.verification_status,
         route: sale.route_text || "",
-        airline: sale.mileage_accounts?.airline_companies?.code || "",
+        airline: sale.mileage_accounts?.airline_companies?.code || "N/A",
         passenger_name: sale.customer_name || "",
         passenger_cpf_encrypted: sale.customer_cpf || "",
         departure_date: travelDates.departure || new Date().toISOString().split('T')[0],
         status: "pending",
+        attachments: attachments,
       });
 
       if (!success) return;
@@ -196,6 +199,7 @@ export function RegisterTicketDialog({ open, onOpenChange }: RegisterTicketDialo
 
       form.reset();
       setCpfWarning(null);
+      setAttachments([]);
       onOpenChange(false);
     } catch (error: any) {
       toast({
@@ -358,6 +362,15 @@ export function RegisterTicketDialog({ open, onOpenChange }: RegisterTicketDialo
                     <FormMessage />
                   </FormItem>
                 )}
+              />
+            </div>
+
+            <div className="border-t pt-4">
+              <FormLabel>Anexar PDFs</FormLabel>
+              <TicketPDFUpload
+                attachments={attachments}
+                onAttachmentsChange={setAttachments}
+                disabled={submitting}
               />
             </div>
 

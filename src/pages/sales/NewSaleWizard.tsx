@@ -29,6 +29,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AccountCombobox } from "@/components/sales/AccountCombobox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Calculator } from "lucide-react";
+import { RegisterTicketDialog } from "@/components/tickets/RegisterTicketDialog";
 
 const steps = ["Origem", "Cliente & Voo", "Cálculo", "Confirmar"];
 
@@ -76,6 +77,7 @@ export default function NewSaleWizard() {
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [lastSaleData, setLastSaleData] = useState<any>(null);
   const [showCalculatorDialog, setShowCalculatorDialog] = useState(false);
+  const [showRegisterTicket, setShowRegisterTicket] = useState(false);
 
   // Filter accounts - show all active accounts
   const filteredAccounts = accounts.filter(
@@ -903,9 +905,24 @@ export default function NewSaleWizard() {
             setShowSuccessDialog(false);
             navigate("/sales");
           }}
+          onRegisterTicket={() => {
+            setShowSuccessDialog(false);
+            setShowRegisterTicket(true);
+          }}
           saleData={lastSaleData}
         />
       )}
+
+      {/* Register Ticket Dialog */}
+      <RegisterTicketDialog
+        open={showRegisterTicket}
+        onOpenChange={(open) => {
+          setShowRegisterTicket(open);
+          if (!open) {
+            navigate("/sales");
+          }
+        }}
+      />
     </div>
   );
 }
