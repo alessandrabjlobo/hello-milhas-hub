@@ -782,59 +782,74 @@ export default function NewSaleWizard() {
                          <h3 className="font-semibold text-green-900 dark:text-green-100 flex items-center gap-2">
                            💰 Resumo Financeiro
                          </h3>
-                         <div className="grid grid-cols-3 gap-4 text-sm">
-                           <div>
-                             <p className="text-muted-foreground">Custo</p>
-                             <p className="font-semibold">
-                               R$ {(() => {
-                                 const miles = parseFloat(milesNeeded) || 0;
-                                 if (saleSource === 'internal_account' && accountId) {
-                                   const account = filteredAccounts.find(a => a.id === accountId);
-                                   return (miles * (account?.cost_per_mile || 0.029)).toFixed(2);
-                                 } else if (saleSource === 'mileage_counter' && counterCostPerThousand) {
-                                   return ((miles / 1000) * parseFloat(counterCostPerThousand)).toFixed(2);
-                                 }
-                                 return '0.00';
-                               })()}
-                             </p>
-                           </div>
-                           <div>
-                             <p className="text-muted-foreground">Lucro</p>
-                             <p className="font-semibold text-green-600 dark:text-green-400">
-                               R$ {(() => {
-                                 const total = parseFloat(priceTotal) || 0;
-                                 const miles = parseFloat(milesNeeded) || 0;
-                                 let cost = 0;
-                                 if (saleSource === 'internal_account' && accountId) {
-                                   const account = filteredAccounts.find(a => a.id === accountId);
-                                   cost = miles * (account?.cost_per_mile || 0.029);
-                                 } else if (saleSource === 'mileage_counter' && counterCostPerThousand) {
-                                   cost = (miles / 1000) * parseFloat(counterCostPerThousand);
-                                 }
-                                 return (total - cost).toFixed(2);
-                               })()}
-                             </p>
-                           </div>
-                           <div>
-                             <p className="text-muted-foreground">Margem</p>
-                             <p className="font-semibold">
-                               {(() => {
-                                 const total = parseFloat(priceTotal) || 0;
-                                 const miles = parseFloat(milesNeeded) || 0;
-                                 let cost = 0;
-                                 if (saleSource === 'internal_account' && accountId) {
-                                   const account = filteredAccounts.find(a => a.id === accountId);
-                                   cost = miles * (account?.cost_per_mile || 0.029);
-                                 } else if (saleSource === 'mileage_counter' && counterCostPerThousand) {
-                                   cost = (miles / 1000) * parseFloat(counterCostPerThousand);
-                                 }
-                                 const profit = total - cost;
-                                 const margin = total > 0 ? (profit / total) * 100 : 0;
-                                 return `${margin.toFixed(1)}%`;
-                               })()}
-                             </p>
-                           </div>
-                         </div>
+                          <div className="grid grid-cols-3 gap-4 text-sm">
+                            <div>
+                              <p className="text-muted-foreground">Custo</p>
+                              <p className="font-semibold">
+                                R$ {(() => {
+                                  const miles = parseFloat(milesNeeded) || 0;
+                                  const boardingFeeTotal = (parseFloat(boardingFee) || 0) * passengers;
+                                  let milesCost = 0;
+                                  
+                                  if (saleSource === 'internal_account' && accountId) {
+                                    const account = filteredAccounts.find(a => a.id === accountId);
+                                    const costPerThousand = (account?.cost_per_mile || 0.029) * 1000;
+                                    milesCost = (miles / 1000) * costPerThousand;
+                                  } else if (saleSource === 'mileage_counter' && counterCostPerThousand) {
+                                    milesCost = (miles / 1000) * parseFloat(counterCostPerThousand);
+                                  }
+                                  
+                                  return (milesCost + boardingFeeTotal).toFixed(2);
+                                })()}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Lucro</p>
+                              <p className="font-semibold text-green-600 dark:text-green-400">
+                                R$ {(() => {
+                                  const total = parseFloat(priceTotal) || 0;
+                                  const miles = parseFloat(milesNeeded) || 0;
+                                  const boardingFeeTotal = (parseFloat(boardingFee) || 0) * passengers;
+                                  let milesCost = 0;
+                                  
+                                  if (saleSource === 'internal_account' && accountId) {
+                                    const account = filteredAccounts.find(a => a.id === accountId);
+                                    const costPerThousand = (account?.cost_per_mile || 0.029) * 1000;
+                                    milesCost = (miles / 1000) * costPerThousand;
+                                  } else if (saleSource === 'mileage_counter' && counterCostPerThousand) {
+                                    milesCost = (miles / 1000) * parseFloat(counterCostPerThousand);
+                                  }
+                                  
+                                  const totalCost = milesCost + boardingFeeTotal;
+                                  return (total - totalCost).toFixed(2);
+                                })()}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Margem</p>
+                              <p className="font-semibold">
+                                {(() => {
+                                  const total = parseFloat(priceTotal) || 0;
+                                  const miles = parseFloat(milesNeeded) || 0;
+                                  const boardingFeeTotal = (parseFloat(boardingFee) || 0) * passengers;
+                                  let milesCost = 0;
+                                  
+                                  if (saleSource === 'internal_account' && accountId) {
+                                    const account = filteredAccounts.find(a => a.id === accountId);
+                                    const costPerThousand = (account?.cost_per_mile || 0.029) * 1000;
+                                    milesCost = (miles / 1000) * costPerThousand;
+                                  } else if (saleSource === 'mileage_counter' && counterCostPerThousand) {
+                                    milesCost = (miles / 1000) * parseFloat(counterCostPerThousand);
+                                  }
+                                  
+                                  const totalCost = milesCost + boardingFeeTotal;
+                                  const profit = total - totalCost;
+                                  const margin = total > 0 ? (profit / total) * 100 : 0;
+                                  return `${margin.toFixed(1)}%`;
+                                })()}
+                              </p>
+                            </div>
+                          </div>
                        </div>
                      </Card>
                    )}

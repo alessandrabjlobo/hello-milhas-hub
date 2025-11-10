@@ -109,14 +109,21 @@ export const useSales = () => {
       let marginValue = 0;
       let marginPercentage = 0;
 
+      const passengers = Number((saleData as any).passengers) || 1;
+      const boardingFee = Number((saleData as any).boarding_fee) || 0;
+      const boardingFeeTotal = boardingFee * passengers;
+
       if (saleSource === 'internal_account') {
-        totalCost = milesUsed * costPerMileSnapshot;
+        const costPerThousand = costPerMileSnapshot * 1000;
+        const milesCost = (milesUsed / 1000) * costPerThousand;
+        totalCost = milesCost + boardingFeeTotal;
         marginValue = priceTotal - totalCost;
         marginPercentage = priceTotal > 0 ? (marginValue / priceTotal) * 100 : 0;
       } else if (saleSource === 'mileage_counter') {
         // For mileage counter, calculate cost based on supplier price
         const counterCostPerThousand = Number((saleData as any).counter_cost_per_thousand) || 0;
-        totalCost = (milesUsed / 1000) * counterCostPerThousand;
+        const milesCost = (milesUsed / 1000) * counterCostPerThousand;
+        totalCost = milesCost + boardingFeeTotal;
         marginValue = priceTotal - totalCost;
         marginPercentage = priceTotal > 0 ? (marginValue / priceTotal) * 100 : 0;
       }
