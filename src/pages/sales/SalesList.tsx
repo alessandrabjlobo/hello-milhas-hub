@@ -16,6 +16,7 @@ import { PlusCircle, Eye, ShoppingCart } from "lucide-react";
 import { useSales } from "@/hooks/useSales";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { exportToCSV } from "@/lib/csv-export";
+import { PaymentStatusBadge } from "@/components/sales/PaymentStatusBadge";
 
 export default function SalesList() {
   const { sales, loading } = useSales();
@@ -104,6 +105,7 @@ export default function SalesList() {
                   <TableHead>Passageiros</TableHead>
                   <TableHead>Companhia</TableHead>
                   <TableHead>Valor</TableHead>
+                  <TableHead>Pagamento</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
@@ -122,6 +124,13 @@ export default function SalesList() {
                     </TableCell>
                     <TableCell>
                       R$ {(sale.price_total || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell>
+                      <PaymentStatusBadge
+                        status={sale.payment_status || "pending"}
+                        paidAmount={sale.paid_amount || 0}
+                        totalAmount={sale.sale_price || 0}
+                      />
                     </TableCell>
                     <TableCell>{getStatusBadge(sale.status)}</TableCell>
                     <TableCell className="text-right">

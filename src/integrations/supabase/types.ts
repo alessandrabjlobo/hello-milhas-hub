@@ -588,9 +588,13 @@ export type Database = {
           miles_needed: number | null
           miles_used: number
           notes: string | null
+          paid_amount: number | null
+          paid_at: string | null
           passenger_cpfs: Json | null
           passengers: number | null
           payment_method: string | null
+          payment_notes: string | null
+          payment_status: Database["public"]["Enums"]["payment_status_enum"]
           price_per_passenger: number | null
           price_total: number | null
           profit: number
@@ -634,9 +638,13 @@ export type Database = {
           miles_needed?: number | null
           miles_used: number
           notes?: string | null
+          paid_amount?: number | null
+          paid_at?: string | null
           passenger_cpfs?: Json | null
           passengers?: number | null
           payment_method?: string | null
+          payment_notes?: string | null
+          payment_status?: Database["public"]["Enums"]["payment_status_enum"]
           price_per_passenger?: number | null
           price_total?: number | null
           profit: number
@@ -680,9 +688,13 @@ export type Database = {
           miles_needed?: number | null
           miles_used?: number
           notes?: string | null
+          paid_amount?: number | null
+          paid_at?: string | null
           passenger_cpfs?: Json | null
           passengers?: number | null
           payment_method?: string | null
+          payment_notes?: string | null
+          payment_status?: Database["public"]["Enums"]["payment_status_enum"]
           price_per_passenger?: number | null
           price_total?: number | null
           profit?: number
@@ -1046,6 +1058,12 @@ export type Database = {
       account_status: "active" | "inactive"
       app_role: "admin" | "supplier_owner" | "seller"
       cpf_status: "available" | "blocked" | "expired"
+      payment_status_enum:
+        | "pending"
+        | "partial"
+        | "paid"
+        | "overdue"
+        | "refunded"
       quote_status: "pending" | "sent" | "accepted" | "rejected" | "expired"
       renewal_type: "annual" | "rolling"
       sale_status: "pending" | "completed" | "cancelled"
@@ -1183,6 +1201,13 @@ export const Constants = {
       account_status: ["active", "inactive"],
       app_role: ["admin", "supplier_owner", "seller"],
       cpf_status: ["available", "blocked", "expired"],
+      payment_status_enum: [
+        "pending",
+        "partial",
+        "paid",
+        "overdue",
+        "refunded",
+      ],
       quote_status: ["pending", "sent", "accepted", "rejected", "expired"],
       renewal_type: ["annual", "rolling"],
       sale_status: ["pending", "completed", "cancelled"],

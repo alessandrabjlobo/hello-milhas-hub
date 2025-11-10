@@ -14,6 +14,7 @@ import Onboarding from "./pages/Onboarding";
 import Auth from "./pages/Auth";
 import NewSaleWizard from "./pages/sales/NewSaleWizard";
 import SalesList from "./pages/sales/SalesList";
+import SaleDetail from "./pages/sales/SaleDetail";
 import AccountDetail from "./pages/AccountDetail";
 import Accounts from "./pages/Accounts";
 import Suppliers from "./pages/Suppliers";
@@ -55,6 +56,7 @@ const App = () => (
                       <Route path="/onboarding" element={<Onboarding />} />
                       <Route path="/admin/users" element={<AdminUsers />} />
                       <Route path="/sales/new" element={<NewSaleWizard />} />
+                      <Route path="/sales/:id" element={<SaleDetail />} />
                       <Route path="/sales" element={<SalesList />} />
                       <Route path="/accounts/:id" element={<AccountDetail />} />
                       <Route path="/accounts" element={<Accounts />} />

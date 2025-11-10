@@ -12,7 +12,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { PlusCircle, Ticket as TicketIcon, FileText, Calendar } from "lucide-react";
+import { PlusCircle, Ticket as TicketIcon, FileText, Calendar, MoreHorizontal, Edit, Trash2 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useTickets } from "@/hooks/useTickets";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { RegisterTicketDialog } from "@/components/tickets/RegisterTicketDialog";
@@ -25,13 +31,13 @@ export default function Tickets() {
   const getStatusBadge = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive"> = {
       pending: "secondary",
-      issued: "default",
+      confirmed: "default",
       cancelled: "destructive",
     };
-    
+
     const labels: Record<string, string> = {
       pending: "Pendente",
-      issued: "Emitido",
+      confirmed: "Confirmado",
       cancelled: "Cancelado",
     };
 
@@ -120,6 +126,7 @@ export default function Tickets() {
                   <TableHead>Bilhete</TableHead>
                   <TableHead>Verificação</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -159,6 +166,25 @@ export default function Tickets() {
                     </TableCell>
                     <TableCell>{getVerificationBadge(ticket.verification_status)}</TableCell>
                     <TableCell>{getStatusBadge(ticket.status)}</TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="text-destructive">
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Excluir
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
