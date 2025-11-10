@@ -23,6 +23,7 @@ import Calculator from "./pages/Calculator";
 import ProgramRules from "./pages/ProgramRules";
 import MyAirlines from "./pages/MyAirlines";
 import Billing from "./pages/Billing";
+import CreditSettings from "./pages/settings/CreditSettings";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import NotFound from "./pages/NotFound";
@@ -66,6 +67,7 @@ const App = () => (
                       <Route path="/settings/my-airlines" element={<MyAirlines />} />
                       <Route path="/settings/programs" element={<ProgramRules />} />
                       <Route path="/settings/billing" element={<Billing />} />
+                      <Route path="/settings/credit" element={<CreditSettings />} />
 
                       {/* Redirects de compatibilidade */}
                       <Route path="/my-airlines" element={<Navigate to="/settings/my-airlines" replace />} />

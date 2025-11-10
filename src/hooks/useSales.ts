@@ -17,6 +17,20 @@ export interface Sale extends SaleRow {
   } | null;
 }
 
+export interface FlightSegment {
+  from: string;
+  to: string;
+  date: string;
+  time?: string;
+  stops?: number;
+  airline?: string;
+}
+
+export interface PassengerCPF {
+  name: string;
+  cpf: string;
+}
+
 export const useSales = () => {
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,9 +77,11 @@ export const useSales = () => {
         .eq("id", userData.user.id)
         .single();
 
-      // Get account to fetch cost_per_mile
+      const saleSource = (saleData as any).sale_source || 'internal_account';
+      
+      // Get account to fetch cost_per_mile (only for internal accounts)
       let costPerMileSnapshot = 0.029; // default
-      if (saleData.mileage_account_id) {
+      if (saleSource === 'internal_account' && saleData.mileage_account_id) {
         const { data: accountData } = await supabase
           .from("mileage_accounts")
           .select("cost_per_mile")
@@ -78,12 +94,31 @@ export const useSales = () => {
       }
 
       const milesUsed = Number(saleData.miles_needed) || 0;
-      const priceTotal = Number(saleData.price_total) || 0;
+      let priceTotal = Number(saleData.price_total) || 0;
+      
+      // Apply interest if installments are used
+      const installments = (saleData as any).installments;
+      const interestRate = (saleData as any).interest_rate;
+      if (installments && installments > 1 && interestRate) {
+        const rate = Number(interestRate) / 100;
+        priceTotal = priceTotal * (1 + rate);
+      }
       
       // Calculate costs and margins
-      const totalCost = milesUsed * costPerMileSnapshot;
-      const marginValue = priceTotal - totalCost;
-      const marginPercentage = priceTotal > 0 ? (marginValue / priceTotal) * 100 : 0;
+      let totalCost = 0;
+      let marginValue = 0;
+      let marginPercentage = 0;
+
+      if (saleSource === 'internal_account') {
+        totalCost = milesUsed * costPerMileSnapshot;
+        marginValue = priceTotal - totalCost;
+        marginPercentage = priceTotal > 0 ? (marginValue / priceTotal) * 100 : 0;
+      } else {
+        // For mileage counter, no cost from internal account
+        totalCost = 0;
+        marginValue = priceTotal;
+        marginPercentage = 100;
+      }
 
       const { error } = await supabase.from("sales").insert({
         ...saleData,
@@ -92,9 +127,10 @@ export const useSales = () => {
         client_name: saleData.customer_name || "",
         client_cpf_encrypted: saleData.customer_cpf || "",
         miles_used: milesUsed,
-        cost_per_mile_snapshot: costPerMileSnapshot,
+        cost_per_mile_snapshot: saleSource === 'internal_account' ? costPerMileSnapshot : null,
         total_cost: totalCost,
-        sale_price: priceTotal,
+        sale_price: Number(saleData.price_total) || 0,
+        final_price_with_interest: priceTotal,
         margin_value: marginValue,
         margin_percentage: marginPercentage,
         profit: marginValue,
@@ -103,8 +139,8 @@ export const useSales = () => {
 
       if (error) throw error;
 
-      // Update account balance
-      if (saleData.mileage_account_id && milesUsed > 0) {
+      // Update account balance (only for internal accounts)
+      if (saleSource === 'internal_account' && saleData.mileage_account_id && milesUsed > 0) {
         const { error: balanceError } = await supabase.rpc("update_account_balance", {
           account_id: saleData.mileage_account_id,
           miles_delta: -milesUsed,
