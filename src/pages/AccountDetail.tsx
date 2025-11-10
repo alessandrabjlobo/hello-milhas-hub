@@ -6,13 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, TrendingUp, TrendingDown, Download } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, Download, Edit } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useMovements } from "@/hooks/useMovements";
 import { useAuditLogs } from "@/hooks/useAuditLogs";
 import { AddMovementDialog } from "@/components/movements/AddMovementDialog";
 import { MovementsTable } from "@/components/movements/MovementsTable";
 import { AuditLogsTable } from "@/components/audit/AuditLogsTable";
+import { AccountSalesTable } from "@/components/accounts/AccountSalesTable";
+import { EditAccountDialog } from "@/components/accounts/EditAccountDialog";
 import { exportToCSV } from "@/lib/csv-export";
 
 interface AccountDetails {
@@ -39,6 +41,7 @@ export default function AccountDetail() {
   const { toast } = useToast();
   const [account, setAccount] = useState<AccountDetails | null>(null);
   const [loading, setLoading] = useState(true);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const { movements, loading: movementsLoading, fetchMovements } = useMovements(id);
   const { auditLogs, loading: auditLoading } = useAuditLogs(id, "mileage_accounts");
 
@@ -114,9 +117,15 @@ export default function AccountDetail() {
           <h1 className="text-3xl font-bold">{account.airline_companies?.name}</h1>
           <p className="text-muted-foreground">Conta: {account.account_number}</p>
         </div>
-        <Badge variant={account.status === "active" ? "default" : "secondary"}>
-          {account.status === "active" ? "Ativa" : "Inativa"}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant={account.status === "active" ? "default" : "secondary"}>
+            {account.status === "active" ? "Ativa" : "Inativa"}
+          </Badge>
+          <Button variant="outline" onClick={() => setEditDialogOpen(true)}>
+            <Edit className="h-4 w-4 mr-2" />
+            Editar Conta
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -168,9 +177,10 @@ export default function AccountDetail() {
       </div>
 
       <Tabs defaultValue="summary" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="summary">Resumo</TabsTrigger>
           <TabsTrigger value="movements">Movimentações</TabsTrigger>
+          <TabsTrigger value="sales">Vendas</TabsTrigger>
           <TabsTrigger value="history">Histórico</TabsTrigger>
         </TabsList>
 
@@ -216,11 +226,40 @@ export default function AccountDetail() {
           <MovementsTable movements={movements} loading={movementsLoading} />
         </TabsContent>
 
+        <TabsContent value="sales" className="space-y-4">
+          <h3 className="text-lg font-semibold">Vendas Utilizando Esta Conta</h3>
+          <AccountSalesTable accountId={id!} />
+        </TabsContent>
+
         <TabsContent value="history" className="space-y-4">
           <h3 className="text-lg font-semibold">Histórico de Alterações</h3>
           <AuditLogsTable logs={auditLogs} loading={auditLoading} />
         </TabsContent>
       </Tabs>
+
+      {account && (
+        <EditAccountDialog
+          open={editDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          account={{
+            id: account.id,
+            account_number: account.account_number,
+            balance: account.balance,
+            cost_per_mile: account.cost_per_mile,
+            status: account.status as "active" | "inactive",
+            cpf_limit: account.cpf_limit,
+            account_holder_name: account.account_holder_name,
+            user_id: '',
+            airline_company_id: '',
+            created_at: '',
+            updated_at: '',
+          }}
+          onUpdate={async () => {
+            await fetchAccountDetails();
+            return true;
+          }}
+        />
+      )}
     </div>
   );
 }

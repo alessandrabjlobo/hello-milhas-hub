@@ -417,6 +417,94 @@ export type Database = {
           },
         ]
       }
+      payment_methods_config: {
+        Row: {
+          additional_info: Json | null
+          created_at: string
+          description: string | null
+          display_order: number
+          id: string
+          is_active: boolean
+          method_name: string
+          method_type: string
+          supplier_id: string
+          updated_at: string
+        }
+        Insert: {
+          additional_info?: Json | null
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          method_name: string
+          method_type: string
+          supplier_id: string
+          updated_at?: string
+        }
+        Update: {
+          additional_info?: Json | null
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          method_name?: string
+          method_type?: string
+          supplier_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_methods_config_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string
+          id: string
+          notes: string | null
+          payment_date: string
+          payment_method: string
+          sale_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by: string
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          payment_method: string
+          sale_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          payment_method?: string
+          sale_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_transactions_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           company_name: string | null
@@ -487,10 +575,13 @@ export type Database = {
       }
       quotes: {
         Row: {
+          attachments: Json | null
           boarding_fee: number | null
           client_name: string
           client_phone: string | null
           company_name: string | null
+          converted_at: string | null
+          converted_to_sale_id: string | null
           created_at: string
           departure_date: string | null
           final_price_with_interest: number | null
@@ -511,10 +602,13 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          attachments?: Json | null
           boarding_fee?: number | null
           client_name: string
           client_phone?: string | null
           company_name?: string | null
+          converted_at?: string | null
+          converted_to_sale_id?: string | null
           created_at?: string
           departure_date?: string | null
           final_price_with_interest?: number | null
@@ -535,10 +629,13 @@ export type Database = {
           user_id: string
         }
         Update: {
+          attachments?: Json | null
           boarding_fee?: number | null
           client_name?: string
           client_phone?: string | null
           company_name?: string | null
+          converted_at?: string | null
+          converted_to_sale_id?: string | null
           created_at?: string
           departure_date?: string | null
           final_price_with_interest?: number | null
@@ -558,7 +655,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "quotes_converted_to_sale_id_fkey"
+            columns: ["converted_to_sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sales: {
         Row: {

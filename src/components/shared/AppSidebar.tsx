@@ -48,7 +48,8 @@ const operationsNavItems = [
 ];
 
 const toolsNavItems = [
-  { title: "Calculadora", url: "/calculator", icon: Calculator },
+  { title: "Calculadora & Orçamentos", url: "/calculator", icon: Calculator },
+  { title: "Histórico de Orçamentos", url: "/quotes", icon: FileText },
 ];
 
 const reportsNavItems = [
@@ -57,6 +58,7 @@ const reportsNavItems = [
 
 const settingsNavItems = [
   { title: "Regras de Programas", url: "/settings/programs", icon: Plane },
+  { title: "Formas de Pagamento", url: "/settings/payment-methods", icon: CreditCard },
   { title: "Plano & Pagamento", url: "/settings/billing", icon: DollarSign },
 ];
 

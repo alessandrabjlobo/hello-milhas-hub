@@ -13,8 +13,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ArrowLeft, Plane, User, CreditCard, DollarSign, MoreVertical } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PaymentDialog } from "@/components/sales/PaymentDialog";
 import { PaymentStatusBadge } from "@/components/sales/PaymentStatusBadge";
+import { PaymentTimeline } from "@/components/sales/PaymentTimeline";
 import { EditSaleDialog } from "@/components/sales/EditSaleDialog";
 import { DeleteSaleDialog } from "@/components/sales/DeleteSaleDialog";
 import type { Database } from "@/integrations/supabase/types";
@@ -177,143 +179,154 @@ export default function SaleDetail() {
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" />
-              Cliente
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div>
-              <p className="text-sm text-muted-foreground">Nome</p>
-              <p className="font-medium">{sale.customer_name || sale.client_name}</p>
-            </div>
-            {sale.customer_phone && (
-              <div>
-                <p className="text-sm text-muted-foreground">Telefone</p>
-                <p className="font-medium">{sale.customer_phone}</p>
-              </div>
-            )}
-            {sale.customer_cpf && (
-              <div>
-                <p className="text-sm text-muted-foreground">CPF</p>
-                <p className="font-medium">{sale.customer_cpf}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      <Tabs defaultValue="summary" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="summary">Resumo</TabsTrigger>
+          <TabsTrigger value="payments">Pagamentos</TabsTrigger>
+          <TabsTrigger value="tickets">Passagens</TabsTrigger>
+        </TabsList>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Plane className="h-5 w-5" />
-              Viagem
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div>
-              <p className="text-sm text-muted-foreground">Rota</p>
-              <p className="font-medium">{sale.route_text || "N/A"}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Passageiros</p>
-              <p className="font-medium">{sale.passengers}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Programa</p>
-              <p className="font-medium">
-                {sale.mileage_accounts?.airline_companies?.name || "Balcão"}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <TabsContent value="summary" className="space-y-6">
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  Cliente
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div>
+                  <p className="text-sm text-muted-foreground">Nome</p>
+                  <p className="font-medium">{sale.customer_name || sale.client_name}</p>
+                </div>
+                {sale.customer_phone && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Telefone</p>
+                    <p className="font-medium">{sale.customer_phone}</p>
+                  </div>
+                )}
+                {sale.customer_cpf && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">CPF</p>
+                    <p className="font-medium">{sale.customer_cpf}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 justify-between">
-              <div className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5" />
-                Financeiro
-              </div>
-              <PaymentStatusBadge
-                status={sale.payment_status || "pending"}
-                paidAmount={sale.paid_amount || 0}
-                totalAmount={sale.sale_price || 0}
-              />
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">Valor Total</span>
-              <span className="font-medium">R$ {sale.sale_price?.toFixed(2) || "0.00"}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">Já Pago</span>
-              <span className="font-medium text-green-600">
-                R$ {sale.paid_amount?.toFixed(2) || "0.00"}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">Restante</span>
-              <span className="font-medium text-orange-600">
-                R$ {((sale.sale_price || 0) - (sale.paid_amount || 0)).toFixed(2)}
-              </span>
-            </div>
-            <Separator className="my-2" />
-            <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">Custo</span>
-              <span className="font-medium">R$ {sale.total_cost?.toFixed(2) || "0.00"}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">Lucro</span>
-              <span className="font-medium text-green-600">
-                R$ {sale.profit?.toFixed(2) || "0.00"}
-              </span>
-            </div>
-            {sale.payment_notes && (
-              <div className="pt-2">
-                <p className="text-sm text-muted-foreground">Observações</p>
-                <p className="text-sm">{sale.payment_notes}</p>
-              </div>
-            )}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Plane className="h-5 w-5" />
+                  Viagem
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div>
+                  <p className="text-sm text-muted-foreground">Rota</p>
+                  <p className="font-medium">{sale.route_text || "N/A"}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Passageiros</p>
+                  <p className="font-medium">{sale.passengers}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Programa</p>
+                  <p className="font-medium">
+                    {sale.mileage_accounts?.airline_companies?.name || "Balcão"}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 justify-between">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="h-5 w-5" />
+                    Financeiro
+                  </div>
+                  <PaymentStatusBadge
+                    status={sale.payment_status || "pending"}
+                    paidAmount={sale.paid_amount || 0}
+                    totalAmount={sale.sale_price || 0}
+                  />
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Valor Total</span>
+                  <span className="font-medium">R$ {sale.sale_price?.toFixed(2) || "0.00"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Já Pago</span>
+                  <span className="font-medium text-green-600">
+                    R$ {sale.paid_amount?.toFixed(2) || "0.00"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Restante</span>
+                  <span className="font-medium text-orange-600">
+                    R$ {((sale.sale_price || 0) - (sale.paid_amount || 0)).toFixed(2)}
+                  </span>
+                </div>
+                <Separator className="my-2" />
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Custo</span>
+                  <span className="font-medium">R$ {sale.total_cost?.toFixed(2) || "0.00"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Lucro</span>
+                  <span className="font-medium text-green-600">
+                    R$ {sale.profit?.toFixed(2) || "0.00"}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="payments" className="space-y-6">
+          <div className="flex justify-end mb-4">
             <Button
-              className="w-full mt-4"
               onClick={() => setPaymentDialogOpen(true)}
               disabled={sale.payment_status === "paid"}
             >
               <CreditCard className="h-4 w-4 mr-2" />
               Registrar Pagamento
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+          <PaymentTimeline saleId={sale.id} totalAmount={sale.sale_price || 0} />
+        </TabsContent>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Passagens Emitidas</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {tickets.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Nenhuma passagem registrada</p>
-            ) : (
-              <div className="space-y-2">
-                {tickets.map((ticket) => (
-                  <div key={ticket.id} className="flex justify-between items-center p-2 border rounded">
-                    <div>
-                      <p className="font-medium">{ticket.passenger_name}</p>
-                      <p className="text-sm text-muted-foreground">{ticket.route}</p>
+        <TabsContent value="tickets" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Passagens Emitidas</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {tickets.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhuma passagem registrada</p>
+              ) : (
+                <div className="space-y-2">
+                  {tickets.map((ticket) => (
+                    <div key={ticket.id} className="flex justify-between items-center p-2 border rounded">
+                      <div>
+                        <p className="font-medium">{ticket.passenger_name}</p>
+                        <p className="text-sm text-muted-foreground">{ticket.route}</p>
+                      </div>
+                      <Badge variant={ticket.status === "confirmed" ? "default" : "secondary"}>
+                        {ticket.status === "confirmed" ? "Confirmado" : "Pendente"}
+                      </Badge>
                     </div>
-                    <Badge variant={ticket.status === "confirmed" ? "default" : "secondary"}>
-                      {ticket.status === "confirmed" ? "Confirmado" : "Pendente"}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       <PaymentDialog
         open={paymentDialogOpen}
