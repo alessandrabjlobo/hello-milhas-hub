@@ -51,7 +51,8 @@ export const AddMovementDialog = ({ accountId, onMovementAdded }: AddMovementDia
         if (account) {
           const currentTotalCost = account.balance * account.cost_per_mile;
           const newMiles = parseInt(formData.amount);
-          const newCost = parseFloat(formData.cost);
+          const costPerThousand = parseFloat(formData.cost);
+          const newCost = (newMiles / 1000) * costPerThousand; // Calcular custo total a partir do milheiro
           const newBalance = account.balance + newMiles;
           const newAvgCost = (currentTotalCost + newCost) / newBalance;
           
@@ -123,10 +124,10 @@ export const AddMovementDialog = ({ accountId, onMovementAdded }: AddMovementDia
             />
           </div>
 
-          {/* FASE 3: Campo de custo para crédito */}
+          {/* FASE 3: Campo de custo do milheiro para crédito */}
           {formData.type === "credit" && (
             <div className="space-y-2">
-              <Label htmlFor="cost">Custo Total (R$)</Label>
+              <Label htmlFor="cost">Custo do Milheiro (R$/mil)</Label>
               <Input
                 id="cost"
                 type="number"
@@ -134,11 +135,12 @@ export const AddMovementDialog = ({ accountId, onMovementAdded }: AddMovementDia
                 min="0"
                 value={formData.cost}
                 onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
-                placeholder="Ex: 1450.00"
+                placeholder="Ex: 45.00"
               />
               {formData.amount && formData.cost && (
                 <p className="text-xs text-muted-foreground">
-                  Custo por milha: R$ {(parseFloat(formData.cost) / parseInt(formData.amount)).toFixed(4)}
+                  Custo total: R$ {((parseInt(formData.amount) / 1000) * parseFloat(formData.cost)).toFixed(2)} • 
+                  Custo/milha: R$ {(parseFloat(formData.cost) / 1000).toFixed(4)}
                 </p>
               )}
             </div>
