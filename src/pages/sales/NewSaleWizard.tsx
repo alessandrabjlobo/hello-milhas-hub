@@ -26,6 +26,7 @@ import { MarginCalculator } from "@/components/calculator/MarginCalculator";
 import { PassengerCPFDialog } from "@/components/sales/PassengerCPFDialog";
 import { FlightSegmentForm } from "@/components/sales/FlightSegmentForm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AccountCombobox } from "@/components/sales/AccountCombobox";
 
 const steps = ["Origem", "Cliente & Voo", "Cálculo", "Confirmar"];
 
@@ -495,18 +496,12 @@ export default function NewSaleWizard() {
                           </AlertDescription>
                         </Alert>
                       ) : (
-                        <Select value={accountId} onValueChange={setAccountId}>
-                          <SelectTrigger id="account">
-                            <SelectValue placeholder="Selecione a conta" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {filteredAccounts.map((acc) => (
-                              <SelectItem key={acc.id} value={acc.id}>
-                                {acc.airline_companies?.name} - {acc.account_number}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <AccountCombobox
+                          accounts={filteredAccounts}
+                          value={accountId}
+                          onChange={setAccountId}
+                          placeholder="Busque por companhia ou número da conta..."
+                        />
                       )}
                     </div>
                   )}
