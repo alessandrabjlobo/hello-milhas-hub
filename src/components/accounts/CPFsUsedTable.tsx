@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/table";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Users } from "lucide-react";
+import { AddCPFDialog } from "./AddCPFDialog";
 
 interface CPFRegistryEntry {
   id: string;
@@ -33,22 +34,36 @@ interface CPFsUsedTableProps {
 export function CPFsUsedTable({ accountId, cpfLimit }: CPFsUsedTableProps) {
   const [cpfs, setCpfs] = useState<CPFRegistryEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [airlineCompanyId, setAirlineCompanyId] = useState<string>("");
 
   useEffect(() => {
-    fetchCPFs();
+    fetchAccountAndCPFs();
   }, [accountId]);
 
-  const fetchCPFs = async () => {
+  const fetchAccountAndCPFs = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("cpf_registry")
-        .select("*")
-        .eq("airline_company_id", accountId)
-        .order("usage_count", { ascending: false });
+      
+      // Buscar airline_company_id da conta
+      const { data: accountData } = await supabase
+        .from("mileage_accounts")
+        .select("airline_company_id")
+        .eq("id", accountId)
+        .single();
+      
+      if (accountData) {
+        setAirlineCompanyId(accountData.airline_company_id);
+        
+        // Buscar CPFs usando airline_company_id
+        const { data, error } = await supabase
+          .from("cpf_registry")
+          .select("*")
+          .eq("airline_company_id", accountData.airline_company_id)
+          .order("usage_count", { ascending: false });
 
-      if (error) throw error;
-      setCpfs(data || []);
+        if (error) throw error;
+        setCpfs(data || []);
+      }
     } catch (error) {
       console.error("Failed to fetch CPFs:", error);
     } finally {
@@ -96,8 +111,17 @@ export function CPFsUsedTable({ accountId, cpfLimit }: CPFsUsedTableProps) {
   return (
     <Card>
       <CardContent className="p-6">
-        <div className="mb-4 text-sm text-muted-foreground">
-          {cpfs.length} CPF(s) cadastrado(s) - Limite: {cpfLimit} usos por CPF/ano
+        <div className="mb-4 flex items-center justify-between">
+          <div className="text-sm text-muted-foreground">
+            {cpfs.length} CPF(s) cadastrado(s) - Limite: {cpfLimit} usos por CPF/ano
+          </div>
+          {airlineCompanyId && (
+            <AddCPFDialog
+              accountId={accountId}
+              airlineCompanyId={airlineCompanyId}
+              onSuccess={fetchAccountAndCPFs}
+            />
+          )}
         </div>
         <div className="rounded-md border">
           <Table>

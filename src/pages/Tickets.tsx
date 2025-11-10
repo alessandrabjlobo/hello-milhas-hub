@@ -45,7 +45,7 @@ export default function Tickets() {
     };
 
     const labels: Record<string, string> = {
-      pending: "Pendente",
+      pending: "Aguardando Emissão",
       confirmed: "Confirmado",
       cancelled: "Cancelado",
     };

@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FileText, Send, Copy, Download, User, Phone, MapPin, Calendar, Plane, DollarSign, Clock, Users } from "lucide-react";
@@ -19,6 +20,7 @@ export function QuoteGenerator() {
   const [milesNeeded, setMilesNeeded] = useState("");
   const [passengers, setPassengers] = useState("1");
   const [totalPrice, setTotalPrice] = useState("");
+  const [costPerThousand, setCostPerThousand] = useState("");
   
   // Novos campos de voo
   const [departureTime, setDepartureTime] = useState("");
@@ -372,6 +374,54 @@ export function QuoteGenerator() {
                     Valor por passageiro: <span className="font-semibold text-foreground">R$ {pricePerPassenger}</span>
                   </p>
                 </div>
+              )}
+
+              <div className="space-y-2 mt-4">
+                <Label htmlFor="cost-per-thousand" className="flex items-center gap-2">
+                  Custo do Milheiro (R$/mil)
+                  <Badge variant="secondary" className="ml-2">Interno</Badge>
+                </Label>
+                <Input
+                  id="cost-per-thousand"
+                  type="number"
+                  step="0.01"
+                  placeholder="29.00"
+                  value={costPerThousand}
+                  onChange={(e) => setCostPerThousand(e.target.value)}
+                  className="h-11"
+                />
+                <p className="text-xs text-muted-foreground">
+                  📊 Este valor não será enviado ao cliente. Serve apenas para calcular sua margem de lucro.
+                </p>
+              </div>
+
+              {milesNeeded && totalPrice && costPerThousand && (
+                <Card className="p-4 bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800">
+                  <p className="text-sm font-semibold mb-2">💰 Resumo Financeiro (Interno)</p>
+                  <div className="grid grid-cols-3 gap-2 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Custo</p>
+                      <p className="font-semibold">
+                        R$ {((parseInt(milesNeeded) / 1000) * parseFloat(costPerThousand)).toFixed(2)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Lucro</p>
+                      <p className="font-semibold text-green-600 dark:text-green-400">
+                        R$ {(parseFloat(totalPrice) - ((parseInt(milesNeeded) / 1000) * parseFloat(costPerThousand))).toFixed(2)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Margem</p>
+                      <p className="font-semibold">
+                        {(((parseFloat(totalPrice) - ((parseInt(milesNeeded) / 1000) * parseFloat(costPerThousand))) / parseFloat(totalPrice)) * 100).toFixed(1)}%
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    ⚠️ Esta informação não será incluída na mensagem enviada ao cliente.
+                  </p>
+                </Card>
               )}
             </div>
 

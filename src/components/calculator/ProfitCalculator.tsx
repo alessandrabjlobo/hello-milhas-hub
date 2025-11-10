@@ -150,7 +150,7 @@ export function ProfitCalculator() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="manual-cost">Custo por Milheiro (R$)</Label>
+              <Label htmlFor="manual-cost">Custo do Milheiro (R$/mil)</Label>
               <Input
                 id="manual-cost"
                 type="number"
@@ -160,7 +160,7 @@ export function ProfitCalculator() {
                 onChange={(e) => setCostPerMile(e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                💡 Valor por cada 1.000 milhas
+                💡 Custo por cada 1.000 milhas
               </p>
             </div>
 
@@ -267,7 +267,7 @@ export function ProfitCalculator() {
                 <SelectContent>
                   {accounts.map((account) => (
                     <SelectItem key={account.id} value={account.id}>
-                      {account.airline_companies.name} - {account.account_number} ({account.balance.toLocaleString()} milhas)
+                      {account.airline_companies.name} - {account.account_number} ({account.balance.toLocaleString('pt-BR')} milhas)
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -388,12 +388,24 @@ export function ProfitCalculator() {
           <div className="mt-6 space-y-4">
             <h4 className="font-semibold text-lg mb-4">💰 Resultados do Cálculo</h4>
             
+            <Card className="p-4 bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Custo do Milheiro</p>
+                  <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+                    R$ {costPerThousand.toFixed(2)}/mil
+                  </p>
+                </div>
+                <DollarSign className="h-8 w-8 text-blue-600" />
+              </div>
+            </Card>
+            
             <div className="bg-muted/50 p-4 rounded-lg space-y-2 mb-4">
               <h5 className="font-semibold text-sm mb-2">📊 Breakdown do Cálculo:</h5>
               <div className="text-sm space-y-1 text-muted-foreground">
-                <p>• Milhas: {miles.toLocaleString()} → {(miles / 1000).toFixed(1)} milheiros</p>
-                <p>• Custo por milheiro: R$ {costPerThousand.toFixed(2)}</p>
-                <p>• Taxa de embarque: R$ {boardingFeeNum.toFixed(2)}</p>
+                <p>• Milhas: {miles.toLocaleString('pt-BR')} → {(miles / 1000).toFixed(1)} milheiros</p>
+                <p>• Custo do Milheiro: R$ {costPerThousand.toFixed(2)}</p>
+                <p>• Taxa de embarque: R$ {boardingFeeNum.toFixed(2)} × {passengersNum} passageiro(s)</p>
                 <p>• Subtotal por passageiro: R$ {costPerPassenger.toFixed(2)}</p>
                 <p>• × Número de passageiros: {passengersNum}</p>
                 <p className="font-semibold text-foreground pt-1 border-t">= Custo Total: R$ {totalCost.toFixed(2)}</p>
@@ -448,7 +460,7 @@ export function ProfitCalculator() {
 
               <Card className="border-2 border-border/50">
                 <CardContent className="p-4 space-y-2">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Custo/Milha</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Custo Efetivo/Milha</p>
                   <p className="text-2xl font-bold text-foreground">
                     R$ {effectiveCostPerMile.toFixed(4)}
                   </p>

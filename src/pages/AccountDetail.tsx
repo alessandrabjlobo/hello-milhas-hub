@@ -135,9 +135,9 @@ export default function AccountDetail() {
             <CardTitle className="text-sm font-medium">Saldo Atual</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{account.balance.toLocaleString("pt-BR")} pts</div>
+            <div className="text-2xl font-bold">{account.balance.toLocaleString("pt-BR")} milhas</div>
             <p className="text-xs text-muted-foreground mt-1">
-              Custo/milha: R$ {account.cost_per_mile.toFixed(3)}
+              Custo Milheiro: R$ {(account.cost_per_mile * 1000).toFixed(2)}/mil
             </p>
           </CardContent>
         </Card>
@@ -151,7 +151,7 @@ export default function AccountDetail() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              +{totalCredits.toLocaleString("pt-BR")}
+              +{totalCredits.toLocaleString("pt-BR")} milhas
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               {movements.filter(m => m.type === "credit").length} movimentações
@@ -168,7 +168,7 @@ export default function AccountDetail() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">
-              -{totalDebits.toLocaleString("pt-BR")}
+              -{totalDebits.toLocaleString("pt-BR")} milhas
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               {movements.filter(m => m.type === "debit").length} movimentações

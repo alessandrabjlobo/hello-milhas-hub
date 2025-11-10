@@ -112,7 +112,7 @@ export default function SaleDetail() {
       cancelled: "destructive",
     };
     const labels: Record<string, string> = {
-      pending: "Pendente",
+      pending: "Aguardando",
       completed: "Concluída",
       cancelled: "Cancelada",
     };

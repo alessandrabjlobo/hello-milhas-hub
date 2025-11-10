@@ -263,16 +263,48 @@ export default function NewSaleWizard() {
     // FASE 1: Buscar CPF disponível para vincular à venda
     let cpfUsedId = null;
     if (saleSource === "internal_account" && accountId && passengerCpfs.length > 0) {
-      const { data: availableCPF } = await supabase
-        .from('cpf_registry')
-        .select('id')
-        .eq('airline_company_id', accountId)
-        .eq('status', 'available')
-        .order('usage_count', { ascending: true })
-        .limit(1)
-        .maybeSingle();
+      // Primeiro buscar a airline_company_id da conta
+      const { data: accountData } = await supabase
+        .from('mileage_accounts')
+        .select('airline_company_id')
+        .eq('id', accountId)
+        .single();
       
-      cpfUsedId = availableCPF?.id || null;
+      if (accountData) {
+        const { data: availableCPF } = await supabase
+          .from('cpf_registry')
+          .select('id')
+          .eq('airline_company_id', accountData.airline_company_id)
+          .eq('status', 'available')
+          .order('usage_count', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        
+        cpfUsedId = availableCPF?.id || null;
+        
+        // Se não encontrou CPF disponível, criar um novo a partir do primeiro passageiro
+        if (!cpfUsedId && passengerCpfs.length > 0) {
+          const firstPassenger = passengerCpfs[0];
+          const { data: { user } } = await supabase.auth.getUser();
+          
+          if (user) {
+            const { data: newCPF } = await supabase
+              .from('cpf_registry')
+              .insert({
+                airline_company_id: accountData.airline_company_id,
+                full_name: firstPassenger.name,
+                cpf_encrypted: firstPassenger.cpf,
+                user_id: user.id,
+                status: 'available',
+                usage_count: 0,
+              })
+              .select('id')
+              .single();
+            
+            cpfUsedId = newCPF?.id || null;
+          }
+        }
+      }
     }
 
     const saleId = await createSale({

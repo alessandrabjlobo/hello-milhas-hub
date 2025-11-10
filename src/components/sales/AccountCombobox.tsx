@@ -115,7 +115,7 @@ export function AccountCombobox({
                   <div className="flex items-center justify-between text-xs text-muted-foreground mt-1">
                     <span className="font-semibold text-primary">R$ {(account.cost_per_mile * 1000).toFixed(2)}/mil</span>
                     <span className="font-medium text-green-600">
-                      {(account.balance / 1000).toFixed(0)}k milhas
+                      {account.balance.toLocaleString('pt-BR')} milhas
                     </span>
                   </div>
                 </div>

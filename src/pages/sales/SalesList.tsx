@@ -67,9 +67,9 @@ export default function SalesList() {
       Cliente: sale.customer_name || sale.client_name,
       Rota: sale.route_text,
       Passageiros: sale.passengers,
-      Milhagem: sale.miles_needed,
+      Milhagem: sale.miles_needed?.toLocaleString('pt-BR') || '0',
       "Valor Total": sale.price_total,
-      Status: sale.status,
+      Status: sale.status === 'pending' ? 'Aguardando' : sale.status === 'completed' ? 'Concluída' : 'Cancelada',
     }));
     exportToCSV(data, `vendas-${new Date().toISOString().split("T")[0]}`);
   };
@@ -80,7 +80,12 @@ export default function SalesList() {
       completed: "default",
       cancelled: "destructive",
     };
-    return <Badge variant={variants[status] || "default"}>{status}</Badge>;
+    const labels: Record<string, string> = {
+      pending: "Aguardando",
+      completed: "Concluída",
+      cancelled: "Cancelada",
+    };
+    return <Badge variant={variants[status] || "default"}>{labels[status] || status}</Badge>;
   };
 
   if (loading) {
@@ -141,14 +146,13 @@ export default function SalesList() {
                 <TableRow>
                   <TableHead>Data</TableHead>
                   <TableHead>Cliente</TableHead>
-                  <TableHead>Rota</TableHead>
                   <TableHead>Passageiros</TableHead>
                   <TableHead>Companhia</TableHead>
                   <TableHead>Valor</TableHead>
                   <TableHead>Pagamento</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Ações</TableHead>
-              <TableHead></TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                  <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -158,7 +162,6 @@ export default function SalesList() {
                       {new Date(sale.created_at).toLocaleDateString("pt-BR")}
                     </TableCell>
                     <TableCell>{sale.customer_name || sale.client_name}</TableCell>
-                    <TableCell>{sale.route_text}</TableCell>
                     <TableCell>{sale.passengers}</TableCell>
                     <TableCell>
                       {sale.mileage_accounts?.airline_companies?.code || "-"}
