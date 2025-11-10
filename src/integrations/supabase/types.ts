@@ -72,6 +72,7 @@ export type Database = {
           name: string
           renewal_config: Json | null
           renewal_type: Database["public"]["Enums"]["renewal_type"]
+          supplier_id: string | null
           updated_at: string
           user_id: string
         }
@@ -84,6 +85,7 @@ export type Database = {
           name: string
           renewal_config?: Json | null
           renewal_type?: Database["public"]["Enums"]["renewal_type"]
+          supplier_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -96,10 +98,18 @@ export type Database = {
           name?: string
           renewal_config?: Json | null
           renewal_type?: Database["public"]["Enums"]["renewal_type"]
+          supplier_id?: string | null
           updated_at?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "airline_companies_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "airline_companies_user_id_fkey"
             columns: ["user_id"]
@@ -943,6 +953,7 @@ export type Database = {
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_locked: { Args: { _user_id: string }; Returns: boolean }
+      normalize_uppercase: { Args: { text_input: string }; Returns: string }
       update_account_balance: {
         Args: { account_id: string; miles_delta: number }
         Returns: undefined

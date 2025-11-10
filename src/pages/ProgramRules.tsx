@@ -7,14 +7,14 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Save, Info, Plus, Lock } from "lucide-react";
+import { ArrowLeft, Save, Info, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AirlineCombobox } from "@/components/airlines/AirlineCombobox";
 import { getSupplierId } from "@/lib/getSupplierId";
 import { saveProgramRule } from "@/actions/saveProgramRule";
-import { useUserRole } from "@/hooks/useUserRole";
+
 
 type RenewalType = "annual" | "rolling";
 
@@ -33,7 +33,6 @@ interface ProgramRule {
 export default function ProgramRules() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { isAdmin, loading: roleLoading } = useUserRole();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -139,15 +138,15 @@ export default function ProgramRules() {
 
   // Create airline
   const createAirline = async (name: string, code: string) => {
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) throw new Error("Not authenticated");
+    const { supplierId, userId } = await getSupplierId();
 
     const { data, error } = await supabase
       .from("airline_companies")
       .insert({
-        name: name.trim(),
+        name: name.trim().toUpperCase(),
         code: code.trim().toUpperCase(),
-        user_id: userData.user.id,
+        user_id: userId,
+        supplier_id: supplierId,
       })
       .select("id, name, code")
       .single();
@@ -174,15 +173,15 @@ export default function ProgramRules() {
   // Combobox create handler
   const handleComboboxCreate = async (typed: string) => {
     const match = typed.match(/^(.+?)\s*\((\w{1,4})\)\s*$/i);
-    let name = typed.trim();
+    let name = typed.trim().toUpperCase();
     let code = "";
 
     if (match) {
-      name = match[1].trim();
+      name = match[1].trim().toUpperCase();
       code = match[2].toUpperCase();
     } else {
       const promptCode = window.prompt(
-        `Enter code (e.g., LA for LATAM) for "${typed}":`
+        `Digite o código (ex: LA para LATAM) para "${typed}":`
       );
       if (!promptCode) return null;
       code = promptCode.toUpperCase().trim();
@@ -342,7 +341,7 @@ export default function ProgramRules() {
     }
   };
 
-  if (loading || roleLoading) {
+  if (loading) {
     return (
       <div className="container max-w-4xl mx-auto p-6 space-y-6">
         <Skeleton className="h-12 w-full" />
@@ -376,24 +375,13 @@ export default function ProgramRules() {
         </AlertDescription>
       </Alert>
 
-      {!isAdmin && (
-        <Alert>
-          <Lock className="h-4 w-4" />
-          <AlertDescription>
-            Apenas administradores podem criar novas companhias aéreas. Entre em contato com um administrador se precisar adicionar programas.
-          </AlertDescription>
-        </Alert>
-      )}
-
       {/* Quick-add form */}
       <Card>
         <CardHeader>
           <CardTitle>Adicionar Programa</CardTitle>
-          {!isAdmin && (
-            <CardDescription className="text-muted-foreground">
-              Criação de companhias requer permissões de administrador
-            </CardDescription>
-          )}
+          <CardDescription>
+            Adicione programas de fidelidade e configure as regras padrão
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid md:grid-cols-3 gap-3 items-start">
@@ -404,28 +392,21 @@ export default function ProgramRules() {
                     options={options}
                     value={airlineId}
                     onChange={setAirlineId}
-                    onCreate={isAdmin ? handleComboboxCreate : undefined}
+                    onCreate={handleComboboxCreate}
                     placeholder="Programa/Companhia Aérea"
                   />
                 </div>
                 <Button 
                   variant="secondary" 
                   onClick={handleCreateAirlineViaPrompt} 
-                  title={isAdmin ? "Nova companhia aérea" : "Requer permissão de administrador"}
-                  disabled={!isAdmin}
+                  title="Nova companhia aérea"
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
-              {isAdmin ? (
-                <p className="text-xs text-muted-foreground">
-                  Dica: digite "Nome (CÓDIGO)" e clique em Adicionar.
-                </p>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  Selecione uma companhia existente. Apenas admins podem criar novas.
-                </p>
-              )}
+              <p className="text-xs text-muted-foreground">
+                Dica: digite "NOME (CÓDIGO)" e clique em Adicionar. Exemplo: LATAM (LA)
+              </p>
             </div>
 
             <Input
