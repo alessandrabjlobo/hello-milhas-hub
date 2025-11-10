@@ -228,6 +228,9 @@ export default function ProgramRules() {
     const cpfLimit = normalizeLimit(Number(cpfLimitInput));
 
     try {
+      const { supplierId } = await getSupplierId();
+      
+      // Save program rule
       const result = await saveProgramRule({
         airline_id: airlineId,
         cpf_limit: cpfLimit,
@@ -235,6 +238,21 @@ export default function ProgramRules() {
       });
       
       console.log("Save result:", result);
+
+      // Also ensure airline is linked in suppliers_airlines
+      const { error: linkError } = await supabase
+        .from("suppliers_airlines")
+        .upsert(
+          {
+            supplier_id: supplierId,
+            airline_company_id: airlineId,
+          },
+          { onConflict: "supplier_id,airline_company_id" }
+        );
+
+      if (linkError) {
+        console.error("Erro ao vincular companhia:", linkError);
+      }
 
       setRules((prev) => ({
         ...prev,
@@ -255,8 +273,8 @@ export default function ProgramRules() {
       }));
 
       toast({
-        title: "Regra salva",
-        description: "Configuração aplicada com sucesso.",
+        title: "Programa configurado",
+        description: "Regra salva e programa disponível para uso.",
       });
       setAirlineId("");
       setCpfLimitInput("25");
@@ -313,19 +331,32 @@ export default function ProgramRules() {
     }
     try {
       setSaving(true);
+      const { supplierId } = await getSupplierId();
 
       for (const row of diffToSave) {
+        // Save program rule
         await saveProgramRule({
           airline_id: row.id,
           cpf_limit: row.cpf_limit,
           renewal_type: row.renewal_type,
         });
+
+        // Also ensure airline is linked in suppliers_airlines
+        await supabase
+          .from("suppliers_airlines")
+          .upsert(
+            {
+              supplier_id: supplierId,
+              airline_company_id: row.id,
+            },
+            { onConflict: "supplier_id,airline_company_id" }
+          );
       }
 
       setOriginalRules(JSON.parse(JSON.stringify(rules)));
       toast({
-        title: "Regras salvas",
-        description: "Todas as alterações salvas com sucesso.",
+        title: "Programas atualizados",
+        description: "Todas as alterações salvas e disponíveis para uso.",
       });
     } catch (err: any) {
       console.error("Erro ao salvar em lote:", err);

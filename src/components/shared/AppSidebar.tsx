@@ -16,6 +16,7 @@ import {
   DollarSign,
   Shield,
   Calculator,
+  LogOut,
 } from "lucide-react";
 import {
   Sidebar,
@@ -269,6 +270,30 @@ export function AppSidebar() {
                   collapsed={collapsed}
                 />
               ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Logout Section */}
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  onClick={async () => {
+                    const { supabase } = await import("@/integrations/supabase/client");
+                    await supabase.auth.signOut();
+                    window.location.href = "/auth";
+                  }}
+                  className={collapsed ? "justify-center" : ""}
+                >
+                  <button type="button" className="w-full flex items-center">
+                    <LogOut className="h-5 w-5" />
+                    {!collapsed && <span className="ml-3">Sair</span>}
+                  </button>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

@@ -862,13 +862,26 @@ export default function NewSaleWizard() {
               milesNeeded={milesNeeded}
               priceTotal={installmentDetails?.finalPrice.toFixed(2) || priceTotal}
             />
-            {currentStep === 2 && saleSource === "internal_account" && accountId && (
+            {currentStep === 2 && (
               <Dialog open={showCalculatorDialog} onOpenChange={setShowCalculatorDialog}>
                 <DialogTrigger asChild>
-                  <Button variant="outline" className="w-full">
-                    <Calculator className="h-4 w-4 mr-2" />
-                    Simulador de Lucro
-                  </Button>
+                  <div className="w-full">
+                    <Button 
+                      variant="outline" 
+                      className="w-full"
+                      disabled={saleSource !== "internal_account" || !accountId}
+                      title={
+                        saleSource !== "internal_account" 
+                          ? "Simulador disponível apenas para vendas de conta interna"
+                          : !accountId
+                          ? "Selecione uma conta para usar o simulador"
+                          : "Calcular margem de lucro"
+                      }
+                    >
+                      <Calculator className="h-4 w-4 mr-2" />
+                      Simulador de Lucro
+                    </Button>
+                  </div>
                 </DialogTrigger>
                 <DialogContent className="max-w-2xl">
                   <DialogHeader>
