@@ -7,6 +7,7 @@ export interface FlightSegment {
   from: string;
   to: string;
   date: string;
+  miles?: number;
 }
 
 interface FlightSegmentFormProps {
@@ -45,7 +46,7 @@ export function FlightSegmentForm({
         )}
       </div>
 
-      <div className="grid md:grid-cols-3 gap-3">
+      <div className="grid md:grid-cols-4 gap-3">
         <div className="space-y-2">
           <Label htmlFor={`from-${index}`}>Origem *</Label>
           <Input
@@ -73,6 +74,17 @@ export function FlightSegmentForm({
             type="date"
             value={segment.date}
             onChange={(e) => onUpdate(index, "date", e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor={`miles-${index}`}>Milhas *</Label>
+          <Input
+            id={`miles-${index}`}
+            type="number"
+            placeholder="15000"
+            value={segment.miles || ""}
+            onChange={(e) => onUpdate(index, "miles", parseInt(e.target.value) || 0)}
           />
         </div>
       </div>

@@ -32,8 +32,10 @@ export function QuoteGenerator() {
     origin: "",
     destination: "",
     departureDate: "",
-    returnDate: ""
+    returnDate: "",
+    miles: 0
   });
+  const [costPerMile, setCostPerMile] = useState("0.029");
   
   const [showPreview, setShowPreview] = useState(false);
 
@@ -58,10 +60,10 @@ export function QuoteGenerator() {
         return;
       }
     } else if (tripType === "round_trip") {
-      if (!roundTripData.origin || !roundTripData.destination || !roundTripData.departureDate || !roundTripData.returnDate) {
+      if (!roundTripData.origin || !roundTripData.destination || !roundTripData.departureDate || !roundTripData.returnDate || !roundTripData.miles) {
         toast({
           title: "Campos obrigatórios",
-          description: "Preencha todos os campos do voo de ida e volta.",
+          description: "Preencha todos os campos do voo de ida e volta, incluindo milhas.",
           variant: "destructive",
         });
         return;
@@ -75,11 +77,11 @@ export function QuoteGenerator() {
         return;
       }
     } else if (tripType === "multi_city") {
-      const hasValidSegment = flightSegments.some(seg => seg.from && seg.to && seg.date);
+      const hasValidSegment = flightSegments.some(seg => seg.from && seg.to && seg.date && seg.miles);
       if (!hasValidSegment) {
         toast({
           title: "Campos obrigatórios",
-          description: "Preencha ao menos 1 trecho completo.",
+          description: "Preencha ao menos 1 trecho completo com milhas.",
           variant: "destructive",
         });
         return;
@@ -317,7 +319,7 @@ export function QuoteGenerator() {
                 <div className="space-y-3">
                   {tripType === "one_way" && (
                     <div className="p-4 border rounded-lg space-y-3 bg-muted/30">
-                      <div className="grid md:grid-cols-3 gap-3">
+                      <div className="grid md:grid-cols-4 gap-3">
                         <div className="space-y-2">
                           <Label htmlFor="one-way-from">Origem *</Label>
                           <Input
@@ -353,6 +355,20 @@ export function QuoteGenerator() {
                             onChange={(e) => {
                               const newSegments = [...flightSegments];
                               newSegments[0] = { ...newSegments[0], date: e.target.value };
+                              setFlightSegments(newSegments);
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="one-way-miles">Milhas *</Label>
+                          <Input
+                            id="one-way-miles"
+                            type="number"
+                            placeholder="15000"
+                            value={flightSegments[0]?.miles || ""}
+                            onChange={(e) => {
+                              const newSegments = [...flightSegments];
+                              newSegments[0] = { ...newSegments[0], miles: parseInt(e.target.value) || 0 };
                               setFlightSegments(newSegments);
                             }}
                           />
@@ -407,7 +423,7 @@ export function QuoteGenerator() {
                 <DollarSign className="h-5 w-5 text-primary" />
                 Valores
               </h3>
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="passengers">Nº de Passageiros *</Label>
                   <Input
@@ -422,7 +438,23 @@ export function QuoteGenerator() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="total-price">Valor Total (R$) *</Label>
+                  <Label htmlFor="cost-per-mile">Custo por Milha (R$) *</Label>
+                  <Input
+                    id="cost-per-mile"
+                    type="number"
+                    step="0.001"
+                    placeholder="0.029"
+                    value={costPerMile}
+                    onChange={(e) => setCostPerMile(e.target.value)}
+                    className="h-11"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Custo interno para calcular margem
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="total-price">Valor de Venda (R$) *</Label>
                   <Input
                     id="total-price"
                     type="number"
@@ -784,7 +816,7 @@ export function QuoteGenerator() {
       )}
 
       {/* Análise Interna - Apenas para a agência */}
-      {showPreview && totalPrice && passengers && (
+      {showPreview && totalPrice && passengers && costPerMile && (
         <Card className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20 shadow-lg">
           <CardHeader>
             <CardTitle className="text-amber-700 dark:text-amber-500 flex items-center gap-2">
@@ -796,44 +828,99 @@ export function QuoteGenerator() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid md:grid-cols-3 gap-4">
-              <div className="p-4 bg-background rounded-lg border">
-                <p className="text-sm text-muted-foreground mb-1">Valor Total</p>
-                <p className="text-2xl font-bold">R$ {parseFloat(totalPrice).toFixed(2)}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {parseInt(passengers)} passageiro{parseInt(passengers) > 1 ? 's' : ''}
-                </p>
-              </div>
-              
-              <div className="p-4 bg-background rounded-lg border">
-                <p className="text-sm text-muted-foreground mb-1">Por Passageiro</p>
-                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                  R$ {pricePerPassenger}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Valor unitário médio
-                </p>
-              </div>
+            {(() => {
+              // Calcular total de milhas
+              let totalMiles = 0;
+              if (tripType === "round_trip") {
+                totalMiles = roundTripData.miles || 0;
+              } else {
+                totalMiles = flightSegments.reduce((sum, seg) => sum + (seg.miles || 0), 0);
+              }
 
-              {boardingFee && parseFloat(boardingFee) > 0 && (
-                <div className="p-4 bg-background rounded-lg border">
-                  <p className="text-sm text-muted-foreground mb-1">Taxas de Embarque</p>
-                  <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-                    R$ {(parseFloat(boardingFee) * parseInt(passengers)).toFixed(2)}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    R$ {parseFloat(boardingFee).toFixed(2)} por passageiro
-                  </p>
-                </div>
-              )}
-            </div>
+              // Calcular custos
+              const milesPerPassenger = totalMiles;
+              const totalMilesAllPassengers = milesPerPassenger * parseInt(passengers);
+              const costPerMileValue = parseFloat(costPerMile);
+              const totalCost = (totalMilesAllPassengers * costPerMileValue) / 1000; // Custo por 1000 milhas
+              const salePrice = parseFloat(totalPrice);
+              const profit = salePrice - totalCost;
+              const margin = salePrice > 0 ? (profit / salePrice) * 100 : 0;
 
-            <div className="mt-4 p-4 bg-muted/50 rounded-lg">
-              <p className="text-sm text-muted-foreground text-center">
-                💡 <strong>Dica:</strong> Utilize esta seção para calcular seus custos e margem de lucro. 
-                Estas informações não aparecem no orçamento enviado ao cliente.
-              </p>
-            </div>
+              return (
+                <>
+                  <div className="grid md:grid-cols-4 gap-4 mb-4">
+                    <div className="p-4 bg-background rounded-lg border">
+                      <p className="text-sm text-muted-foreground mb-1">Total de Milhas</p>
+                      <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                        {totalMilesAllPassengers.toLocaleString('pt-BR')}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {milesPerPassenger.toLocaleString('pt-BR')} por passageiro
+                      </p>
+                    </div>
+
+                    <div className="p-4 bg-background rounded-lg border">
+                      <p className="text-sm text-muted-foreground mb-1">Custo Total</p>
+                      <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                        R$ {totalCost.toFixed(2)}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        R$ {costPerMileValue.toFixed(3)} por milha
+                      </p>
+                    </div>
+                    
+                    <div className="p-4 bg-background rounded-lg border">
+                      <p className="text-sm text-muted-foreground mb-1">Lucro</p>
+                      <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                        R$ {profit.toFixed(2)}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Venda - Custo
+                      </p>
+                    </div>
+
+                    <div className="p-4 bg-background rounded-lg border">
+                      <p className="text-sm text-muted-foreground mb-1">Margem</p>
+                      <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                        {margin.toFixed(1)}%
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Margem de lucro
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="p-4 bg-background rounded-lg border">
+                      <p className="text-sm text-muted-foreground mb-1">Valor de Venda</p>
+                      <p className="text-2xl font-bold">R$ {salePrice.toFixed(2)}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        R$ {pricePerPassenger} por passageiro
+                      </p>
+                    </div>
+
+                    {boardingFee && parseFloat(boardingFee) > 0 && (
+                      <div className="p-4 bg-background rounded-lg border">
+                        <p className="text-sm text-muted-foreground mb-1">Taxas de Embarque</p>
+                        <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                          R$ {(parseFloat(boardingFee) * parseInt(passengers)).toFixed(2)}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          R$ {parseFloat(boardingFee).toFixed(2)} por passageiro
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-4 p-4 bg-muted/50 rounded-lg">
+                    <p className="text-sm text-muted-foreground text-center">
+                      💡 <strong>Dica:</strong> Esta análise completa mostra custo, lucro e margem baseados no total de milhas e custo por milha. 
+                      Estas informações não aparecem no orçamento enviado ao cliente.
+                    </p>
+                  </div>
+                </>
+              );
+            })()}
           </CardContent>
         </Card>
       )}

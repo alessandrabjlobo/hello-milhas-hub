@@ -21,6 +21,7 @@ export interface FlightSegment {
   from: string;
   to: string;
   date: string;
+  miles?: number;
   time?: string;
   stops?: number;
   airline?: string;

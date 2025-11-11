@@ -7,6 +7,7 @@ export interface RoundTripData {
   destination: string;
   departureDate: string;
   returnDate: string;
+  miles: number;
 }
 
 interface RoundTripFormProps {
@@ -15,7 +16,7 @@ interface RoundTripFormProps {
 }
 
 export function RoundTripForm({ data, onChange }: RoundTripFormProps) {
-  const updateField = (field: keyof RoundTripData, value: string) => {
+  const updateField = (field: keyof RoundTripData, value: string | number) => {
     onChange({ ...data, [field]: value });
   };
 
@@ -66,6 +67,20 @@ export function RoundTripForm({ data, onChange }: RoundTripFormProps) {
             onChange={(e) => updateField("returnDate", e.target.value)}
           />
         </div>
+      </div>
+
+      <div className="space-y-2 mt-2">
+        <Label htmlFor="miles">Total de Milhas Necessárias *</Label>
+        <Input
+          id="miles"
+          type="number"
+          placeholder="30000"
+          value={data.miles || ""}
+          onChange={(e) => updateField("miles", parseInt(e.target.value) || 0)}
+        />
+        <p className="text-xs text-muted-foreground">
+          Inclui ida + volta ({data.origin} → {data.destination} → {data.origin})
+        </p>
       </div>
 
       <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground pt-2">
