@@ -37,7 +37,7 @@ export function QuoteGenerator() {
     miles: 0
   });
   const [costPerMile, setCostPerMile] = useState("29");
-  const [desiredMargin, setDesiredMargin] = useState("20");
+  const [desiredMarkup, setDesiredMarkup] = useState("20");
   const [showCalculator, setShowCalculator] = useState(false);
   
   const [showPreview, setShowPreview] = useState(false);
@@ -283,7 +283,7 @@ export function QuoteGenerator() {
     }
 
     const costPerMileValue = parseFloat(costPerMile);
-    const marginPercent = parseFloat(desiredMargin);
+    const markupPercent = parseFloat(desiredMarkup);
 
     if (isNaN(costPerMileValue) || costPerMileValue <= 0) {
       toast({
@@ -294,10 +294,10 @@ export function QuoteGenerator() {
       return;
     }
 
-    if (isNaN(marginPercent) || marginPercent <= 0 || marginPercent >= 100) {
+    if (isNaN(markupPercent) || markupPercent <= 0) {
       toast({
-        title: "Margem inválida",
-        description: "Informe uma margem entre 0% e 100%.",
+        title: "Markup inválido",
+        description: "Informe um markup válido acima de 0%.",
         variant: "destructive",
       });
       return;
@@ -307,20 +307,20 @@ export function QuoteGenerator() {
     const totalMilesAllPassengers = totalMiles * parseInt(passengers);
     const milesCost = (totalMilesAllPassengers * costPerMileValue) / 1000;
 
-    // 2. Preço de venda das milhas COM margem de lucro
-    const milesPrice = milesCost / (1 - marginPercent / 100);
+    // 2. Preço de venda das milhas COM markup
+    const milesPrice = milesCost * (1 + markupPercent / 100);
 
-    // 3. Taxas de embarque (repasse direto, SEM margem)
+    // 3. Taxas de embarque (repasse direto, SEM markup)
     const totalBoardingFees = parseFloat(boardingFee || "0") * parseInt(passengers);
 
-    // 4. Preço final = milhas com margem + taxas sem margem
+    // 4. Preço final = milhas com markup + taxas sem markup
     const finalPrice = milesPrice + totalBoardingFees;
 
     setTotalPrice(finalPrice.toFixed(2));
 
     toast({
       title: "Preço calculado!",
-      description: `Preço de venda: R$ ${finalPrice.toFixed(2)} com ${marginPercent}% de margem sobre milhas`,
+      description: `Preço de venda: R$ ${finalPrice.toFixed(2)} com ${markupPercent}% de markup sobre milhas`,
     });
   };
 
@@ -567,7 +567,7 @@ export function QuoteGenerator() {
                   💡 Não sabe qual preço cobrar?
                 </h4>
                 <p className="text-sm text-muted-foreground mb-3">
-                  Use nossa calculadora automática! Defina a margem de lucro desejada 
+                  Use nossa calculadora automática! Defina o markup desejado 
                   e calcularemos o preço ideal de venda automaticamente.
                 </p>
                 <Button 
@@ -584,60 +584,59 @@ export function QuoteGenerator() {
                   <Alert>
                     <FileText className="h-4 w-4" />
                     <AlertDescription className="text-sm">
-                      A margem de lucro é aplicada apenas sobre o custo das milhas. 
-                      As taxas de embarque são repassadas sem margem.
+                      O markup é aplicado apenas sobre o custo das milhas. 
+                      As taxas de embarque são repassadas sem markup.
                     </AlertDescription>
                   </Alert>
 
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="desired-margin">
-                        Qual margem de lucro você quer? (%)
+                      <Label htmlFor="desired-markup">
+                        Qual markup você quer? (%)
                       </Label>
                       <div className="flex gap-2">
                         <Input
-                          id="desired-margin"
+                          id="desired-markup"
                           type="number"
                           min="0"
-                          max="100"
                           step="1"
                           placeholder="20"
-                          value={desiredMargin}
-                          onChange={(e) => setDesiredMargin(e.target.value)}
+                          value={desiredMarkup}
+                          onChange={(e) => setDesiredMarkup(e.target.value)}
                           className="h-11"
                         />
                         <div className="flex gap-2">
                           <Button 
                             variant="outline" 
                             size="sm"
-                            onClick={() => setDesiredMargin("15")}
+                            onClick={() => setDesiredMarkup("15")}
                           >
                             15%
                           </Button>
                           <Button 
                             variant="outline" 
                             size="sm"
-                            onClick={() => setDesiredMargin("20")}
+                            onClick={() => setDesiredMarkup("20")}
                           >
                             20%
                           </Button>
                           <Button 
                             variant="outline" 
                             size="sm"
-                            onClick={() => setDesiredMargin("25")}
+                            onClick={() => setDesiredMarkup("25")}
                           >
                             25%
                           </Button>
                         </div>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        💡 <strong>Exemplo:</strong> Com 20% de margem, se as milhas custam R$ 1.000, você venderá por R$ 1.250 
-                        (lucro de R$ 250)
+                        💡 <strong>Exemplo:</strong> Com 20% de markup, se as milhas custam R$ 1.000, você venderá por R$ 1.200 
+                        (lucro de R$ 200)
                       </p>
                     </div>
 
                     {/* Preview do Cálculo */}
-                    {desiredMargin && costPerMile && passengers && (
+                    {desiredMarkup && costPerMile && passengers && (
                       (() => {
                         let milesPerPassenger = 0;
                         if (tripType === "round_trip") {
@@ -650,14 +649,14 @@ export function QuoteGenerator() {
 
                         const totalMilesAllPassengers = milesPerPassenger * parseInt(passengers);
                         const costPerMileValue = parseFloat(costPerMile);
-                        const marginPercent = parseFloat(desiredMargin);
+                        const markupPercent = parseFloat(desiredMarkup);
 
                         // Custo das milhas
                         const milesCost = (totalMilesAllPassengers * costPerMileValue) / 1000;
 
-                        // Preço de venda das milhas (com margem)
-                        const milesPrice = marginPercent > 0 && marginPercent < 100
-                          ? milesCost / (1 - marginPercent / 100)
+                        // Preço de venda das milhas (com markup)
+                        const milesPrice = markupPercent > 0
+                          ? milesCost * (1 + markupPercent / 100)
                           : 0;
 
                         // Taxas de embarque
@@ -672,7 +671,7 @@ export function QuoteGenerator() {
                         return (
                           <div className="mt-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
                             <div className="flex items-center justify-between mb-2">
-                              <span className="text-sm font-medium">Preço Sugerido com {marginPercent}% de margem:</span>
+                              <span className="text-sm font-medium">Preço Sugerido com {markupPercent}% de markup:</span>
                               <span className="text-2xl font-bold text-primary">R$ {suggestedPrice.toFixed(2)}</span>
                             </div>
                             
@@ -682,7 +681,7 @@ export function QuoteGenerator() {
                               </div>
                               <div className="flex justify-between">
                                 <span>💰 Custo das milhas: R$ {milesCost.toFixed(2)}</span>
-                                <span>→ Venda com margem: R$ {milesPrice.toFixed(2)}</span>
+                                <span>→ Venda com markup: R$ {milesPrice.toFixed(2)}</span>
                               </div>
                               {totalBoardingFees > 0 && (
                                 <div className="flex justify-between">
@@ -1098,7 +1097,7 @@ export function QuoteGenerator() {
                     const totalMilesAllPassengers = milesPerPassenger * parseInt(passengers);
                     return `${milesPerPassenger.toLocaleString('pt-BR')} por passageiro × ${passengers} = ${totalMilesAllPassengers.toLocaleString('pt-BR')} total`;
                   })()}</li>
-                  <li>• <strong>Margem calculada:</strong> Apenas sobre o custo das milhas (taxas são repasse direto)</li>
+                  <li>• <strong>Markup calculado:</strong> Apenas sobre o custo das milhas (taxas são repasse direto)</li>
                   <li>• <strong>Custo por passageiro:</strong> Inclui milhas + taxa de embarque</li>
                 </ul>
               </AlertDescription>
