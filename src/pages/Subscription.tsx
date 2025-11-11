@@ -26,8 +26,6 @@ export default function Subscription() {
     loadStripeScript().then(() => setReady(true));
   }, []);
 
-  const missing = !pricingTableId || !publishableKey;
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5">
       {/* Header */}
@@ -68,18 +66,7 @@ export default function Subscription() {
 
         {/* Stripe Pricing Table */}
         <div className="max-w-5xl mx-auto">
-          {missing && (
-            <div className="p-6 border-2 border-yellow-500/50 rounded-lg bg-yellow-500/10 text-center">
-              <p className="text-foreground font-medium mb-2">
-                ⚠️ Configuração Necessária
-              </p>
-              <p className="text-muted-foreground text-sm">
-                Configure as variáveis de ambiente VITE_STRIPE_PRICING_TABLE_ID e VITE_STRIPE_PUBLISHABLE_KEY em Configurações do Projeto → Variáveis de Ambiente.
-              </p>
-            </div>
-          )}
-
-          {ready && !missing && (
+          {ready && pricingTableId && publishableKey && (
             <stripe-pricing-table 
               pricing-table-id={pricingTableId}
               publishable-key={publishableKey}
