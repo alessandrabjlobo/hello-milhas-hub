@@ -43,32 +43,21 @@ export default function Subscription() {
 
   const plans = [
     {
-      id: 'start',
-      name: 'Start',
-      price: 'R$ 97',
-      period: '/mês',
-      description: 'Ideal para começar sua operação',
-      features: [
-        'Até 50 vendas por mês',
-        'Gestão de contas de milhagem',
-        'Relatórios básicos',
-        'Suporte por e-mail',
-      ],
-      popular: false,
-    },
-    {
       id: 'pro',
-      name: 'Pro',
-      price: 'R$ 197',
+      name: 'Hello Milhas +',
+      price: 'R$ 25',
       period: '/mês',
-      description: 'Para agências em crescimento',
+      description: 'Plataforma completa para gestão de vendas de milhas',
       features: [
         'Vendas ilimitadas',
-        'Gestão avançada de contas',
-        'Relatórios e análises completas',
-        'Suporte prioritário',
-        'Integração com fornecedores',
-        'Exportação de dados',
+        'Gestão completa de contas de milhagem',
+        'Calculadora de margem e lucro',
+        'Gerador de orçamentos',
+        'Controle de passagens emitidas',
+        'Gestão de fornecedores',
+        'Relatórios e dashboards completos',
+        'Sistema de mensagens para clientes',
+        'Suporte completo',
       ],
       popular: true,
     },
@@ -97,7 +86,7 @@ export default function Subscription() {
         </div>
 
         {/* Plans Grid */}
-        <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto mb-12">
+        <div className="flex justify-center max-w-2xl mx-auto mb-12">
           {plans.map((plan) => (
             <Card 
               key={plan.id}

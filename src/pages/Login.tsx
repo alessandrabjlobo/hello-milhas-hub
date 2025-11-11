@@ -163,16 +163,6 @@ export default function Login() {
                 </Button>
               </div>
             </form>
-
-            <div className="mt-6 p-4 bg-muted/50 rounded-lg text-center">
-              <p className="text-sm text-muted-foreground">
-                Ainda não tem conta?{" "}
-                <Link to="/" className="text-primary hover:underline font-medium">
-                  Clique em "Comece já"
-                </Link>{" "}
-                na página inicial e ative seu teste de 7 dias gratuito.
-              </p>
-            </div>
           </CardContent>
         </Card>
       </div>

@@ -92,13 +92,18 @@ const Index = () => {
               <Button 
                 variant="hero" 
                 size="lg"
-                onClick={() => navigate("/auth")}
+                onClick={() => navigate("/assinatura")}
                 className="text-lg px-8"
               >
                 Começar Agora
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
-              <Button variant="outline" size="lg" className="text-lg px-8">
+              <Button 
+                variant="outline" 
+                size="lg" 
+                className="text-lg px-8"
+                onClick={() => navigate("/demo")}
+              >
                 Ver Demonstração
               </Button>
             </div>
@@ -161,10 +166,10 @@ const Index = () => {
               <Button 
                 variant="hero" 
                 size="lg"
-                onClick={() => navigate("/auth")}
+                onClick={() => navigate("/login")}
                 className="text-lg px-10"
               >
-                Entrar / Cadastrar
+                Entrar
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </CardContent>

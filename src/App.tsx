@@ -34,6 +34,7 @@ import Customers from "./pages/Customers";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import NotFound from "./pages/NotFound";
+import Demo from "./pages/Demo";
 
 const queryClient = new QueryClient();
 
@@ -49,6 +50,7 @@ const App = () => (
           <Route path="/assinatura" element={<Subscription />} />
           <Route path="/conta" element={<Account />} />
           <Route path="/auth" element={<Auth />} />
+          <Route path="/demo" element={<Demo />} />
           <Route path="/legal/terms" element={<Terms />} />
           <Route path="/legal/privacy" element={<Privacy />} />
 
