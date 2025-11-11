@@ -33,7 +33,7 @@ interface AccountDetails {
     name: string;
     code: string;
   } | null;
-  suppliers: {
+  supplier: {
     name: string;
   } | null;
 }
@@ -63,7 +63,7 @@ export default function AccountDetail() {
           *,
           airline_company_id,
           airline_companies(name, code),
-          suppliers(name)
+          supplier:suppliers!mileage_accounts_supplier_id_fkey(name)
         `)
         .eq("id", id)
         .single();
@@ -198,7 +198,7 @@ export default function AccountDetail() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Fornecedor</p>
-                  <p className="font-medium">{account.suppliers?.name || "N/A"}</p>
+                  <p className="font-medium">{account.supplier?.name || "N/A"}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Titular</p>

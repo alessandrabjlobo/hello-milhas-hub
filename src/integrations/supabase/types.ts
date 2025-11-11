@@ -419,6 +419,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_mileage_accounts_supplier"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "mileage_accounts_airline_company_id_fkey"
             columns: ["airline_company_id"]
             isOneToOne: false

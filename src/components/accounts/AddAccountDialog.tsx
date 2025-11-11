@@ -21,11 +21,11 @@ import { Eye, EyeOff, Plus, Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
-import { getSupplierId } from "@/lib/getSupplierId";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useSupplierProgramRules } from "@/hooks/useSupplierProgramRules";
 
 type AirlineCompany = { id: string; name: string; code: string };
+type Supplier = { id: string; name: string };
 
 interface AddAccountDialogProps {
   onAccountAdded: () => void;
@@ -34,8 +34,9 @@ interface AddAccountDialogProps {
 export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
 
-  const { programs, loading: programsLoading, supplierId } = useSupplierProgramRules();
+  const { programs, loading: programsLoading } = useSupplierProgramRules();
   const [showPassword, setShowPassword] = useState(false);
 
   const { toast } = useToast();
@@ -43,6 +44,7 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
   // Form controlado (strings) pra evitar warnings
   const [formData, setFormData] = useState<{
     airline_company_id: string;
+    supplier_id: string;
     account_holder_name: string;
     account_holder_cpf: string;
     password: string;
@@ -53,6 +55,7 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
     status: "active" | "inactive";
   }>({
     airline_company_id: "",
+    supplier_id: "",
     account_holder_name: "",
     account_holder_cpf: "",
     password: "",
@@ -72,7 +75,20 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
       .replace(/(-\d{2})\d+?$/, "$1");
   };
 
-  // No need to load suppliers - we always use the user's agency_id from profile
+  useEffect(() => {
+    if (!open) return;
+    (async () => {
+      try {
+        const { data: suppliersRes } = await supabase
+          .from("suppliers")
+          .select("id, name")
+          .order("name");
+        if (suppliersRes) setSuppliers(suppliersRes);
+      } catch (err: any) {
+        console.warn("Falha ao carregar suppliers:", err?.message || err);
+      }
+    })();
+  }, [open]);
 
   // Apply default rules when airline is selected
   const handlePickAirline = (airlineId: string) => {
@@ -87,57 +103,51 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (
-      !formData.airline_company_id ||
-      !formData.account_number ||
-      !formData.account_holder_name ||
-      !formData.account_holder_cpf
-    ) {
+    if (!formData.supplier_id) {
       toast({
-        title: "Campos obrigatórios",
-        description: "Preencha os campos marcados com *",
+        title: "Erro de validação",
+        description: "Selecione um fornecedor.",
         variant: "destructive",
       });
       return;
     }
 
-    // Ensure supplier_id exists before creating account
-    let currentSupplierId = supplierId;
-    
-    if (!currentSupplierId) {
-      try {
-        const { supplierId: provisionedId } = await getSupplierId();
-        currentSupplierId = provisionedId;
-      } catch (error: any) {
-        toast({
-          title: "Erro de configuração",
-          description: "Não foi possível identificar sua organização. Tente fazer logout e login novamente.",
-          variant: "destructive",
-        });
-        return;
-      }
+    if (!formData.airline_company_id) {
+      toast({
+        title: "Erro de validação",
+        description: "Selecione um programa de milhagem.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.account_number.trim()) {
+      toast({
+        title: "Erro de validação",
+        description: "Número da conta é obrigatório.",
+        variant: "destructive",
+      });
+      return;
     }
 
     const { data: userData } = await supabase.auth.getUser();
     if (!userData?.user) {
       toast({
         title: "Erro de autenticação",
-        description: "Usuário não autenticado",
+        description: "Você precisa estar autenticado.",
         variant: "destructive",
       });
       return;
     }
 
-    // Calculate cost_per_mile from price_per_thousand
     const pricePerThousand = parseFloat(formData.price_per_thousand) || 29;
     const costPerMile = pricePerThousand / 1000;
 
-    // CRITICAL: Always use currentSupplierId (agency_id from profile), never from form
     const { error } = await supabase.from("mileage_accounts").insert([
       {
         user_id: userData.user.id,
         airline_company_id: formData.airline_company_id,
-        supplier_id: currentSupplierId,
+        supplier_id: formData.supplier_id,
         account_holder_name: formData.account_holder_name,
         account_holder_cpf: formData.account_holder_cpf.replace(/\D/g, ""),
         password_encrypted: formData.password || null,
@@ -166,6 +176,7 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
     setOpen(false);
     setFormData({
       airline_company_id: "",
+      supplier_id: "",
       account_holder_name: "",
       account_holder_cpf: "",
       password: "",
@@ -200,12 +211,6 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
           <div className="py-8 text-center">
             <p className="text-muted-foreground">Carregando informações...</p>
           </div>
-        ) : !supplierId ? (
-          <Alert variant="destructive">
-            <AlertDescription>
-              Sua conta não está configurada corretamente. Por favor, faça logout e login novamente.
-            </AlertDescription>
-          </Alert>
         ) : programs.length === 0 ? (
           <div className="py-8 text-center space-y-4">
             <p className="text-muted-foreground">
@@ -219,8 +224,37 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
               Configurar Programas
             </Button>
           </div>
+        ) : suppliers.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-muted-foreground mb-4">
+              Você precisa cadastrar um fornecedor antes de criar contas.
+            </p>
+            <Button onClick={() => navigate("/suppliers")}>
+              Ir para Fornecedores
+            </Button>
+          </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Fornecedor */}
+            <div className="space-y-2">
+              <Label htmlFor="supplier">Fornecedor *</Label>
+              <Select
+                value={formData.supplier_id || ""}
+                onValueChange={(value) => setFormData((f) => ({ ...f, supplier_id: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o fornecedor" />
+                </SelectTrigger>
+                <SelectContent position="popper">
+                  {suppliers.map((supplier) => (
+                    <SelectItem key={supplier.id} value={supplier.id}>
+                      {supplier.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Programa de Milhagem (apenas os configurados) */}
             <div className="space-y-2">
               <Label htmlFor="airline">Programa de Milhagem *</Label>
@@ -378,8 +412,8 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
               className="flex-1"
               disabled={
                 programsLoading ||
-                !supplierId ||
                 programs.length === 0 ||
+                !formData.supplier_id ||
                 !formData.airline_company_id ||
                 !formData.account_number ||
                 !formData.account_holder_name ||

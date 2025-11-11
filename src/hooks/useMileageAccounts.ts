@@ -73,18 +73,19 @@ export const useMileageAccounts = () => {
 
   const createAccount = async (accountData: {
     airline_company_id: string;
+    supplier_id: string;
     account_number: string;
     balance: number;
     cost_per_mile: number;
     status: "active" | "inactive";
   }) => {
     try {
-      const { supplierId, userId } = await getSupplierId();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
 
       const { error } = await supabase.from("mileage_accounts").insert({
         ...accountData,
-        user_id: userId,
-        supplier_id: supplierId,
+        user_id: user.id,
       });
 
       if (error) throw error;
