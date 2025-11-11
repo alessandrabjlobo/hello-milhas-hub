@@ -53,10 +53,11 @@ export function QuoteGenerator() {
   const [showPreview, setShowPreview] = useState(false);
 
   const handleGenerateQuote = () => {
-    if (!clientName || !clientPhone || !route || !departureDate || !milesNeeded || !totalPrice) {
+    const hasValidSegment = flightSegments.some(seg => seg.from && seg.to && seg.date);
+    if (!clientName || !clientPhone || !milesNeeded || !totalPrice || !hasValidSegment) {
       toast({
         title: "Campos obrigatórios",
-        description: "Por favor, preencha todos os campos obrigatórios (*).",
+        description: "Preencha cliente, telefone, milhas, valor e ao menos 1 trecho com origem, destino e data.",
         variant: "destructive",
       });
       return;
@@ -504,10 +505,13 @@ export function QuoteGenerator() {
                     onValueChange={(v) => {
                       const inst = parseInt(v);
                       setInstallments(inst);
-                      
+
                       const config = configs.find(c => c.installments === inst && c.payment_type === 'credit');
                       if (config) {
-                        setSelectedInterestRate(config.interest_rate);
+                        const effectiveRate = config.config_type === 'per_installment'
+                          ? (config.per_installment_rates?.[inst] ?? 0)
+                          : config.interest_rate;
+                        setSelectedInterestRate(effectiveRate || 0);
                       } else {
                         setSelectedInterestRate(0);
                       }
@@ -521,11 +525,17 @@ export function QuoteGenerator() {
                       {configs
                         .filter(c => c.payment_type === 'credit')
                         .sort((a, b) => a.installments - b.installments)
-                        .map(config => (
-                          <SelectItem key={config.id} value={config.installments.toString()}>
-                            {config.installments}x - Taxa: {config.interest_rate.toFixed(2)}%
-                          </SelectItem>
-                        ))}
+                        .map(config => {
+                          const inst = config.installments;
+                          const rate = config.config_type === 'per_installment'
+                            ? (config.per_installment_rates?.[inst] ?? 0)
+                            : config.interest_rate;
+                          return (
+                            <SelectItem key={config.id} value={inst.toString()}>
+                              {inst}x - Taxa: {rate.toFixed(2)}%
+                            </SelectItem>
+                          );
+                        })}
                     </SelectContent>
                   </Select>
                 </div>
@@ -625,14 +635,18 @@ export function QuoteGenerator() {
                   Detalhes do Voo
                 </h3>
                 <div className="grid md:grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="text-muted-foreground">Rota</p>
-                    <p className="font-semibold text-lg">{route}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Data</p>
-                    <p className="font-semibold text-lg">{format(new Date(departureDate), 'dd/MM/yyyy')}</p>
-                  </div>
+                  {(flightSegments[0]?.from && flightSegments[0]?.to) && (
+                    <div>
+                      <p className="text-muted-foreground">Rota</p>
+                      <p className="font-semibold text-lg">{flightSegments[0].from} → {flightSegments[0].to}</p>
+                    </div>
+                  )}
+                  {flightSegments[0]?.date && (
+                    <div>
+                      <p className="text-muted-foreground">Data</p>
+                      <p className="font-semibold text-lg">{format(new Date(flightSegments[0].date), 'dd/MM/yyyy')}</p>
+                    </div>
+                  )}
                   {departureTime && (
                     <div>
                       <p className="text-muted-foreground">Partida</p>
