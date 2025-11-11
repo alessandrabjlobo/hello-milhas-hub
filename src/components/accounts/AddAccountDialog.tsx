@@ -26,7 +26,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useSupplierProgramRules } from "@/hooks/useSupplierProgramRules";
 
 type AirlineCompany = { id: string; name: string; code: string };
-type Supplier = { id: string; name: string };
 
 interface AddAccountDialogProps {
   onAccountAdded: () => void;
@@ -36,8 +35,6 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
 
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-
   const { programs, loading: programsLoading, supplierId } = useSupplierProgramRules();
   const [showPassword, setShowPassword] = useState(false);
 
@@ -46,24 +43,22 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
   // Form controlado (strings) pra evitar warnings
   const [formData, setFormData] = useState<{
     airline_company_id: string;
-    supplier_id: string;
     account_holder_name: string;
     account_holder_cpf: string;
     password: string;
     account_number: string;
     balance: string;
-    price_per_thousand: string; // Changed from cost_per_mile
+    price_per_thousand: string;
     cpf_limit: string;
     status: "active" | "inactive";
   }>({
     airline_company_id: "",
-    supplier_id: supplierId || "",
     account_holder_name: "",
     account_holder_cpf: "",
     password: "",
     account_number: "",
     balance: "",
-    price_per_thousand: "29", // Default price per 1000 miles
+    price_per_thousand: "29",
     cpf_limit: "25",
     status: "active",
   });
@@ -77,24 +72,7 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
       .replace(/(-\d{2})\d+?$/, "$1");
   };
 
-  useEffect(() => {
-    if (!open) return;
-    (async () => {
-      try {
-        const { data: suppliersRes } = await supabase
-          .from("suppliers")
-          .select("id, name")
-          .order("name");
-        if (suppliersRes) setSuppliers(suppliersRes);
-
-        if (supplierId && !formData.supplier_id) {
-          setFormData((f) => ({ ...f, supplier_id: supplierId }));
-        }
-      } catch (err: any) {
-        console.warn("Falha ao carregar suppliers:", err?.message || err);
-      }
-    })();
-  }, [open, supplierId]);
+  // No need to load suppliers - we always use the user's agency_id from profile
 
   // Apply default rules when airline is selected
   const handlePickAirline = (airlineId: string) => {
@@ -154,11 +132,12 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
     const pricePerThousand = parseFloat(formData.price_per_thousand) || 29;
     const costPerMile = pricePerThousand / 1000;
 
+    // CRITICAL: Always use currentSupplierId (agency_id from profile), never from form
     const { error } = await supabase.from("mileage_accounts").insert([
       {
         user_id: userData.user.id,
         airline_company_id: formData.airline_company_id,
-        supplier_id: formData.supplier_id || currentSupplierId,
+        supplier_id: currentSupplierId,
         account_holder_name: formData.account_holder_name,
         account_holder_cpf: formData.account_holder_cpf.replace(/\D/g, ""),
         password_encrypted: formData.password || null,
@@ -187,7 +166,6 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
     setOpen(false);
     setFormData({
       airline_company_id: "",
-      supplier_id: supplierId || "",
       account_holder_name: "",
       account_holder_cpf: "",
       password: "",
@@ -243,26 +221,6 @@ export const AddAccountDialog = ({ onAccountAdded }: AddAccountDialogProps) => {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Fornecedor (opcional) */}
-          <div className="space-y-2">
-            <Label htmlFor="supplier">Fornecedor</Label>
-            <Select
-              value={formData.supplier_id || ""}
-              onValueChange={(value) => setFormData((f) => ({ ...f, supplier_id: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o fornecedor (opcional)" />
-              </SelectTrigger>
-              <SelectContent position="popper">
-                {suppliers.map((supplier) => (
-                  <SelectItem key={supplier.id} value={supplier.id}>
-                    {supplier.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
             {/* Programa de Milhagem (apenas os configurados) */}
             <div className="space-y-2">
               <Label htmlFor="airline">Programa de Milhagem *</Label>
