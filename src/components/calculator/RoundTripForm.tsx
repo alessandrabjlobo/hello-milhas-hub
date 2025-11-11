@@ -70,7 +70,7 @@ export function RoundTripForm({ data, onChange }: RoundTripFormProps) {
       </div>
 
       <div className="space-y-2 mt-2">
-        <Label htmlFor="miles">Total de Milhas Necessárias *</Label>
+        <Label htmlFor="miles">Milhas por Passageiro (Ida + Volta) *</Label>
         <Input
           id="miles"
           type="number"
@@ -79,7 +79,9 @@ export function RoundTripForm({ data, onChange }: RoundTripFormProps) {
           onChange={(e) => updateField("miles", parseInt(e.target.value) || 0)}
         />
         <p className="text-xs text-muted-foreground">
-          Inclui ida + volta ({data.origin} → {data.destination} → {data.origin})
+          Quantidade de milhas necessária para 1 passageiro fazer ida e volta completa
+          <br />
+          💡 Exemplo: Se o trecho ida custa 25.000 e volta 25.000, informe 50.000
         </p>
       </div>
 

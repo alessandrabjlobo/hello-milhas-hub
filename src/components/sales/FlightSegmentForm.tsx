@@ -78,7 +78,7 @@ export function FlightSegmentForm({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor={`miles-${index}`}>Milhas *</Label>
+          <Label htmlFor={`miles-${index}`}>Milhas por Passageiro *</Label>
           <Input
             id={`miles-${index}`}
             type="number"
@@ -86,6 +86,9 @@ export function FlightSegmentForm({
             value={segment.miles || ""}
             onChange={(e) => onUpdate(index, "miles", parseInt(e.target.value) || 0)}
           />
+          <p className="text-xs text-muted-foreground">
+            Milhas necessárias para 1 passageiro neste trecho
+          </p>
         </div>
       </div>
     </div>

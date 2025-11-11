@@ -4,8 +4,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { FileText, Send, Copy, Download, User, Plane, DollarSign, Plus } from "lucide-react";
+import { FileText, Send, Copy, Download, User, Plane, DollarSign, Plus, Info, Calculator } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -37,6 +38,7 @@ export function QuoteGenerator() {
   });
   const [costPerMile, setCostPerMile] = useState("29");
   const [desiredMargin, setDesiredMargin] = useState("20");
+  const [showCalculator, setShowCalculator] = useState(false);
   
   const [showPreview, setShowPreview] = useState(false);
 
@@ -448,7 +450,7 @@ export function QuoteGenerator() {
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="one-way-miles">Milhas *</Label>
+                          <Label htmlFor="one-way-miles">Milhas por Passageiro *</Label>
                           <Input
                             id="one-way-miles"
                             type="number"
@@ -460,6 +462,9 @@ export function QuoteGenerator() {
                               setFlightSegments(newSegments);
                             }}
                           />
+                          <p className="text-xs text-muted-foreground">
+                            Quantidade de milhas necessária para 1 passageiro
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -555,115 +560,156 @@ export function QuoteGenerator() {
                 </div>
               </div>
 
-              {/* Calculadora de Margem */}
-              <div className="mt-6 p-5 bg-gradient-to-r from-primary/5 to-primary/10 rounded-xl border border-primary/20">
-                <div className="flex items-center gap-2 mb-3">
-                  <DollarSign className="h-5 w-5 text-primary" />
-                  <h4 className="font-semibold text-primary">Calculadora Automática de Preço</h4>
-                </div>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Defina a margem de lucro desejada e calcularemos automaticamente o preço de venda ideal
+              {/* Calculadora Automática de Preço */}
+              <div className="mt-4 p-4 bg-muted/50 rounded-lg border">
+                <h4 className="font-semibold mb-2 flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-primary" />
+                  💡 Não sabe qual preço cobrar?
+                </h4>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Use nossa calculadora automática! Defina a margem de lucro desejada 
+                  e calcularemos o preço ideal de venda automaticamente.
                 </p>
-                
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="desired-margin">Margem de Lucro Desejada (%)</Label>
-                    <Input
-                      id="desired-margin"
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.1"
-                      placeholder="20"
-                      value={desiredMargin}
-                      onChange={(e) => setDesiredMargin(e.target.value)}
-                      className="h-11"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Exemplo: 20% = lucro de R$ 200 em venda de R$ 1000
-                    </p>
-                  </div>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowCalculator(!showCalculator)}
+                  className="w-full"
+                >
+                  {showCalculator ? "Ocultar" : "Abrir"} Calculadora Automática
+                </Button>
+              </div>
 
-                  <div className="flex items-end">
-                    <Button
-                      type="button"
-                      onClick={handleCalculatePriceByMargin}
-                      className="w-full h-11"
-                      variant="default"
-                    >
-                      <DollarSign className="h-4 w-4 mr-2" />
-                      Calcular Preço Automaticamente
-                    </Button>
-                  </div>
-                </div>
+              {showCalculator && (
+                <div className="p-4 border rounded-lg bg-gradient-to-br from-primary/5 to-primary/10 space-y-4">
+                  <Alert>
+                    <FileText className="h-4 w-4" />
+                    <AlertDescription className="text-sm">
+                      A margem de lucro é aplicada apenas sobre o custo das milhas. 
+                      As taxas de embarque são repassadas sem margem.
+                    </AlertDescription>
+                  </Alert>
 
-                {(() => {
-                  // Preview do cálculo
-                  let totalMiles = 0;
-                  if (tripType === "round_trip") {
-                    totalMiles = roundTripData.miles || 0;
-                  } else {
-                    totalMiles = flightSegments.reduce((sum, seg) => sum + (seg.miles || 0), 0);
-                  }
-
-                  if (totalMiles > 0 && passengers && costPerMile && desiredMargin) {
-                    const totalMilesAllPassengers = totalMiles * parseInt(passengers);
-                    const costPerMileValue = parseFloat(costPerMile);
-                    const marginPercent = parseFloat(desiredMargin);
-                    
-                    // Custo das milhas
-                    const milesCost = (totalMilesAllPassengers * costPerMileValue) / 1000;
-                    
-                    // Preço de venda das milhas (com margem)
-                    const milesPrice = milesCost / (1 - marginPercent / 100);
-                    
-                    // Taxas de embarque
-                    const totalBoardingFees = parseFloat(boardingFee || "0") * parseInt(passengers);
-                    
-                    // Preço final
-                    const suggestedPrice = milesPrice + totalBoardingFees;
-                    
-                    // Lucro (apenas sobre milhas)
-                    const profit = milesPrice - milesCost;
-
-                    return (
-                      <div className="mt-4 p-4 bg-background rounded-lg border">
-                        <p className="text-sm font-semibold mb-3">Preview do Cálculo:</p>
-                        <div className="grid md:grid-cols-3 gap-3 text-sm">
-                          <div className="p-3 bg-background rounded-lg border">
-                            <p className="text-muted-foreground text-xs">Custo das Milhas</p>
-                            <p className="text-lg font-bold text-red-600">
-                              R$ {milesCost.toFixed(2)}
-                            </p>
-                          </div>
-                          
-                          <div className="p-3 bg-background rounded-lg border">
-                            <p className="text-muted-foreground text-xs">Preço Sugerido (Total)</p>
-                            <p className="text-lg font-bold text-primary">
-                              R$ {suggestedPrice.toFixed(2)}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Milhas: R$ {milesPrice.toFixed(2)}
-                              {totalBoardingFees > 0 && ` + Taxas: R$ ${totalBoardingFees.toFixed(2)}`}
-                            </p>
-                          </div>
-                          
-                          <div className="p-3 bg-background rounded-lg border">
-                            <p className="text-muted-foreground text-xs">Lucro (sobre milhas)</p>
-                            <p className="text-lg font-bold text-green-600">
-                              R$ {profit.toFixed(2)}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Margem: {marginPercent}%
-                            </p>
-                          </div>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="desired-margin">
+                        Qual margem de lucro você quer? (%)
+                      </Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="desired-margin"
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="1"
+                          placeholder="20"
+                          value={desiredMargin}
+                          onChange={(e) => setDesiredMargin(e.target.value)}
+                          className="h-11"
+                        />
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => setDesiredMargin("15")}
+                          >
+                            15%
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => setDesiredMargin("20")}
+                          >
+                            20%
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => setDesiredMargin("25")}
+                          >
+                            25%
+                          </Button>
                         </div>
                       </div>
-                    );
-                  }
-                  return null;
-                })()}
-              </div>
+                      <p className="text-xs text-muted-foreground">
+                        💡 <strong>Exemplo:</strong> Com 20% de margem, se as milhas custam R$ 1.000, você venderá por R$ 1.250 
+                        (lucro de R$ 250)
+                      </p>
+                    </div>
+
+                    {/* Preview do Cálculo */}
+                    {desiredMargin && costPerMile && passengers && (
+                      (() => {
+                        let milesPerPassenger = 0;
+                        if (tripType === "round_trip") {
+                          milesPerPassenger = roundTripData.miles || 0;
+                        } else if (tripType === "one_way") {
+                          milesPerPassenger = flightSegments[0]?.miles || 0;
+                        } else {
+                          milesPerPassenger = flightSegments.reduce((sum, seg) => sum + (seg.miles || 0), 0);
+                        }
+
+                        const totalMilesAllPassengers = milesPerPassenger * parseInt(passengers);
+                        const costPerMileValue = parseFloat(costPerMile);
+                        const marginPercent = parseFloat(desiredMargin);
+
+                        // Custo das milhas
+                        const milesCost = (totalMilesAllPassengers * costPerMileValue) / 1000;
+
+                        // Preço de venda das milhas (com margem)
+                        const milesPrice = marginPercent > 0 && marginPercent < 100
+                          ? milesCost / (1 - marginPercent / 100)
+                          : 0;
+
+                        // Taxas de embarque
+                        const totalBoardingFees = parseFloat(boardingFee || "0") * parseInt(passengers);
+
+                        // Preço final
+                        const suggestedPrice = milesPrice + totalBoardingFees;
+
+                        // Lucro
+                        const profit = milesPrice - milesCost;
+
+                        return (
+                          <div className="mt-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-medium">Preço Sugerido com {marginPercent}% de margem:</span>
+                              <span className="text-2xl font-bold text-primary">R$ {suggestedPrice.toFixed(2)}</span>
+                            </div>
+                            
+                            <div className="text-xs text-muted-foreground space-y-1 mt-3 pt-3 border-t">
+                              <div className="flex justify-between">
+                                <span>📊 {milesPerPassenger.toLocaleString('pt-BR')} milhas × {passengers} passageiro(s) = {totalMilesAllPassengers.toLocaleString('pt-BR')} milhas</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>💰 Custo das milhas: R$ {milesCost.toFixed(2)}</span>
+                                <span>→ Venda com margem: R$ {milesPrice.toFixed(2)}</span>
+                              </div>
+                              {totalBoardingFees > 0 && (
+                                <div className="flex justify-between">
+                                  <span>✈️ Taxas de embarque (repasse): R$ {totalBoardingFees.toFixed(2)}</span>
+                                </div>
+                              )}
+                              <div className="flex justify-between pt-2 border-t font-semibold text-green-600">
+                                <span>✅ Seu lucro (sobre milhas):</span>
+                                <span>R$ {profit.toFixed(2)}</span>
+                              </div>
+                            </div>
+                            
+                            <Button 
+                              onClick={() => setTotalPrice(suggestedPrice.toFixed(2))}
+                              variant="outline"
+                              size="sm"
+                              className="w-full mt-3"
+                            >
+                              Usar este preço
+                            </Button>
+                          </div>
+                        );
+                      })()
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="grid md:grid-cols-2 gap-4 mt-4">
                 <div className="space-y-2">
@@ -1037,6 +1083,26 @@ export function QuoteGenerator() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {/* Info Alert */}
+            <Alert className="mb-4 bg-blue-50 dark:bg-blue-950/20 border-blue-200">
+              <Info className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-sm">
+                <p className="font-semibold text-blue-900 dark:text-blue-100 mb-1">Como interpretar os valores:</p>
+                <ul className="text-blue-700 dark:text-blue-300 space-y-1 text-xs">
+                  <li>• <strong>Milhas informadas:</strong> {(() => {
+                    const milesPerPassenger = tripType === "round_trip" 
+                      ? (roundTripData.miles || 0)
+                      : tripType === "one_way"
+                      ? (flightSegments[0]?.miles || 0)
+                      : flightSegments.reduce((sum, seg) => sum + (seg.miles || 0), 0);
+                    const totalMilesAllPassengers = milesPerPassenger * parseInt(passengers);
+                    return `${milesPerPassenger.toLocaleString('pt-BR')} por passageiro × ${passengers} = ${totalMilesAllPassengers.toLocaleString('pt-BR')} total`;
+                  })()}</li>
+                  <li>• <strong>Margem calculada:</strong> Apenas sobre o custo das milhas (taxas são repasse direto)</li>
+                  <li>• <strong>Custo por passageiro:</strong> Inclui milhas + taxa de embarque</li>
+                </ul>
+              </AlertDescription>
+            </Alert>
             {(() => {
               // Calcular total de milhas
               let totalMiles = 0;
