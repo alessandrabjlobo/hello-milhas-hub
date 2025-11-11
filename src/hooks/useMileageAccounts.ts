@@ -37,7 +37,20 @@ export const useMileageAccounts = () => {
       const { data, error } = await supabase
         .from("mileage_accounts")
         .select(`
-          *,
+          id,
+          user_id,
+          airline_company_id,
+          supplier_id,
+          account_holder_name,
+          account_holder_cpf,
+          account_number,
+          balance,
+          cost_per_mile,
+          cpf_limit,
+          cpf_count,
+          status,
+          created_at,
+          updated_at,
           airline_companies (
             name,
             code
