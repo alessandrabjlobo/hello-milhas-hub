@@ -55,6 +55,34 @@ export function useSubscriptionGuard() {
         console.log('[useSubscriptionGuard] ✅ User has access');
         setHasAccess(true);
       } else {
+        // Fallback: buscar whitelist no backend quando ENV público estiver vazio
+        try {
+          const whitelistEnv = import.meta.env.VITE_ALWAYS_ACTIVE_EMAILS || '';
+          const envHasEmails = whitelistEnv.trim().length > 0;
+          if (!envHasEmails && user.email) {
+            // cache simples para evitar múltiplas chamadas
+            let emails: string[] | null = null;
+            const cached = sessionStorage.getItem('wl_emails');
+            if (cached) {
+              try { emails = JSON.parse(cached); } catch { /* ignore */ }
+            }
+            if (!emails) {
+              const { data, error: fnError } = await supabase.functions.invoke('get-whitelist');
+              if (!fnError && (data as any)?.whitelist) {
+                emails = (data as any).whitelist as string[];
+                sessionStorage.setItem('wl_emails', JSON.stringify(emails));
+              }
+            }
+            const inList = emails?.some(e => e.toLowerCase() === user.email!.toLowerCase());
+            if (inList) {
+              console.log('[useSubscriptionGuard] ✅ User whitelisted via backend');
+              setHasAccess(true);
+              return;
+            }
+          }
+        } catch (e) {
+          console.error('[useSubscriptionGuard] Whitelist fallback error:', e);
+        }
         console.log('[useSubscriptionGuard] ❌ User does not have access, redirecting to /assinatura');
         navigate('/assinatura');
       }
