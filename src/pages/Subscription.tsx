@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Plane } from "lucide-react";
 
@@ -17,7 +17,6 @@ function loadStripeScript() {
 }
 
 export default function Subscription() {
-  const navigate = useNavigate();
   const [ready, setReady] = useState(false);
 
   const pricingTableId = import.meta.env.VITE_STRIPE_PRICING_TABLE_ID;
@@ -32,7 +31,7 @@ export default function Subscription() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5">
       {/* Header */}
-      <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 relative z-50">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -42,17 +41,11 @@ export default function Subscription() {
               <span className="font-bold text-lg">Hello Milhas +</span>
             </div>
             <div className="flex items-center gap-3">
-              <Button 
-                variant="ghost" 
-                onClick={() => navigate("/")}
-              >
-                Voltar ao Início
+              <Button asChild variant="ghost">
+                <Link to="/">Voltar ao Início</Link>
               </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => navigate("/login")}
-              >
-                Já tenho conta
+              <Button asChild variant="outline">
+                <Link to="/login">Já tenho conta</Link>
               </Button>
             </div>
           </div>
@@ -81,7 +74,7 @@ export default function Subscription() {
                 ⚠️ Configuração Necessária
               </p>
               <p className="text-muted-foreground text-sm">
-                Defina as variáveis VITE_STRIPE_PRICING_TABLE_ID e VITE_STRIPE_PUBLISHABLE_KEY nas configurações do projeto.
+                Configure as variáveis de ambiente VITE_STRIPE_PRICING_TABLE_ID e VITE_STRIPE_PUBLISHABLE_KEY em Configurações do Projeto → Variáveis de Ambiente.
               </p>
             </div>
           )}
@@ -98,12 +91,8 @@ export default function Subscription() {
         <div className="text-center mt-12">
           <p className="text-muted-foreground">
             Já tem uma conta?{" "}
-            <Button
-              variant="link"
-              className="text-primary p-0"
-              onClick={() => navigate('/login')}
-            >
-              Fazer login
+            <Button asChild variant="link" className="text-primary p-0">
+              <Link to="/login">Fazer login</Link>
             </Button>
           </p>
         </div>
