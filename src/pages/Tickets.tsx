@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { PlusCircle, Eye, Calendar, FileText, MoreHorizontal, Edit, Trash2, Ticket as TicketIcon } from "lucide-react";
+import { PlusCircle, Eye, Calendar, MoreHorizontal, Edit, Trash2, Ticket as TicketIcon } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,9 +37,9 @@ export default function Tickets() {
   const [detailTicket, setDetailTicket] = useState<typeof tickets[0] | null>(null);
   const { toast } = useToast();
 
-  const getFlightStatus = (ticket: typeof tickets[0]) => {
+  const getFlightStatusDot = (ticket: typeof tickets[0]) => {
     if (!ticket.departure_date) {
-      return <Badge variant="secondary">Sem Data</Badge>;
+      return <div className="w-3 h-3 rounded-full bg-muted" title="Sem data" />;
     }
     
     const today = new Date();
@@ -49,11 +49,11 @@ export default function Tickets() {
     flightDate.setHours(0, 0, 0, 0);
     
     if (flightDate < today) {
-      return <Badge className="bg-green-500 text-white hover:bg-green-600">✓ Já Voado</Badge>;
+      return <div className="w-3 h-3 rounded-full bg-green-500" title="Já voado" />;
     } else if (flightDate.getTime() === today.getTime()) {
-      return <Badge className="bg-blue-500 text-white hover:bg-blue-600">✈️ Voa Hoje</Badge>;
+      return <div className="w-3 h-3 rounded-full bg-yellow-500" title="Voa hoje" />;
     } else {
-      return <Badge className="bg-yellow-500 text-black hover:bg-yellow-600">📅 Próximo Voo</Badge>;
+      return <div className="w-3 h-3 rounded-full bg-blue-500" title="Próximo voo" />;
     }
   };
 
@@ -84,29 +84,6 @@ export default function Tickets() {
     }
   };
 
-  const getVerificationBadge = (status: string | null) => {
-    if (!status) return <Badge variant="secondary">-</Badge>;
-    
-    const variants: Record<string, "default" | "secondary" | "outline"> = {
-      pending: "secondary",
-      requested: "outline",
-      received: "default",
-      completed: "default",
-    };
-    
-    const labels: Record<string, string> = {
-      pending: "Pendente",
-      requested: "Solicitado",
-      received: "Recebido",
-      completed: "Completo",
-    };
-
-    return (
-      <Badge variant={variants[status] || "secondary"}>
-        {labels[status] || status}
-      </Badge>
-    );
-  };
 
   if (loading) {
     return (
@@ -156,12 +133,11 @@ export default function Tickets() {
                 <TableRow>
                   <TableHead>Data Emissão</TableHead>
                   <TableHead>Cliente</TableHead>
-                  <TableHead>Rota</TableHead>
+                  <TableHead>Data do Voo</TableHead>
                   <TableHead>Companhia</TableHead>
-                  <TableHead>PNR</TableHead>
+                  <TableHead>Localizador</TableHead>
                   <TableHead>Bilhete</TableHead>
-                  <TableHead>Verificação</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead className="text-center">Status</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -177,16 +153,16 @@ export default function Tickets() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div>
-                        <p className="font-medium">
-                          {ticket.sales?.customer_name || "-"}
-                        </p>
-                      </div>
+                      <p className="font-medium">
+                        {ticket.sales?.customer_name || "-"}
+                      </p>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                        {ticket.sales?.route_text || ticket.route}
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        {ticket.departure_date
+                          ? new Date(ticket.departure_date).toLocaleDateString("pt-BR")
+                          : "-"}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -200,8 +176,11 @@ export default function Tickets() {
                     <TableCell className="font-mono text-sm">
                       {ticket.ticket_number || "-"}
                     </TableCell>
-                    <TableCell>{getVerificationBadge(ticket.verification_status)}</TableCell>
-                    <TableCell>{getFlightStatus(ticket)}</TableCell>
+                    <TableCell>
+                      <div className="flex justify-center">
+                        {getFlightStatusDot(ticket)}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -232,6 +211,27 @@ export default function Tickets() {
                 ))}
               </TableBody>
             </Table>
+          )}
+          {tickets.length > 0 && (
+            <div className="border-t px-6 py-4">
+              <p className="text-sm font-medium text-muted-foreground mb-3">
+                Legenda de Status:
+              </p>
+              <div className="flex flex-wrap gap-6">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-green-500" />
+                  <span className="text-sm text-muted-foreground">Já voado</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                  <span className="text-sm text-muted-foreground">Voa hoje</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-blue-500" />
+                  <span className="text-sm text-muted-foreground">Próximo voo</span>
+                </div>
+              </div>
+            </div>
           )}
         </Card>
       </div>
