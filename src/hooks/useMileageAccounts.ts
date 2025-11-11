@@ -21,6 +21,10 @@ export interface MileageAccount {
     name: string;
     code: string;
   };
+  supplier?: {
+    id: string;
+    name: string;
+  };
 }
 
 export const useMileageAccounts = () => {
@@ -54,6 +58,10 @@ export const useMileageAccounts = () => {
           airline_companies (
             name,
             code
+          ),
+          supplier:suppliers!mileage_accounts_supplier_id_fkey (
+            id,
+            name
           )
         `)
         .order("created_at", { ascending: false });

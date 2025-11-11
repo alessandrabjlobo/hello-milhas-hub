@@ -17,16 +17,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus } from "lucide-react";
+import { Plus, ArrowLeftRight } from "lucide-react";
 import { useMovements } from "@/hooks/useMovements";
 import { supabase } from "@/integrations/supabase/client";
 
 interface AddMovementDialogProps {
   accountId: string;
   onMovementAdded: () => void;
+  showLabel?: boolean;
 }
 
-export const AddMovementDialog = ({ accountId, onMovementAdded }: AddMovementDialogProps) => {
+export const AddMovementDialog = ({ accountId, onMovementAdded, showLabel = false }: AddMovementDialogProps) => {
   const [open, setOpen] = useState(false);
   const { createMovement } = useMovements(accountId);
   const [formData, setFormData] = useState({
@@ -83,10 +84,17 @@ export const AddMovementDialog = ({ accountId, onMovementAdded }: AddMovementDia
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          Nova Movimentação
-        </Button>
+        {showLabel ? (
+          <Button variant="outline" size="sm">
+            <ArrowLeftRight className="h-4 w-4 mr-2" />
+            Movimentações
+          </Button>
+        ) : (
+          <Button>
+            <Plus className="h-4 w-4 mr-2" />
+            Nova Movimentação
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>

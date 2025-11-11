@@ -81,6 +81,7 @@ export default function Accounts() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Companhia</TableHead>
+                  <TableHead>Fornecedor</TableHead>
                   <TableHead>Número da Conta</TableHead>
                   <TableHead>Saldo</TableHead>
                   <TableHead>CPFs Usados</TableHead>
@@ -101,6 +102,11 @@ export default function Accounts() {
                           {account.airline_companies?.name || "-"}
                         </span>
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-medium">
+                        {account.supplier?.name || "Não informado"}
+                      </span>
                     </TableCell>
                     <TableCell className="font-mono">
                       {account.account_number?.slice(-4) 
@@ -133,10 +139,11 @@ export default function Accounts() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <AddMovementDialog accountId={account.id} onMovementAdded={fetchAccounts} />
-                        <Button variant="ghost" size="icon" asChild>
+                        <AddMovementDialog accountId={account.id} onMovementAdded={fetchAccounts} showLabel />
+                        <Button variant="ghost" size="sm" asChild>
                           <Link to={`/accounts/${account.id}`}>
-                            <Eye className="h-4 w-4" />
+                            <Eye className="h-4 w-4 mr-2" />
+                            Ver detalhes
                           </Link>
                         </Button>
                       </div>
