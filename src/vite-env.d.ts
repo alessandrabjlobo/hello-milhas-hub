@@ -1,1 +1,15 @@
 /// <reference types="vite/client" />
+
+interface ImportMetaEnv {
+  readonly VITE_SUPABASE_URL: string
+  readonly VITE_SUPABASE_PUBLISHABLE_KEY: string
+  readonly VITE_SUPABASE_PROJECT_ID: string
+  readonly VITE_STRIPE_PUBLISHABLE_KEY: string
+  readonly VITE_STRIPE_PRICING_TABLE_ID: string
+  readonly VITE_ALWAYS_ACTIVE_EMAILS: string
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv
+}
+

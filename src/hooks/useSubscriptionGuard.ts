@@ -22,12 +22,12 @@ export function useSubscriptionGuard() {
       return;
     }
     
-    // 1. Verificar whitelist (ENV)
+    // 1. Verificar whitelist via VITE env (fallback)
     const whitelistEnv = import.meta.env.VITE_ALWAYS_ACTIVE_EMAILS || '';
-    const whitelist = whitelistEnv.split(',').map((e: string) => e.trim()).filter(Boolean);
+    const whitelist = whitelistEnv.split(',').map((e: string) => e.trim().toLowerCase()).filter(Boolean);
     
-    if (whitelist.includes(user.email || '')) {
-      console.log('User in whitelist, granting access');
+    if (whitelist.length > 0 && whitelist.includes(user.email?.toLowerCase() || '')) {
+      console.log('User in whitelist (env), granting access');
       setHasAccess(true);
       setLoading(false);
       return;

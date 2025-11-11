@@ -59,6 +59,40 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Top Navigation Bar */}
+      <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
+        <div className="container mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-gradient-primary flex items-center justify-center">
+                <Plane className="h-4 w-4 text-primary-foreground" />
+              </div>
+              <span className="font-bold text-lg">Hello Milhas +</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button 
+                variant="ghost" 
+                onClick={() => navigate("/login")}
+              >
+                Login
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => navigate("/demo")}
+              >
+                Ver Demonstração
+              </Button>
+              <Button 
+                variant="default" 
+                onClick={() => navigate("/assinatura")}
+              >
+                Comece já
+              </Button>
+            </div>
+          </div>
+        </div>
+      </nav>
+      
       {/* Hero Section */}
       <section className="relative overflow-hidden">
         <div 

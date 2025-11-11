@@ -15,11 +15,11 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Mapeamento de Price ID para Plan
+// Mapeamento de Price ID para Plan (pode ser expandido no futuro)
 const getPlanFromPriceId = (priceId: string): 'start' | 'pro' => {
-  const stripePriceId = Deno.env.get('STRIPE_PRICE_ID') || '';
-  if (priceId === stripePriceId) return 'pro';
-  return 'start';
+  // Por enquanto, todos os preços são 'pro'
+  // Adicione mais lógica aqui se houver múltiplos planos
+  return 'pro';
 };
 
 // Mapeamento de status Stripe para status do banco

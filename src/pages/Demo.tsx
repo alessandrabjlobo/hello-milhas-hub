@@ -1,323 +1,221 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { 
-  TrendingUp, 
+  ArrowUpRight, 
+  DollarSign, 
+  ShoppingCart, 
   Users, 
-  Plane, 
-  DollarSign,
-  ArrowRight,
-  AlertCircle
+  Ticket,
+  Info,
+  Plane
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function Demo() {
   const navigate = useNavigate();
+  const [showModal, setShowModal] = useState(false);
 
   // Dados fictícios
-  const mockMetrics = {
-    revenue: "R$ 47.580,00",
-    sales: 23,
-    customers: 18,
-    tickets: 31
+  const metrics = [
+    {
+      title: "Receita Total",
+      value: "R$ 127.450,00",
+      change: "+12.5%",
+      trend: "up",
+      icon: DollarSign,
+    },
+    {
+      title: "Vendas no Mês",
+      value: "48",
+      change: "+8.2%",
+      trend: "up",
+      icon: ShoppingCart,
+    },
+    {
+      title: "Clientes Ativos",
+      value: "156",
+      change: "+5.1%",
+      trend: "up",
+      icon: Users,
+    },
+    {
+      title: "Passagens Emitidas",
+      value: "72",
+      change: "+15.3%",
+      trend: "up",
+      icon: Ticket,
+    },
+  ];
+
+  const recentSales = [
+    { id: 1, cliente: "Maria Silva", rota: "GRU-MIA", valor: "R$ 2.450,00", status: "Pago" },
+    { id: 2, cliente: "João Santos", rota: "GRU-LIS", valor: "R$ 3.200,00", status: "Pago" },
+    { id: 3, cliente: "Ana Costa", rota: "GRU-NYC", valor: "R$ 2.850,00", status: "Pendente" },
+    { id: 4, cliente: "Pedro Lima", rota: "GRU-PAR", valor: "R$ 3.100,00", status: "Pago" },
+    { id: 5, cliente: "Carla Souza", rota: "GRU-LON", valor: "R$ 3.500,00", status: "Pago" },
+  ];
+
+  const handleActionClick = () => {
+    setShowModal(true);
   };
-
-  const mockSales = [
-    {
-      id: 1,
-      customer: "João Silva",
-      miles: "60.000",
-      program: "Smiles",
-      value: "R$ 2.400,00",
-      status: "Pago",
-      date: "15/01/2024"
-    },
-    {
-      id: 2,
-      customer: "Maria Santos",
-      miles: "80.000",
-      program: "LATAM Pass",
-      value: "R$ 3.200,00",
-      status: "Pendente",
-      date: "14/01/2024"
-    },
-    {
-      id: 3,
-      customer: "Carlos Oliveira",
-      miles: "45.000",
-      program: "TudoAzul",
-      value: "R$ 1.800,00",
-      status: "Pago",
-      date: "13/01/2024"
-    }
-  ];
-
-  const mockAccounts = [
-    {
-      id: 1,
-      program: "Smiles",
-      account: "1234567890",
-      balance: "250.000",
-      status: "Ativa"
-    },
-    {
-      id: 2,
-      program: "LATAM Pass",
-      account: "9876543210",
-      balance: "180.000",
-      status: "Ativa"
-    },
-    {
-      id: 3,
-      program: "TudoAzul",
-      account: "5555666677",
-      balance: "320.000",
-      status: "Ativa"
-    }
-  ];
-
-  const mockTickets = [
-    {
-      id: 1,
-      passenger: "Ana Costa",
-      route: "GRU → MIA",
-      date: "25/02/2024",
-      status: "Emitida"
-    },
-    {
-      id: 2,
-      passenger: "Pedro Lima",
-      route: "GIG → LIS",
-      date: "10/03/2024",
-      status: "Emitida"
-    },
-    {
-      id: 3,
-      passenger: "Julia Mendes",
-      route: "BSB → NYC",
-      date: "05/04/2024",
-      status: "Pendente"
-    }
-  ];
 
   return (
     <div className="min-h-screen bg-background">
       {/* Demo Banner */}
-      <div className="bg-gradient-primary text-primary-foreground py-3 px-4">
-        <div className="container mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5" />
-            <span className="font-medium">
-              Você está visualizando uma demonstração com dados fictícios
-            </span>
-          </div>
+      <Alert className="border-primary bg-primary/10 rounded-none">
+        <Info className="h-4 w-4" />
+        <AlertDescription className="flex items-center justify-between">
+          <span className="font-medium">
+            DEMONSTRAÇÃO - Todos os dados exibidos são fictícios
+          </span>
           <div className="flex gap-2">
             <Button 
-              variant="secondary" 
-              size="sm"
-              onClick={() => navigate("/login")}
+              size="sm" 
+              variant="default"
+              onClick={() => navigate('/assinatura')}
             >
-              Fazer Login
+              Testar 7 dias grátis
             </Button>
             <Button 
-              variant="default" 
-              size="sm"
-              onClick={() => navigate("/assinatura")}
+              size="sm" 
+              variant="outline"
+              onClick={() => navigate('/login')}
             >
-              Começar Agora
-              <ArrowRight className="ml-2 h-4 w-4" />
+              Login
             </Button>
           </div>
-        </div>
-      </div>
+        </AlertDescription>
+      </Alert>
 
-      {/* Main Content */}
-      <div className="container mx-auto p-6 space-y-8">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-            <p className="text-muted-foreground">Visão geral do seu negócio</p>
+      {/* Navigation */}
+      <nav className="border-b bg-background/95 backdrop-blur">
+        <div className="container mx-auto px-6 py-4">
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-lg bg-gradient-primary flex items-center justify-center">
+              <Plane className="h-4 w-4 text-primary-foreground" />
+            </div>
+            <span className="font-bold text-lg">Hello Milhas + | Demo</span>
           </div>
-          <Alert className="max-w-md">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              Explore as funcionalidades! Ações de edição estão desabilitadas na demo.
-            </AlertDescription>
-          </Alert>
+        </div>
+      </nav>
+
+      <div className="container mx-auto px-6 py-8">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground mb-2">Dashboard</h1>
+            <p className="text-muted-foreground">
+              Visão geral do seu negócio de milhas
+            </p>
+          </div>
+          <Button onClick={handleActionClick}>
+            Nova Venda
+          </Button>
         </div>
 
-        {/* Metrics Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Receita Total</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">{mockMetrics.revenue}</div>
-              <p className="text-xs text-muted-foreground">Últimos 30 dias</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Vendas</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">{mockMetrics.sales}</div>
-              <p className="text-xs text-muted-foreground">+12% vs. mês anterior</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Clientes</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">{mockMetrics.customers}</div>
-              <p className="text-xs text-muted-foreground">+3 novos este mês</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Passagens</CardTitle>
-              <Plane className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">{mockMetrics.tickets}</div>
-              <p className="text-xs text-muted-foreground">Emitidas este mês</p>
-            </CardContent>
-          </Card>
+        {/* Metrics Grid */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
+          {metrics.map((metric, index) => (
+            <Card key={index} onClick={handleActionClick} className="cursor-pointer hover:shadow-lg transition-shadow">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  {metric.title}
+                </CardTitle>
+                <metric.icon className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{metric.value}</div>
+                <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                  <ArrowUpRight className="h-3 w-3 text-green-500" />
+                  <span className="text-green-500">{metric.change}</span>
+                  <span>vs. mês anterior</span>
+                </p>
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
-        {/* Sales Table */}
+        {/* Recent Sales */}
         <Card>
           <CardHeader>
             <CardTitle>Vendas Recentes</CardTitle>
+            <CardDescription>
+              Últimas transações realizadas
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Milhas</TableHead>
-                  <TableHead>Programa</TableHead>
-                  <TableHead>Valor</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Data</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {mockSales.map((sale) => (
-                  <TableRow key={sale.id}>
-                    <TableCell className="font-medium">{sale.customer}</TableCell>
-                    <TableCell>{sale.miles}</TableCell>
-                    <TableCell>{sale.program}</TableCell>
-                    <TableCell>{sale.value}</TableCell>
-                    <TableCell>
-                      <Badge variant={sale.status === "Pago" ? "default" : "secondary"}>
-                        {sale.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{sale.date}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <div className="space-y-4">
+              {recentSales.map((sale) => (
+                <div 
+                  key={sale.id} 
+                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                  onClick={handleActionClick}
+                >
+                  <div className="flex flex-col gap-1">
+                    <p className="font-medium">{sale.cliente}</p>
+                    <p className="text-sm text-muted-foreground">{sale.rota}</p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <p className="font-semibold">{sale.valor}</p>
+                    <Badge variant={sale.status === "Pago" ? "default" : "secondary"}>
+                      {sale.status}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
 
-        {/* Two Column Layout */}
-        <div className="grid gap-4 md:grid-cols-2">
-          {/* Accounts */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Contas de Milhagem</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Programa</TableHead>
-                    <TableHead>Conta</TableHead>
-                    <TableHead>Saldo</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {mockAccounts.map((account) => (
-                    <TableRow key={account.id}>
-                      <TableCell className="font-medium">{account.program}</TableCell>
-                      <TableCell className="text-muted-foreground">{account.account}</TableCell>
-                      <TableCell>{account.balance}</TableCell>
-                      <TableCell>
-                        <Badge variant="default">{account.status}</Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-
-          {/* Tickets */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Passagens Emitidas</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Passageiro</TableHead>
-                    <TableHead>Rota</TableHead>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {mockTickets.map((ticket) => (
-                    <TableRow key={ticket.id}>
-                      <TableCell className="font-medium">{ticket.passenger}</TableCell>
-                      <TableCell>{ticket.route}</TableCell>
-                      <TableCell className="text-muted-foreground">{ticket.date}</TableCell>
-                      <TableCell>
-                        <Badge variant={ticket.status === "Emitida" ? "default" : "secondary"}>
-                          {ticket.status}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </div>
-
         {/* CTA Section */}
-        <Card className="border-2 border-primary/20 shadow-glow">
-          <CardContent className="p-8 text-center space-y-4">
-            <h2 className="text-2xl font-bold">Pronto para começar?</h2>
-            <p className="text-muted-foreground">
-              Teste grátis por 7 dias. Todas as funcionalidades liberadas.
+        <Card className="mt-8 bg-gradient-to-r from-primary/10 to-accent/10 border-primary/20">
+          <CardContent className="p-8 text-center">
+            <h2 className="text-2xl font-bold mb-4">
+              Gostou do que viu?
+            </h2>
+            <p className="text-muted-foreground mb-6">
+              Comece seu teste gratuito de 7 dias e tenha acesso completo a todos os recursos
             </p>
             <Button 
-              variant="hero" 
-              size="lg"
-              onClick={() => navigate("/assinatura")}
+              size="lg" 
+              onClick={() => navigate('/assinatura')}
             >
               Começar Teste Gratuito
-              <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           </CardContent>
         </Card>
       </div>
+
+      {/* Modal de Recurso Bloqueado */}
+      <Dialog open={showModal} onOpenChange={setShowModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Recurso disponível no plano completo</DialogTitle>
+            <DialogDescription>
+              Esta é apenas uma demonstração com dados fictícios. Inicie seu teste grátis de 7 dias para ter acesso completo a todos os recursos da plataforma.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setShowModal(false)}>
+              Continuar Explorando
+            </Button>
+            <Button onClick={() => navigate('/assinatura')}>
+              Iniciar Teste Grátis
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

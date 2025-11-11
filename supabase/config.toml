@@ -8,3 +8,7 @@ verify_jwt = true
 
 [functions.stripe-portal]
 verify_jwt = true
+
+[functions.get-whitelist]
+verify_jwt = true
+

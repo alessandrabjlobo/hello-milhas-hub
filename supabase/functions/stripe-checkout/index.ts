@@ -18,21 +18,15 @@ serve(async (req) => {
   try {
     const { email } = await req.json();
     
-    const priceId = Deno.env.get('STRIPE_PRICE_ID');
+    // Usar variáveis de ambiente do Pricing Table (não mais STRIPE_PRICE_ID)
     const baseUrl = req.headers.get('origin') || Deno.env.get('VITE_SUPABASE_URL');
     const successUrl = `${baseUrl}/conta`;
     const cancelUrl = `${baseUrl}/assinatura`;
 
+    // Criar sessão sem price_id (a Pricing Table gerencia isso)
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
-      line_items: [{
-        price: priceId,
-        quantity: 1,
-      }],
-      subscription_data: {
-        trial_period_days: 7,
-      },
-      payment_method_collection: 'always', // Cartão obrigatório no trial
+      payment_method_collection: 'always',
       success_url: successUrl,
       cancel_url: cancelUrl,
       customer_email: email || undefined,

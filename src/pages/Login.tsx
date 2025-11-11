@@ -151,7 +151,7 @@ export default function Login() {
                 {loading ? "Entrando..." : "Entrar"}
               </Button>
 
-              <div className="text-center">
+              <div className="text-center space-y-2">
                 <Button
                   type="button"
                   variant="link"
@@ -161,6 +161,11 @@ export default function Login() {
                 >
                   Esqueci minha senha
                 </Button>
+                <div>
+                  <Link to="/" className="text-sm text-muted-foreground hover:text-primary">
+                    Voltar ao início
+                  </Link>
+                </div>
               </div>
             </form>
           </CardContent>
