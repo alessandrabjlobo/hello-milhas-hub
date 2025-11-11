@@ -162,6 +162,7 @@ export type Database = {
       }
       billing_subscriptions: {
         Row: {
+          billing_email: string | null
           created_at: string
           grace_period_ends: string | null
           id: string
@@ -172,10 +173,14 @@ export type Database = {
           receipt_url: string | null
           renewal_date: string
           status: Database["public"]["Enums"]["subscription_status"]
+          stripe_customer_id: string | null
+          stripe_price_id: string | null
+          stripe_subscription_id: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          billing_email?: string | null
           created_at?: string
           grace_period_ends?: string | null
           id?: string
@@ -186,10 +191,14 @@ export type Database = {
           receipt_url?: string | null
           renewal_date: string
           status?: Database["public"]["Enums"]["subscription_status"]
+          stripe_customer_id?: string | null
+          stripe_price_id?: string | null
+          stripe_subscription_id?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          billing_email?: string | null
           created_at?: string
           grace_period_ends?: string | null
           id?: string
@@ -200,6 +209,9 @@ export type Database = {
           receipt_url?: string | null
           renewal_date?: string
           status?: Database["public"]["Enums"]["subscription_status"]
+          stripe_customer_id?: string | null
+          stripe_price_id?: string | null
+          stripe_subscription_id?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -1323,7 +1335,13 @@ export type Database = {
       renewal_type: "annual" | "rolling"
       sale_status: "pending" | "completed" | "cancelled"
       subscription_plan: "start" | "pro"
-      subscription_status: "active" | "grace_period" | "suspended" | "cancelled"
+      subscription_status:
+        | "active"
+        | "grace_period"
+        | "suspended"
+        | "cancelled"
+        | "trialing"
+        | "past_due"
       ticket_status: "confirmed" | "pending" | "cancelled"
       verification_status: "pending" | "requested" | "received" | "completed"
     }
@@ -1467,7 +1485,14 @@ export const Constants = {
       renewal_type: ["annual", "rolling"],
       sale_status: ["pending", "completed", "cancelled"],
       subscription_plan: ["start", "pro"],
-      subscription_status: ["active", "grace_period", "suspended", "cancelled"],
+      subscription_status: [
+        "active",
+        "grace_period",
+        "suspended",
+        "cancelled",
+        "trialing",
+        "past_due",
+      ],
       ticket_status: ["confirmed", "pending", "cancelled"],
       verification_status: ["pending", "requested", "received", "completed"],
     },

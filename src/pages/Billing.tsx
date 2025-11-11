@@ -12,7 +12,7 @@ import { ArrowLeft, CreditCard, Upload, Check, AlertCircle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast";
 
 type SubscriptionPlan = "start" | "pro";
-type SubscriptionStatus = "active" | "grace_period" | "suspended" | "cancelled";
+type SubscriptionStatus = "active" | "grace_period" | "suspended" | "cancelled" | "trialing" | "past_due";
 
 interface Subscription {
   id: string;
