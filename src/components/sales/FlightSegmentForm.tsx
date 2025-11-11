@@ -7,9 +7,6 @@ export interface FlightSegment {
   from: string;
   to: string;
   date: string;
-  time?: string;
-  stops?: number;
-  airline?: string;
 }
 
 interface FlightSegmentFormProps {
@@ -48,7 +45,7 @@ export function FlightSegmentForm({
         )}
       </div>
 
-      <div className="grid md:grid-cols-2 gap-3">
+      <div className="grid md:grid-cols-3 gap-3">
         <div className="space-y-2">
           <Label htmlFor={`from-${index}`}>Origem *</Label>
           <Input
@@ -76,38 +73,6 @@ export function FlightSegmentForm({
             type="date"
             value={segment.date}
             onChange={(e) => onUpdate(index, "date", e.target.value)}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor={`time-${index}`}>Horário</Label>
-          <Input
-            id={`time-${index}`}
-            type="time"
-            value={segment.time || ""}
-            onChange={(e) => onUpdate(index, "time", e.target.value)}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor={`stops-${index}`}>Escalas</Label>
-          <Input
-            id={`stops-${index}`}
-            type="number"
-            min="0"
-            placeholder="0 = Direto"
-            value={segment.stops ?? ""}
-            onChange={(e) => onUpdate(index, "stops", parseInt(e.target.value) || 0)}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor={`airline-${index}`}>Companhia</Label>
-          <Input
-            id={`airline-${index}`}
-            placeholder="LATAM, Gol, Azul..."
-            value={segment.airline || ""}
-            onChange={(e) => onUpdate(index, "airline", e.target.value)}
           />
         </div>
       </div>

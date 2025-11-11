@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { FlightSegmentForm, type FlightSegment } from "@/components/sales/FlightSegmentForm";
+import { RoundTripForm, type RoundTripData } from "@/components/calculator/RoundTripForm";
 import { usePaymentInterestConfig } from "@/hooks/usePaymentInterestConfig";
 
 export function QuoteGenerator() {
@@ -25,21 +26,64 @@ export function QuoteGenerator() {
   // Trip type e flight segments
   const [tripType, setTripType] = useState<"one_way" | "round_trip" | "multi_city">("round_trip");
   const [flightSegments, setFlightSegments] = useState<FlightSegment[]>([
-    { from: "", to: "", date: "" },
     { from: "", to: "", date: "" }
   ]);
+  const [roundTripData, setRoundTripData] = useState<RoundTripData>({
+    origin: "",
+    destination: "",
+    departureDate: "",
+    returnDate: ""
+  });
   
   const [showPreview, setShowPreview] = useState(false);
 
   const handleGenerateQuote = () => {
-    const hasValidSegment = flightSegments.some(seg => seg.from && seg.to && seg.date);
-    if (!clientName || !clientPhone || !totalPrice || !hasValidSegment) {
+    if (!clientName || !clientPhone || !totalPrice) {
       toast({
         title: "Campos obrigatórios",
-        description: "Preencha cliente, telefone, valor e ao menos 1 trecho completo.",
+        description: "Preencha cliente, telefone e valor total.",
         variant: "destructive",
       });
       return;
+    }
+
+    // Validar de acordo com o tipo de viagem
+    if (tripType === "one_way") {
+      if (!flightSegments[0]?.from || !flightSegments[0]?.to || !flightSegments[0]?.date) {
+        toast({
+          title: "Campos obrigatórios",
+          description: "Preencha origem, destino e data do voo.",
+          variant: "destructive",
+        });
+        return;
+      }
+    } else if (tripType === "round_trip") {
+      if (!roundTripData.origin || !roundTripData.destination || !roundTripData.departureDate || !roundTripData.returnDate) {
+        toast({
+          title: "Campos obrigatórios",
+          description: "Preencha todos os campos do voo de ida e volta.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (new Date(roundTripData.returnDate) < new Date(roundTripData.departureDate)) {
+        toast({
+          title: "Data inválida",
+          description: "Data de volta deve ser após a data de ida.",
+          variant: "destructive",
+        });
+        return;
+      }
+    } else if (tripType === "multi_city") {
+      const hasValidSegment = flightSegments.some(seg => seg.from && seg.to && seg.date);
+      if (!hasValidSegment) {
+        toast({
+          title: "Campos obrigatórios",
+          description: "Preencha ao menos 1 trecho completo.",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     setShowPreview(true);
@@ -61,18 +105,26 @@ export function QuoteGenerator() {
       return;
     }
 
+    const route = tripType === "round_trip" 
+      ? `${roundTripData.origin} → ${roundTripData.destination}`
+      : `${flightSegments[0]?.from || ''} → ${flightSegments[0]?.to || ''}`;
+    
+    const departureDate = tripType === "round_trip"
+      ? roundTripData.departureDate
+      : flightSegments[0]?.date || null;
+
     const { error } = await supabase.from("quotes").insert([{
       user_id: user.id,
       client_name: clientName,
       client_phone: clientPhone,
-      route: `${flightSegments[0]?.from || ''} → ${flightSegments[0]?.to || ''}`,
-      departure_date: flightSegments[0]?.date || null,
+      route,
+      departure_date: departureDate,
       miles_needed: 0,
       total_price: parseFloat(totalPrice),
       passengers: parseInt(passengers),
       trip_type: tripType,
       boarding_fee: boardingFee ? parseFloat(boardingFee) : 0,
-      flight_segments: flightSegments as any,
+      flight_segments: tripType === "round_trip" ? [roundTripData] as any : flightSegments as any,
       status: 'pending' as const
     }]);
 
@@ -103,12 +155,17 @@ export function QuoteGenerator() {
     text += `*🛫 DETALHES DO VOO*\n`;
     text += `Tipo: ${tripType === 'one_way' ? 'Só Ida' : tripType === 'round_trip' ? 'Ida e Volta' : 'Múltiplos Trechos'}\n`;
     
-    flightSegments.filter(seg => seg.from && seg.to).forEach((segment, index) => {
-      text += `\nTrecho ${index + 1}: ${segment.from} → ${segment.to}\n`;
-      if (segment.date) text += `Data: ${format(new Date(segment.date), 'dd/MM/yyyy')}\n`;
-      if (segment.time) text += `Horário: ${segment.time}\n`;
-      if (segment.airline) text += `Companhia: ${segment.airline}\n`;
-    });
+    if (tripType === 'round_trip') {
+      text += `Origem: ${roundTripData.origin}\n`;
+      text += `Destino: ${roundTripData.destination}\n`;
+      text += `Data de Ida: ${format(new Date(roundTripData.departureDate), 'dd/MM/yyyy')}\n`;
+      text += `Data de Volta: ${format(new Date(roundTripData.returnDate), 'dd/MM/yyyy')}\n`;
+    } else {
+      flightSegments.filter(seg => seg.from && seg.to).forEach((segment, index) => {
+        text += `\nTrecho ${index + 1}: ${segment.from} → ${segment.to}\n`;
+        if (segment.date) text += `Data: ${format(new Date(segment.date), 'dd/MM/yyyy')}\n`;
+      });
+    }
     
     text += `\n*💰 VALORES*\n`;
     text += `Passageiros: ${passengers}\n`;
@@ -238,24 +295,7 @@ export function QuoteGenerator() {
                   <Label>Tipo de Viagem *</Label>
                   <RadioGroup 
                     value={tripType} 
-                    onValueChange={(v) => {
-                      const newType = v as typeof tripType;
-                      setTripType(newType);
-                      
-                      if (newType === "one_way") {
-                        setFlightSegments([{ from: "", to: "", date: "" }]);
-                      } else if (newType === "round_trip") {
-                        setFlightSegments([
-                          { from: "", to: "", date: "" },
-                          { from: "", to: "", date: "" }
-                        ]);
-                      } else {
-                        setFlightSegments([
-                          { from: "", to: "", date: "" },
-                          { from: "", to: "", date: "" }
-                        ]);
-                      }
-                    }}
+                    onValueChange={(v) => setTripType(v as typeof tripType)}
                   >
                     <div className="flex gap-4">
                       <div className="flex items-center space-x-2">
@@ -275,33 +315,85 @@ export function QuoteGenerator() {
                 </div>
 
                 <div className="space-y-3">
-                  {flightSegments.map((segment, index) => (
-                    <FlightSegmentForm
-                      key={index}
-                      segment={segment}
-                      index={index}
-                      onUpdate={(idx, field, value) => {
-                        const newSegments = [...flightSegments];
-                        newSegments[idx] = { ...newSegments[idx], [field]: value };
-                        setFlightSegments(newSegments);
-                      }}
-                      onRemove={tripType === "multi_city" ? (idx) => {
-                        setFlightSegments(flightSegments.filter((_, i) => i !== idx));
-                      } : undefined}
-                      canRemove={tripType === "multi_city" && flightSegments.length > 1}
-                    />
-                  ))}
-                  
+                  {tripType === "one_way" && (
+                    <div className="p-4 border rounded-lg space-y-3 bg-muted/30">
+                      <div className="grid md:grid-cols-3 gap-3">
+                        <div className="space-y-2">
+                          <Label htmlFor="one-way-from">Origem *</Label>
+                          <Input
+                            id="one-way-from"
+                            placeholder="GRU - São Paulo"
+                            value={flightSegments[0]?.from || ""}
+                            onChange={(e) => {
+                              const newSegments = [...flightSegments];
+                              newSegments[0] = { ...newSegments[0], from: e.target.value };
+                              setFlightSegments(newSegments);
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="one-way-to">Destino *</Label>
+                          <Input
+                            id="one-way-to"
+                            placeholder="MIA - Miami"
+                            value={flightSegments[0]?.to || ""}
+                            onChange={(e) => {
+                              const newSegments = [...flightSegments];
+                              newSegments[0] = { ...newSegments[0], to: e.target.value };
+                              setFlightSegments(newSegments);
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="one-way-date">Data *</Label>
+                          <Input
+                            id="one-way-date"
+                            type="date"
+                            value={flightSegments[0]?.date || ""}
+                            onChange={(e) => {
+                              const newSegments = [...flightSegments];
+                              newSegments[0] = { ...newSegments[0], date: e.target.value };
+                              setFlightSegments(newSegments);
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {tripType === "round_trip" && (
+                    <RoundTripForm data={roundTripData} onChange={setRoundTripData} />
+                  )}
+
                   {tripType === "multi_city" && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setFlightSegments([...flightSegments, { from: "", to: "", date: "" }])}
-                      className="w-full"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Adicionar Trecho
-                    </Button>
+                    <>
+                      {flightSegments.map((segment, index) => (
+                        <FlightSegmentForm
+                          key={index}
+                          segment={segment}
+                          index={index}
+                          onUpdate={(idx, field, value) => {
+                            const newSegments = [...flightSegments];
+                            newSegments[idx] = { ...newSegments[idx], [field]: value };
+                            setFlightSegments(newSegments);
+                          }}
+                          onRemove={(idx) => {
+                            setFlightSegments(flightSegments.filter((_, i) => i !== idx));
+                          }}
+                          canRemove={flightSegments.length > 1}
+                        />
+                      ))}
+                      
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setFlightSegments([...flightSegments, { from: "", to: "", date: "" }])}
+                        className="w-full"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Adicionar Trecho
+                      </Button>
+                    </>
                   )}
                 </div>
               </div>
@@ -519,17 +611,40 @@ export function QuoteGenerator() {
                   <Plane className="h-5 w-5 text-primary" />
                   Detalhes do Voo
                 </h3>
-                <div className="grid md:grid-cols-2 gap-4 text-sm">
-                  {(flightSegments[0]?.from && flightSegments[0]?.to) && (
-                    <div>
-                      <p className="text-muted-foreground">Rota</p>
-                      <p className="font-semibold text-lg">{flightSegments[0].from} → {flightSegments[0].to}</p>
+                <div className="text-sm space-y-3">
+                  <div>
+                    <p className="text-muted-foreground">Tipo</p>
+                    <p className="font-semibold text-lg">
+                      {tripType === 'one_way' ? 'Só Ida' : tripType === 'round_trip' ? 'Ida e Volta' : 'Múltiplos Trechos'}
+                    </p>
+                  </div>
+                  
+                  {tripType === 'round_trip' ? (
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-muted-foreground">Rota</p>
+                        <p className="font-semibold text-lg">{roundTripData.origin} ↔ {roundTripData.destination}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Data de Ida</p>
+                        <p className="font-semibold">{format(new Date(roundTripData.departureDate), 'dd/MM/yyyy')}</p>
+                      </div>
+                      <div className="md:col-span-2">
+                        <p className="text-muted-foreground">Data de Volta</p>
+                        <p className="font-semibold">{format(new Date(roundTripData.returnDate), 'dd/MM/yyyy')}</p>
+                      </div>
                     </div>
-                  )}
-                  {flightSegments[0]?.date && (
-                    <div>
-                      <p className="text-muted-foreground">Data</p>
-                      <p className="font-semibold text-lg">{format(new Date(flightSegments[0].date), 'dd/MM/yyyy')}</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {flightSegments.filter(seg => seg.from && seg.to).map((segment, index) => (
+                        <div key={index} className="p-3 bg-muted/30 rounded-lg">
+                          <p className="text-muted-foreground text-xs">Trecho {index + 1}</p>
+                          <p className="font-semibold">{segment.from} → {segment.to}</p>
+                          {segment.date && (
+                            <p className="text-sm">{format(new Date(segment.date), 'dd/MM/yyyy')}</p>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -663,6 +778,61 @@ export function QuoteGenerator() {
                 <Download className="h-5 w-5 mr-2" />
                 Salvar
               </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Análise Interna - Apenas para a agência */}
+      {showPreview && totalPrice && passengers && (
+        <Card className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20 shadow-lg">
+          <CardHeader>
+            <CardTitle className="text-amber-700 dark:text-amber-500 flex items-center gap-2">
+              📊 Análise Interna
+              <span className="text-sm font-normal text-muted-foreground">(Não incluído no orçamento do cliente)</span>
+            </CardTitle>
+            <CardDescription>
+              Informações para controle e análise de rentabilidade da agência
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-3 gap-4">
+              <div className="p-4 bg-background rounded-lg border">
+                <p className="text-sm text-muted-foreground mb-1">Valor Total</p>
+                <p className="text-2xl font-bold">R$ {parseFloat(totalPrice).toFixed(2)}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {parseInt(passengers)} passageiro{parseInt(passengers) > 1 ? 's' : ''}
+                </p>
+              </div>
+              
+              <div className="p-4 bg-background rounded-lg border">
+                <p className="text-sm text-muted-foreground mb-1">Por Passageiro</p>
+                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  R$ {pricePerPassenger}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Valor unitário médio
+                </p>
+              </div>
+
+              {boardingFee && parseFloat(boardingFee) > 0 && (
+                <div className="p-4 bg-background rounded-lg border">
+                  <p className="text-sm text-muted-foreground mb-1">Taxas de Embarque</p>
+                  <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                    R$ {(parseFloat(boardingFee) * parseInt(passengers)).toFixed(2)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    R$ {parseFloat(boardingFee).toFixed(2)} por passageiro
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4 p-4 bg-muted/50 rounded-lg">
+              <p className="text-sm text-muted-foreground text-center">
+                💡 <strong>Dica:</strong> Utilize esta seção para calcular seus custos e margem de lucro. 
+                Estas informações não aparecem no orçamento enviado ao cliente.
+              </p>
             </div>
           </CardContent>
         </Card>
