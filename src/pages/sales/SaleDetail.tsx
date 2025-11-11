@@ -43,6 +43,39 @@ export default function SaleDetail() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
+  const getFlightStatus = () => {
+    if (!sale) return <Badge variant="secondary">Sem Data</Badge>;
+    
+    let departureDate: Date | null = null;
+    
+    if (sale.flight_segments && Array.isArray(sale.flight_segments) && sale.flight_segments.length > 0) {
+      const firstSegment = sale.flight_segments[0] as { date?: string };
+      if (firstSegment.date) {
+        departureDate = new Date(firstSegment.date);
+      }
+    } else if (sale.travel_dates) {
+      departureDate = new Date(String(sale.travel_dates));
+    }
+    
+    if (!departureDate || isNaN(departureDate.getTime())) {
+      return <Badge variant="secondary">Sem Data</Badge>;
+    }
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const flightDate = new Date(departureDate);
+    flightDate.setHours(0, 0, 0, 0);
+    
+    if (flightDate < today) {
+      return <Badge className="bg-green-500 text-white hover:bg-green-600">✓ Já Voado</Badge>;
+    } else if (flightDate.getTime() === today.getTime()) {
+      return <Badge className="bg-blue-500 text-white hover:bg-blue-600">✈️ Voa Hoje</Badge>;
+    } else {
+      return <Badge className="bg-yellow-500 text-black hover:bg-yellow-600">📅 Próximo Voo</Badge>;
+    }
+  };
+
   const fetchSaleDetails = async () => {
     if (!id) return;
 
@@ -104,40 +137,6 @@ export default function SaleDetail() {
   if (!sale) {
     return null;
   }
-
-  const getFlightStatus = () => {
-    if (!sale) return <Badge variant="secondary">Sem Data</Badge>;
-    
-    // Tentar extrair a data do voo de flight_segments ou travel_dates
-    let departureDate: Date | null = null;
-    
-    if (sale.flight_segments && Array.isArray(sale.flight_segments) && sale.flight_segments.length > 0) {
-      const firstSegment = sale.flight_segments[0] as { date?: string };
-      if (firstSegment.date) {
-        departureDate = new Date(firstSegment.date);
-      }
-    } else if (sale.travel_dates) {
-      departureDate = new Date(String(sale.travel_dates));
-    }
-    
-    if (!departureDate || isNaN(departureDate.getTime())) {
-      return <Badge variant="secondary">Sem Data</Badge>;
-    }
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const flightDate = new Date(departureDate);
-    flightDate.setHours(0, 0, 0, 0);
-    
-    if (flightDate < today) {
-      return <Badge variant="outline">✓ Já Voado</Badge>;
-    } else if (flightDate.getTime() === today.getTime()) {
-      return <Badge variant="default">✈️ Voa Hoje</Badge>;
-    } else {
-      return <Badge variant="secondary">📅 Próximo Voo</Badge>;
-    }
-  };
 
   const handleDeleteSale = async () => {
     if (!sale) return;

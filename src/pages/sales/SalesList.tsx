@@ -98,11 +98,11 @@ export default function SalesList() {
     flightDate.setHours(0, 0, 0, 0);
     
     if (flightDate < today) {
-      return <Badge variant="outline">✓ Já Voado</Badge>;
+      return <Badge className="bg-green-500 text-white hover:bg-green-600">✓ Já Voado</Badge>;
     } else if (flightDate.getTime() === today.getTime()) {
-      return <Badge variant="default">✈️ Voa Hoje</Badge>;
+      return <Badge className="bg-blue-500 text-white hover:bg-blue-600">✈️ Voa Hoje</Badge>;
     } else {
-      return <Badge variant="secondary">📅 Próximo Voo</Badge>;
+      return <Badge className="bg-yellow-500 text-black hover:bg-yellow-600">📅 Próximo Voo</Badge>;
     }
   };
 

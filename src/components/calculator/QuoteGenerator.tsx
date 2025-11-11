@@ -6,13 +6,19 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
-import { FileText, Send, Copy, Download, User, Phone, MapPin, Calendar, Plane, DollarSign, Clock, Users } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FileText, Send, Copy, Download, User, Phone, MapPin, Calendar, Plane, DollarSign, Clock, Users, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { FlightSegmentForm, type FlightSegment } from "@/components/sales/FlightSegmentForm";
+import { usePaymentInterestConfig } from "@/hooks/usePaymentInterestConfig";
 
 export function QuoteGenerator() {
   const { toast } = useToast();
+  const { configs, calculateInstallmentValue } = usePaymentInterestConfig();
+  
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [route, setRoute] = useState("");
@@ -23,12 +29,23 @@ export function QuoteGenerator() {
   const [costPerThousand, setCostPerThousand] = useState("");
   const [boardingFee, setBoardingFee] = useState("");
   
-  // Novos campos de voo
+  // Trip type e flight segments
+  const [tripType, setTripType] = useState<"one_way" | "round_trip" | "multi_city">("round_trip");
+  const [flightSegments, setFlightSegments] = useState<FlightSegment[]>([
+    { from: "", to: "", date: "" },
+    { from: "", to: "", date: "" }
+  ]);
+  
+  // Novos campos de voo (legacy - para compatibilidade)
   const [departureTime, setDepartureTime] = useState("");
   const [arrivalTime, setArrivalTime] = useState("");
   const [duration, setDuration] = useState("");
   const [stops, setStops] = useState("");
   const [stopCities, setStopCities] = useState("");
+  
+  // Parcelamento
+  const [installments, setInstallments] = useState<number>();
+  const [selectedInterestRate, setSelectedInterestRate] = useState<number>(0);
   
   // Formas de pagamento
   const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
@@ -72,19 +89,29 @@ export function QuoteGenerator() {
       stop_cities: stopCities ? stopCities.split(",").map(s => s.trim()) : []
     };
 
-    const { error } = await supabase.from("quotes").insert({
+    const finalPrice = installments && installments > 1 
+      ? parseFloat(totalPrice) * (1 + selectedInterestRate / 100)
+      : parseFloat(totalPrice);
+
+    const { error } = await supabase.from("quotes").insert([{
       user_id: user.id,
       client_name: clientName,
       client_phone: clientPhone,
       route: route,
-      departure_date: departureDate,
+      departure_date: flightSegments[0]?.date || departureDate,
       miles_needed: parseInt(milesNeeded),
       total_price: parseFloat(totalPrice),
       passengers: parseInt(passengers),
-      flight_details: flightDetails,
+      trip_type: tripType,
+      boarding_fee: boardingFee ? parseFloat(boardingFee) : 0,
+      installments: installments || null,
+      interest_rate: selectedInterestRate || null,
+      final_price_with_interest: finalPrice,
+      flight_segments: flightSegments as any,
+      flight_details: flightDetails as any,
       payment_methods: paymentMethods,
-      status: 'pending'
-    });
+      status: 'pending' as const
+    }]);
 
     if (error) {
       toast({
@@ -111,18 +138,15 @@ export function QuoteGenerator() {
     text += `Telefone: ${clientPhone}\n\n`;
     
     text += `*🛫 DETALHES DO VOO*\n`;
-    text += `Rota: ${route}\n`;
-    text += `Data: ${format(new Date(departureDate), 'dd/MM/yyyy')}\n`;
+    text += `Tipo: ${tripType === 'one_way' ? 'Só Ida' : tripType === 'round_trip' ? 'Ida e Volta' : 'Múltiplos Trechos'}\n`;
     
-    if (departureTime) text += `Partida: ${departureTime}\n`;
-    if (arrivalTime) text += `Chegada: ${arrivalTime}\n`;
-    if (duration) text += `Duração: ${duration}\n`;
-    if (stops) {
-      const stopsNum = parseInt(stops);
-      text += `Escalas: ${stopsNum === 0 ? 'Direto' : `${stopsNum} parada(s)`}`;
-      if (stopCities && stopsNum > 0) text += ` - ${stopCities}`;
-      text += `\n`;
-    }
+    // Exibir trechos de voo
+    flightSegments.filter(seg => seg.from && seg.to).forEach((segment, index) => {
+      text += `\nTrecho ${index + 1}: ${segment.from} → ${segment.to}\n`;
+      if (segment.date) text += `Data: ${format(new Date(segment.date), 'dd/MM/yyyy')}\n`;
+      if (segment.time) text += `Horário: ${segment.time}\n`;
+      if (segment.airline) text += `Companhia: ${segment.airline}\n`;
+    });
     
     text += `\n*💰 VALORES*\n`;
     text += `Passageiros: ${passengers}\n`;
@@ -135,6 +159,14 @@ export function QuoteGenerator() {
       text += `Valor por pessoa: R$ ${pricePerPassenger}\n`;
     }
     text += `\n*VALOR TOTAL: R$ ${parseFloat(totalPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}*\n`;
+    
+    // Adicionar informação de parcelamento
+    if (installments && installments > 1) {
+      const finalPrice = parseFloat(totalPrice) * (1 + selectedInterestRate / 100);
+      const installmentValue = finalPrice / installments;
+      text += `\n*Parcelamento: ${installments}x de R$ ${installmentValue.toFixed(2)}*\n`;
+      text += `*Valor total parcelado: R$ ${finalPrice.toFixed(2)}* (Taxa: ${selectedInterestRate}%)\n`;
+    }
     
     if (paymentMethods.length > 0) {
       text += `\n*💳 FORMAS DE PAGAMENTO*\n`;
@@ -242,87 +274,80 @@ export function QuoteGenerator() {
                 <Plane className="h-5 w-5 text-primary" />
                 Detalhes do Voo
               </h3>
-              <div className="grid md:grid-cols-2 gap-4">
+              
+              <div className="space-y-4">
+                {/* Tipo de Viagem */}
                 <div className="space-y-2">
-                  <Label htmlFor="route">Rota *</Label>
-                  <Input
-                    id="route"
-                    placeholder="GRU → MIA → GRU"
-                    value={route}
-                    onChange={(e) => setRoute(e.target.value)}
-                    className="h-11"
-                  />
+                  <Label>Tipo de Viagem *</Label>
+                  <RadioGroup 
+                    value={tripType} 
+                    onValueChange={(v) => {
+                      const newType = v as typeof tripType;
+                      setTripType(newType);
+                      
+                      if (newType === "one_way") {
+                        setFlightSegments([{ from: "", to: "", date: "" }]);
+                      } else if (newType === "round_trip") {
+                        setFlightSegments([
+                          { from: "", to: "", date: "" },
+                          { from: "", to: "", date: "" }
+                        ]);
+                      } else {
+                        setFlightSegments([
+                          { from: "", to: "", date: "" },
+                          { from: "", to: "", date: "" }
+                        ]);
+                      }
+                    }}
+                  >
+                    <div className="flex gap-4">
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="one_way" id="one_way" />
+                        <Label htmlFor="one_way" className="cursor-pointer">Só Ida</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="round_trip" id="round_trip" />
+                        <Label htmlFor="round_trip" className="cursor-pointer">Ida e Volta</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="multi_city" id="multi_city" />
+                        <Label htmlFor="multi_city" className="cursor-pointer">Múltiplos Trechos</Label>
+                      </div>
+                    </div>
+                  </RadioGroup>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="departure-date">Data de Partida *</Label>
-                  <Input
-                    id="departure-date"
-                    type="date"
-                    value={departureDate}
-                    onChange={(e) => setDepartureDate(e.target.value)}
-                    className="h-11"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="departure-time">Horário de Partida</Label>
-                  <Input
-                    id="departure-time"
-                    type="time"
-                    value={departureTime}
-                    onChange={(e) => setDepartureTime(e.target.value)}
-                    className="h-11"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="arrival-time">Horário de Chegada</Label>
-                  <Input
-                    id="arrival-time"
-                    type="time"
-                    value={arrivalTime}
-                    onChange={(e) => setArrivalTime(e.target.value)}
-                    className="h-11"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="duration">Duração do Voo</Label>
-                  <Input
-                    id="duration"
-                    placeholder="6h 30m"
-                    value={duration}
-                    onChange={(e) => setDuration(e.target.value)}
-                    className="h-11"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="stops">Número de Escalas</Label>
-                  <Input
-                    id="stops"
-                    type="number"
-                    min="0"
-                    placeholder="0 = Direto"
-                    value={stops}
-                    onChange={(e) => setStops(e.target.value)}
-                    className="h-11"
-                  />
-                </div>
-
-                {stops && parseInt(stops) > 0 && (
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="stop-cities">Cidades das Escalas</Label>
-                    <Input
-                      id="stop-cities"
-                      placeholder="Miami, São Paulo (separadas por vírgula)"
-                      value={stopCities}
-                      onChange={(e) => setStopCities(e.target.value)}
-                      className="h-11"
+                {/* Trechos de Voo */}
+                <div className="space-y-3">
+                  {flightSegments.map((segment, index) => (
+                    <FlightSegmentForm
+                      key={index}
+                      segment={segment}
+                      index={index}
+                      onUpdate={(idx, field, value) => {
+                        const newSegments = [...flightSegments];
+                        newSegments[idx] = { ...newSegments[idx], [field]: value };
+                        setFlightSegments(newSegments);
+                      }}
+                      onRemove={tripType === "multi_city" ? (idx) => {
+                        setFlightSegments(flightSegments.filter((_, i) => i !== idx));
+                      } : undefined}
+                      canRemove={tripType === "multi_city" && flightSegments.length > 1}
                     />
-                  </div>
-                )}
+                  ))}
+                  
+                  {tripType === "multi_city" && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setFlightSegments([...flightSegments, { from: "", to: "", date: "" }])}
+                      className="w-full"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Adicionar Trecho
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -461,6 +486,70 @@ export function QuoteGenerator() {
                   </p>
                 </Card>
               )}
+            </div>
+
+            <Separator />
+
+            {/* Parcelamento */}
+            <div>
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-primary" />
+                Parcelamento
+              </h3>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="installments">Parcelamento (Opcional)</Label>
+                  <Select 
+                    value={installments?.toString()} 
+                    onValueChange={(v) => {
+                      const inst = parseInt(v);
+                      setInstallments(inst);
+                      
+                      const config = configs.find(c => c.installments === inst && c.payment_type === 'credit');
+                      if (config) {
+                        setSelectedInterestRate(config.interest_rate);
+                      } else {
+                        setSelectedInterestRate(0);
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="h-11">
+                      <SelectValue placeholder="À vista" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">À vista</SelectItem>
+                      {configs
+                        .filter(c => c.payment_type === 'credit')
+                        .sort((a, b) => a.installments - b.installments)
+                        .map(config => (
+                          <SelectItem key={config.id} value={config.installments.toString()}>
+                            {config.installments}x - Taxa: {config.interest_rate.toFixed(2)}%
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {installments && installments > 1 && totalPrice && (
+                  <Card className="p-4 bg-blue-50 dark:bg-blue-950/20">
+                    <p className="text-sm font-semibold mb-2">Simulação do Parcelamento</p>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <p className="text-muted-foreground">Parcela</p>
+                        <p className="font-semibold">
+                          R$ {((parseFloat(totalPrice) * (1 + selectedInterestRate / 100)) / installments).toFixed(2)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Total com Juros</p>
+                        <p className="font-semibold">
+                          R$ {(parseFloat(totalPrice) * (1 + selectedInterestRate / 100)).toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                  </Card>
+                )}
+              </div>
             </div>
 
             <Separator />

@@ -267,32 +267,38 @@ export type Database = {
       }
       credit_interest_config: {
         Row: {
+          config_type: string | null
           created_at: string | null
           id: string
           installments: number
           interest_rate: number
           is_active: boolean | null
           payment_type: string
+          per_installment_rates: Json | null
           supplier_id: string
           updated_at: string | null
         }
         Insert: {
+          config_type?: string | null
           created_at?: string | null
           id?: string
           installments: number
           interest_rate: number
           is_active?: boolean | null
           payment_type?: string
+          per_installment_rates?: Json | null
           supplier_id: string
           updated_at?: string | null
         }
         Update: {
+          config_type?: string | null
           created_at?: string | null
           id?: string
           installments?: number
           interest_rate?: number
           is_active?: boolean | null
           payment_type?: string
+          per_installment_rates?: Json | null
           supplier_id?: string
           updated_at?: string | null
         }

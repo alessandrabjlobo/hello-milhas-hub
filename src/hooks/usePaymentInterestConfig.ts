@@ -10,6 +10,8 @@ export interface PaymentInterestConfig {
   interest_rate: number;
   is_active: boolean;
   payment_type: 'debit' | 'credit';
+  config_type?: 'total' | 'per_installment';
+  per_installment_rates?: Record<number, number>;
   created_at: string;
   updated_at: string;
 }
@@ -52,7 +54,13 @@ export const usePaymentInterestConfig = () => {
     return configs.filter(c => c.payment_type === 'credit' && c.is_active);
   };
 
-  const createConfig = async (data: { installments: number; interest_rate: number; payment_type: 'debit' | 'credit' }) => {
+  const createConfig = async (data: { 
+    installments: number; 
+    interest_rate: number; 
+    payment_type: 'debit' | 'credit';
+    config_type?: 'total' | 'per_installment';
+    per_installment_rates?: Record<number, number>;
+  }) => {
     try {
       const { supplierId } = await getSupplierId();
 
@@ -61,6 +69,8 @@ export const usePaymentInterestConfig = () => {
         installments: data.installments,
         interest_rate: data.interest_rate,
         payment_type: data.payment_type,
+        config_type: data.config_type || 'total',
+        per_installment_rates: data.per_installment_rates || {},
         is_active: true,
       } as any);
 
@@ -83,7 +93,12 @@ export const usePaymentInterestConfig = () => {
     }
   };
 
-  const updateConfig = async (id: string, data: { installments?: number; interest_rate?: number }) => {
+  const updateConfig = async (id: string, data: { 
+    installments?: number; 
+    interest_rate?: number;
+    config_type?: 'total' | 'per_installment';
+    per_installment_rates?: Record<number, number>;
+  }) => {
     try {
       const { error } = await supabase
         .from("credit_interest_config" as any)
@@ -149,14 +164,26 @@ export const usePaymentInterestConfig = () => {
       };
     }
 
-    const rate = config.interest_rate / 100;
-    const finalPrice = totalPrice * (1 + rate);
+    let finalPrice: number;
+    let effectiveRate: number;
+
+    if (config.config_type === 'per_installment' && config.per_installment_rates) {
+      // Calcular com taxa personalizada por parcela
+      const rate = config.per_installment_rates[installments] || config.interest_rate;
+      effectiveRate = rate;
+      finalPrice = totalPrice * (1 + rate / 100);
+    } else {
+      // Calcular com taxa total
+      effectiveRate = config.interest_rate;
+      finalPrice = totalPrice * (1 + config.interest_rate / 100);
+    }
+
     const installmentValue = finalPrice / installments;
 
     return {
       installmentValue,
       finalPrice,
-      interestRate: config.interest_rate,
+      interestRate: effectiveRate,
     };
   };
 

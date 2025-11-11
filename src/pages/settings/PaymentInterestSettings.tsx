@@ -29,10 +29,19 @@ export default function PaymentInterestSettings() {
     usePaymentInterestConfig();
 
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingConfig, setEditingConfig] = useState<{ id: string; installments: number; interest_rate: number; payment_type: 'debit' | 'credit' } | null>(null);
+  const [editingConfig, setEditingConfig] = useState<{ 
+    id: string; 
+    installments: number; 
+    interest_rate: number; 
+    payment_type: 'debit' | 'credit';
+    config_type?: 'total' | 'per_installment';
+    per_installment_rates?: Record<number, number>;
+  } | null>(null);
   const [paymentType, setPaymentType] = useState<'debit' | 'credit'>('credit');
   const [installments, setInstallments] = useState("");
   const [interestRate, setInterestRate] = useState("");
+  const [configType, setConfigType] = useState<'total' | 'per_installment'>('total');
+  const [perInstallmentRates, setPerInstallmentRates] = useState<Record<number, number>>({});
   
   // Calculator
   const [calculatorValue, setCalculatorValue] = useState("");
@@ -43,11 +52,15 @@ export default function PaymentInterestSettings() {
       setPaymentType(config.payment_type || 'credit');
       setInstallments(config.installments.toString());
       setInterestRate(config.interest_rate.toString());
+      setConfigType(config.config_type || 'total');
+      setPerInstallmentRates(config.per_installment_rates || {});
     } else {
       setEditingConfig(null);
       setPaymentType('credit');
       setInstallments("");
       setInterestRate("");
+      setConfigType('total');
+      setPerInstallmentRates({});
     }
     setDialogOpen(true);
   };
@@ -65,7 +78,7 @@ export default function PaymentInterestSettings() {
       return;
     }
 
-    if (isNaN(interestRateNum) || interestRateNum < 0) {
+    if (configType === 'total' && (isNaN(interestRateNum) || interestRateNum < 0)) {
       return;
     }
 
@@ -73,13 +86,17 @@ export default function PaymentInterestSettings() {
     if (editingConfig) {
       success = await updateConfig(editingConfig.id, {
         installments: installmentsNum,
-        interest_rate: interestRateNum,
+        interest_rate: configType === 'total' ? interestRateNum : 0,
+        config_type: configType,
+        per_installment_rates: configType === 'per_installment' ? perInstallmentRates : {},
       });
     } else {
       success = await createConfig({
         installments: installmentsNum,
-        interest_rate: interestRateNum,
+        interest_rate: configType === 'total' ? interestRateNum : 0,
         payment_type: paymentType,
+        config_type: configType,
+        per_installment_rates: configType === 'per_installment' ? perInstallmentRates : {},
       });
     }
 
@@ -88,6 +105,8 @@ export default function PaymentInterestSettings() {
       setEditingConfig(null);
       setInstallments("");
       setInterestRate("");
+      setConfigType('total');
+      setPerInstallmentRates({});
     }
   };
 
@@ -308,25 +327,70 @@ export default function PaymentInterestSettings() {
               </p>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="interest-rate">
-                {paymentType === 'debit' ? 'Taxa de Débito (%) *' : 'Taxa de Juros (%) *'}
-              </Label>
-              <Input
-                id="interest-rate"
-                type="number"
-                step="0.001"
-                min="0"
-                placeholder={paymentType === 'debit' ? "4.160" : "6.750"}
-                value={interestRate}
-                onChange={(e) => setInterestRate(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                {paymentType === 'debit' 
-                  ? 'Taxa aplicada para pagamento no débito'
-                  : 'Taxa total aplicada para este número de parcelas (não proporcional)'}
-              </p>
-            </div>
+            {paymentType === 'credit' && parseInt(installments) >= 6 && (
+              <div className="space-y-2">
+                <Label>Tipo de Configuração de Juros</Label>
+                <RadioGroup value={configType} onValueChange={(v) => setConfigType(v as typeof configType)}>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="total" id="total" />
+                    <Label htmlFor="total" className="cursor-pointer">Juros Total</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="per_installment" id="per_installment" />
+                    <Label htmlFor="per_installment" className="cursor-pointer">Juros Personalizado por Parcela</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+            )}
+
+            {configType === 'total' && (
+              <div className="space-y-2">
+                <Label htmlFor="interest-rate">
+                  {paymentType === 'debit' ? 'Taxa de Débito (%) *' : 'Taxa de Juros (%) *'}
+                </Label>
+                <Input
+                  id="interest-rate"
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  placeholder={paymentType === 'debit' ? "4.160" : "6.750"}
+                  value={interestRate}
+                  onChange={(e) => setInterestRate(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {paymentType === 'debit' 
+                    ? 'Taxa aplicada para pagamento no débito'
+                    : 'Taxa total aplicada para este número de parcelas (não proporcional)'}
+                </p>
+              </div>
+            )}
+
+            {configType === 'per_installment' && paymentType === 'credit' && installments && parseInt(installments) >= 6 && (
+              <div className="space-y-2 border rounded-lg p-4 bg-muted/50">
+                <Label className="text-sm font-semibold">Taxa de Juros por Parcela (%)</Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Configure a taxa individual para cada número de parcelas
+                </p>
+                <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+                  {Array.from({ length: parseInt(installments) }, (_, i) => i + 1).map((num) => (
+                    <div key={num} className="flex items-center gap-2">
+                      <Label className="text-xs w-8">{num}x:</Label>
+                      <Input
+                        type="number"
+                        step="0.001"
+                        placeholder="0.000"
+                        value={perInstallmentRates[num] || ''}
+                        onChange={(e) => setPerInstallmentRates(prev => ({
+                          ...prev,
+                          [num]: parseFloat(e.target.value) || 0
+                        }))}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <DialogFooter>
