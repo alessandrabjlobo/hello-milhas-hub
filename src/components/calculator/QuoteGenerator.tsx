@@ -36,6 +36,7 @@ export function QuoteGenerator() {
     miles: 0
   });
   const [costPerMile, setCostPerMile] = useState("0.029");
+  const [desiredMargin, setDesiredMargin] = useState("20");
   
   const [showPreview, setShowPreview] = useState(false);
 
@@ -233,6 +234,69 @@ export function QuoteGenerator() {
   const pricePerPassenger = passengers && totalPrice 
     ? (parseFloat(totalPrice) / parseInt(passengers)).toFixed(2) 
     : "0.00";
+
+  const handleCalculatePriceByMargin = () => {
+    // Calcular total de milhas
+    let totalMiles = 0;
+    if (tripType === "round_trip") {
+      totalMiles = roundTripData.miles || 0;
+    } else {
+      totalMiles = flightSegments.reduce((sum, seg) => sum + (seg.miles || 0), 0);
+    }
+
+    if (totalMiles === 0) {
+      toast({
+        title: "Milhas não informadas",
+        description: "Preencha a quantidade de milhas para calcular o preço automaticamente.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!passengers || parseInt(passengers) === 0) {
+      toast({
+        title: "Passageiros não informados",
+        description: "Informe o número de passageiros.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const costPerMileValue = parseFloat(costPerMile);
+    const marginPercent = parseFloat(desiredMargin);
+
+    if (isNaN(costPerMileValue) || costPerMileValue <= 0) {
+      toast({
+        title: "Custo por milha inválido",
+        description: "Informe um custo por milha válido.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isNaN(marginPercent) || marginPercent <= 0 || marginPercent >= 100) {
+      toast({
+        title: "Margem inválida",
+        description: "Informe uma margem entre 0% e 100%.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Calcular custo total
+    const totalMilesAllPassengers = totalMiles * parseInt(passengers);
+    const totalCost = (totalMilesAllPassengers * costPerMileValue) / 1000;
+
+    // Calcular preço com margem: preço = custo / (1 - margem/100)
+    const calculatedPrice = totalCost / (1 - marginPercent / 100);
+
+    setTotalPrice(calculatedPrice.toFixed(2));
+
+    toast({
+      title: "Preço calculado!",
+      description: `Preço de venda: R$ ${calculatedPrice.toFixed(2)} com ${marginPercent}% de margem`,
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -465,6 +529,89 @@ export function QuoteGenerator() {
                     className="h-11"
                   />
                 </div>
+              </div>
+
+              {/* Calculadora de Margem */}
+              <div className="mt-6 p-5 bg-gradient-to-r from-primary/5 to-primary/10 rounded-xl border border-primary/20">
+                <div className="flex items-center gap-2 mb-3">
+                  <DollarSign className="h-5 w-5 text-primary" />
+                  <h4 className="font-semibold text-primary">Calculadora Automática de Preço</h4>
+                </div>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Defina a margem de lucro desejada e calcularemos automaticamente o preço de venda ideal
+                </p>
+                
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="desired-margin">Margem de Lucro Desejada (%)</Label>
+                    <Input
+                      id="desired-margin"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      placeholder="20"
+                      value={desiredMargin}
+                      onChange={(e) => setDesiredMargin(e.target.value)}
+                      className="h-11"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Exemplo: 20% = lucro de R$ 200 em venda de R$ 1000
+                    </p>
+                  </div>
+
+                  <div className="flex items-end">
+                    <Button
+                      type="button"
+                      onClick={handleCalculatePriceByMargin}
+                      className="w-full h-11"
+                      variant="default"
+                    >
+                      <DollarSign className="h-4 w-4 mr-2" />
+                      Calcular Preço Automaticamente
+                    </Button>
+                  </div>
+                </div>
+
+                {(() => {
+                  // Preview do cálculo
+                  let totalMiles = 0;
+                  if (tripType === "round_trip") {
+                    totalMiles = roundTripData.miles || 0;
+                  } else {
+                    totalMiles = flightSegments.reduce((sum, seg) => sum + (seg.miles || 0), 0);
+                  }
+
+                  if (totalMiles > 0 && passengers && costPerMile && desiredMargin) {
+                    const totalMilesAllPassengers = totalMiles * parseInt(passengers);
+                    const costPerMileValue = parseFloat(costPerMile);
+                    const marginPercent = parseFloat(desiredMargin);
+                    const totalCost = (totalMilesAllPassengers * costPerMileValue) / 1000;
+                    const calculatedPrice = totalCost / (1 - marginPercent / 100);
+                    const profit = calculatedPrice - totalCost;
+
+                    return (
+                      <div className="mt-4 p-4 bg-background rounded-lg border">
+                        <p className="text-sm font-semibold mb-2">Preview do Cálculo:</p>
+                        <div className="grid grid-cols-3 gap-4 text-sm">
+                          <div>
+                            <p className="text-muted-foreground">Custo</p>
+                            <p className="font-bold text-red-600">R$ {totalCost.toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Preço Sugerido</p>
+                            <p className="font-bold text-green-600">R$ {calculatedPrice.toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Lucro</p>
+                            <p className="font-bold text-blue-600">R$ {profit.toFixed(2)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
 
               <div className="grid md:grid-cols-2 gap-4 mt-4">
