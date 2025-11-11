@@ -35,7 +35,7 @@ export function QuoteGenerator() {
     returnDate: "",
     miles: 0
   });
-  const [costPerMile, setCostPerMile] = useState("0.029");
+  const [costPerMile, setCostPerMile] = useState("29");
   const [desiredMargin, setDesiredMargin] = useState("20");
   
   const [showPreview, setShowPreview] = useState(false);
@@ -267,8 +267,8 @@ export function QuoteGenerator() {
 
     if (isNaN(costPerMileValue) || costPerMileValue <= 0) {
       toast({
-        title: "Custo por milha inválido",
-        description: "Informe um custo por milha válido.",
+        title: "Custo por milheiro inválido",
+        description: "Informe um custo por milheiro válido.",
         variant: "destructive",
       });
       return;
@@ -502,18 +502,18 @@ export function QuoteGenerator() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="cost-per-mile">Custo por Milha (R$) *</Label>
+                  <Label htmlFor="cost-per-mile">Custo por Milheiro (R$) *</Label>
                   <Input
                     id="cost-per-mile"
                     type="number"
-                    step="0.001"
-                    placeholder="0.029"
+                    step="0.01"
+                    placeholder="29.00"
                     value={costPerMile}
                     onChange={(e) => setCostPerMile(e.target.value)}
                     className="h-11"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Custo interno para calcular margem
+                    Custo por 1000 milhas para calcular margem
                   </p>
                 </div>
 
@@ -1012,7 +1012,7 @@ export function QuoteGenerator() {
                         R$ {totalCost.toFixed(2)}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        R$ {costPerMileValue.toFixed(3)} por milha
+                        R$ {costPerMileValue.toFixed(2)} por milheiro
                       </p>
                     </div>
                     
@@ -1061,7 +1061,7 @@ export function QuoteGenerator() {
 
                   <div className="mt-4 p-4 bg-muted/50 rounded-lg">
                     <p className="text-sm text-muted-foreground text-center">
-                      💡 <strong>Dica:</strong> Esta análise completa mostra custo, lucro e margem baseados no total de milhas e custo por milha. 
+                      💡 <strong>Dica:</strong> Esta análise completa mostra custo, lucro e margem baseados no total de milhas e custo por milheiro. 
                       Estas informações não aparecem no orçamento enviado ao cliente.
                     </p>
                   </div>
