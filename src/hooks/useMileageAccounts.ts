@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { getSupplierId } from "@/lib/getSupplierId";
 
 export interface MileageAccount {
   id: string;
@@ -30,6 +31,9 @@ export const useMileageAccounts = () => {
   const fetchAccounts = async () => {
     try {
       setLoading(true);
+      // Ensure profile and supplier are provisioned for the authenticated user
+      await getSupplierId().catch(() => {});
+
       const { data, error } = await supabase
         .from("mileage_accounts")
         .select(`
@@ -62,12 +66,12 @@ export const useMileageAccounts = () => {
     status: "active" | "inactive";
   }) => {
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) throw new Error("Usuário não autenticado");
+      const { supplierId, userId } = await getSupplierId();
 
       const { error } = await supabase.from("mileage_accounts").insert({
         ...accountData,
-        user_id: userData.user.id,
+        user_id: userId,
+        supplier_id: supplierId,
       });
 
       if (error) throw error;
