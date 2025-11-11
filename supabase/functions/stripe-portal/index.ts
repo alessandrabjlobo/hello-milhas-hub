@@ -42,16 +42,23 @@ serve(async (req) => {
       .single();
 
     if (subError || !subscription?.stripe_customer_id) {
+      console.error('No subscription found for user:', user.id, subError);
       throw new Error('No subscription found');
     }
 
-    const baseUrl = req.headers.get('origin') || Deno.env.get('VITE_SUPABASE_URL');
+    console.log('Creating portal session for customer:', subscription.stripe_customer_id);
+
+    const baseUrl = req.headers.get('origin') || Deno.env.get('SUPABASE_URL');
     const returnUrl = `${baseUrl}/conta`;
+    
+    console.log('Return URL:', returnUrl);
 
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: subscription.stripe_customer_id,
       return_url: returnUrl,
     });
+    
+    console.log('Portal session created:', portalSession.id);
 
     return new Response(JSON.stringify({ url: portalSession.url }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

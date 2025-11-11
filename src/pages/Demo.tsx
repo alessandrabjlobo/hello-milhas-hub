@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -80,19 +81,11 @@ export default function Demo() {
             DEMONSTRAÇÃO - Todos os dados exibidos são fictícios
           </span>
           <div className="flex gap-2">
-            <Button 
-              size="sm" 
-              variant="default"
-              onClick={() => navigate('/assinatura')}
-            >
-              Testar 7 dias grátis
+            <Button asChild size="sm" variant="default">
+              <Link to="/assinatura">Testar 7 dias grátis</Link>
             </Button>
-            <Button 
-              size="sm" 
-              variant="outline"
-              onClick={() => navigate('/login')}
-            >
-              Login
+            <Button asChild size="sm" variant="outline">
+              <Link to="/login">Login</Link>
             </Button>
           </div>
         </AlertDescription>

@@ -10,7 +10,7 @@ import {
   Zap,
   ArrowRight
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import heroBackground from "@/assets/hero-background.jpg";
 
@@ -70,23 +70,14 @@ const Index = () => {
               <span className="font-bold text-lg">Hello Milhas +</span>
             </div>
             <div className="flex items-center gap-3">
-              <Button 
-                variant="ghost" 
-                onClick={() => navigate("/login")}
-              >
-                Login
+              <Button asChild variant="ghost">
+                <Link to="/login">Login</Link>
               </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => navigate("/demo")}
-              >
-                Ver Demonstração
+              <Button asChild variant="outline">
+                <Link to="/demo">Ver Demonstração</Link>
               </Button>
-              <Button 
-                variant="default" 
-                onClick={() => navigate("/assinatura")}
-              >
-                Comece já
+              <Button asChild variant="default">
+                <Link to="/assinatura">Comece já</Link>
               </Button>
             </div>
           </div>
@@ -123,22 +114,14 @@ const Index = () => {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-4">
-              <Button 
-                variant="hero" 
-                size="lg"
-                onClick={() => navigate("/assinatura")}
-                className="text-lg px-8"
-              >
-                Começar Agora
-                <ArrowRight className="ml-2 h-5 w-5" />
+              <Button asChild variant="hero" size="lg" className="text-lg px-8">
+                <Link to="/assinatura">
+                  Começar Agora
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Link>
               </Button>
-              <Button 
-                variant="outline" 
-                size="lg" 
-                className="text-lg px-8"
-                onClick={() => navigate("/demo")}
-              >
-                Ver Demonstração
+              <Button asChild variant="outline" size="lg" className="text-lg px-8">
+                <Link to="/demo">Ver Demonstração</Link>
               </Button>
             </div>
           </div>
@@ -197,14 +180,11 @@ const Index = () => {
               <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
                 Junte-se a centenas de vendedores que já transformaram seus negócios com o Hello Milhas +
               </p>
-              <Button 
-                variant="hero" 
-                size="lg"
-                onClick={() => navigate("/login")}
-                className="text-lg px-10"
-              >
-                Entrar
-                <ArrowRight className="ml-2 h-5 w-5" />
+              <Button asChild variant="hero" size="lg" className="text-lg px-10">
+                <Link to="/login">
+                  Entrar
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Link>
               </Button>
             </CardContent>
           </Card>
