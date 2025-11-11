@@ -3,12 +3,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Send, Copy, Download, User, Phone, MapPin, Calendar, Plane, DollarSign, Clock, Users, Plus } from "lucide-react";
+import { FileText, Send, Copy, Download, User, Plane, DollarSign, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -17,16 +14,12 @@ import { usePaymentInterestConfig } from "@/hooks/usePaymentInterestConfig";
 
 export function QuoteGenerator() {
   const { toast } = useToast();
-  const { configs, calculateInstallmentValue } = usePaymentInterestConfig();
+  const { configs } = usePaymentInterestConfig();
   
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
-  const [route, setRoute] = useState("");
-  const [departureDate, setDepartureDate] = useState("");
-  const [milesNeeded, setMilesNeeded] = useState("");
   const [passengers, setPassengers] = useState("1");
   const [totalPrice, setTotalPrice] = useState("");
-  const [costPerThousand, setCostPerThousand] = useState("");
   const [boardingFee, setBoardingFee] = useState("");
   
   // Trip type e flight segments
@@ -36,28 +29,14 @@ export function QuoteGenerator() {
     { from: "", to: "", date: "" }
   ]);
   
-  // Novos campos de voo (legacy - para compatibilidade)
-  const [departureTime, setDepartureTime] = useState("");
-  const [arrivalTime, setArrivalTime] = useState("");
-  const [duration, setDuration] = useState("");
-  const [stops, setStops] = useState("");
-  const [stopCities, setStopCities] = useState("");
-  
-  // Parcelamento
-  const [installments, setInstallments] = useState<number>();
-  const [selectedInterestRate, setSelectedInterestRate] = useState<number>(0);
-  
-  // Formas de pagamento
-  const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
-  
   const [showPreview, setShowPreview] = useState(false);
 
   const handleGenerateQuote = () => {
     const hasValidSegment = flightSegments.some(seg => seg.from && seg.to && seg.date);
-    if (!clientName || !clientPhone || !milesNeeded || !totalPrice || !hasValidSegment) {
+    if (!clientName || !clientPhone || !totalPrice || !hasValidSegment) {
       toast({
         title: "Campos obrigatórios",
-        description: "Preencha cliente, telefone, milhas, valor e ao menos 1 trecho com origem, destino e data.",
+        description: "Preencha cliente, telefone, valor e ao menos 1 trecho completo.",
         variant: "destructive",
       });
       return;
@@ -82,35 +61,18 @@ export function QuoteGenerator() {
       return;
     }
 
-    const flightDetails = {
-      departure_time: departureTime || null,
-      arrival_time: arrivalTime || null,
-      duration: duration || null,
-      stops: stops ? parseInt(stops) : null,
-      stop_cities: stopCities ? stopCities.split(",").map(s => s.trim()) : []
-    };
-
-    const finalPrice = installments && installments > 1 
-      ? parseFloat(totalPrice) * (1 + selectedInterestRate / 100)
-      : parseFloat(totalPrice);
-
     const { error } = await supabase.from("quotes").insert([{
       user_id: user.id,
       client_name: clientName,
       client_phone: clientPhone,
-      route: route,
-      departure_date: flightSegments[0]?.date || departureDate,
-      miles_needed: parseInt(milesNeeded),
+      route: `${flightSegments[0]?.from || ''} → ${flightSegments[0]?.to || ''}`,
+      departure_date: flightSegments[0]?.date || null,
+      miles_needed: 0,
       total_price: parseFloat(totalPrice),
       passengers: parseInt(passengers),
       trip_type: tripType,
       boarding_fee: boardingFee ? parseFloat(boardingFee) : 0,
-      installments: installments || null,
-      interest_rate: selectedInterestRate || null,
-      final_price_with_interest: finalPrice,
       flight_segments: flightSegments as any,
-      flight_details: flightDetails as any,
-      payment_methods: paymentMethods,
       status: 'pending' as const
     }]);
 
@@ -141,7 +103,6 @@ export function QuoteGenerator() {
     text += `*🛫 DETALHES DO VOO*\n`;
     text += `Tipo: ${tripType === 'one_way' ? 'Só Ida' : tripType === 'round_trip' ? 'Ida e Volta' : 'Múltiplos Trechos'}\n`;
     
-    // Exibir trechos de voo
     flightSegments.filter(seg => seg.from && seg.to).forEach((segment, index) => {
       text += `\nTrecho ${index + 1}: ${segment.from} → ${segment.to}\n`;
       if (segment.date) text += `Data: ${format(new Date(segment.date), 'dd/MM/yyyy')}\n`;
@@ -151,7 +112,6 @@ export function QuoteGenerator() {
     
     text += `\n*💰 VALORES*\n`;
     text += `Passageiros: ${passengers}\n`;
-    text += `Milhas necessárias: ${parseInt(milesNeeded).toLocaleString('pt-BR')}\n`;
     if (boardingFee && parseFloat(boardingFee) > 0) {
       text += `Taxa de embarque: R$ ${parseFloat(boardingFee).toFixed(2)} por passageiro\n`;
       text += `Total taxas: R$ ${totalBoardingFee}\n`;
@@ -159,20 +119,29 @@ export function QuoteGenerator() {
     if (parseInt(passengers) > 1) {
       text += `Valor por pessoa: R$ ${pricePerPassenger}\n`;
     }
-    text += `\n*VALOR TOTAL: R$ ${parseFloat(totalPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}*\n`;
+    text += `\n*VALOR À VISTA: R$ ${parseFloat(totalPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}*\n`;
     
-    // Adicionar informação de parcelamento
-    if (installments && installments > 1) {
-      const finalPrice = parseFloat(totalPrice) * (1 + selectedInterestRate / 100);
-      const installmentValue = finalPrice / installments;
-      text += `\n*Parcelamento: ${installments}x de R$ ${installmentValue.toFixed(2)}*\n`;
-      text += `*Valor total parcelado: R$ ${finalPrice.toFixed(2)}* (Taxa: ${selectedInterestRate}%)\n`;
+    text += `\n*💳 FORMAS DE PAGAMENTO*\n`;
+    text += `• PIX - R$ ${parseFloat(totalPrice).toFixed(2)}\n`;
+    
+    const debitConfig = configs.find(c => c.payment_type === 'debit');
+    if (debitConfig && debitConfig.interest_rate > 0) {
+      const debitTotal = parseFloat(totalPrice) * (1 + debitConfig.interest_rate / 100);
+      text += `• Débito - R$ ${debitTotal.toFixed(2)} (Taxa: ${debitConfig.interest_rate.toFixed(2)}%)\n`;
+    } else {
+      text += `• Débito - R$ ${parseFloat(totalPrice).toFixed(2)}\n`;
     }
     
-    if (paymentMethods.length > 0) {
-      text += `\n*💳 FORMAS DE PAGAMENTO*\n`;
-      paymentMethods.forEach(method => {
-        text += `• ${method}\n`;
+    const creditConfigs = configs.filter(c => c.payment_type === 'credit').sort((a, b) => a.installments - b.installments);
+    if (creditConfigs.length > 0) {
+      text += `• Crédito:\n`;
+      creditConfigs.forEach(config => {
+        const rate = config.config_type === 'per_installment'
+          ? (config.per_installment_rates?.[config.installments] ?? config.interest_rate)
+          : config.interest_rate;
+        const finalPrice = parseFloat(totalPrice) * (1 + rate / 100);
+        const installmentValue = finalPrice / config.installments;
+        text += `  ${config.installments}x de R$ ${installmentValue.toFixed(2)} = R$ ${finalPrice.toFixed(2)}\n`;
       });
     }
     
@@ -202,14 +171,6 @@ export function QuoteGenerator() {
     });
   };
 
-  const togglePaymentMethod = (method: string) => {
-    setPaymentMethods(prev => 
-      prev.includes(method) 
-        ? prev.filter(m => m !== method)
-        : [...prev, method]
-    );
-  };
-
   const pricePerPassenger = passengers && totalPrice 
     ? (parseFloat(totalPrice) / parseInt(passengers)).toFixed(2) 
     : "0.00";
@@ -231,8 +192,8 @@ export function QuoteGenerator() {
           </div>
         </CardHeader>
         <CardContent className="pt-6">
-          {/* Dados do Cliente */}
           <div className="space-y-6">
+            {/* Dados do Cliente */}
             <div>
               <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <User className="h-5 w-5 text-primary" />
@@ -240,9 +201,7 @@ export function QuoteGenerator() {
               </h3>
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="client-name" className="flex items-center gap-2">
-                    Nome Completo *
-                  </Label>
+                  <Label htmlFor="client-name">Nome Completo *</Label>
                   <Input
                     id="client-name"
                     placeholder="João Silva"
@@ -253,9 +212,7 @@ export function QuoteGenerator() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="client-phone" className="flex items-center gap-2">
-                    Telefone (WhatsApp) *
-                  </Label>
+                  <Label htmlFor="client-phone">Telefone (WhatsApp) *</Label>
                   <Input
                     id="client-phone"
                     placeholder="(11) 99999-9999"
@@ -277,7 +234,6 @@ export function QuoteGenerator() {
               </h3>
               
               <div className="space-y-4">
-                {/* Tipo de Viagem */}
                 <div className="space-y-2">
                   <Label>Tipo de Viagem *</Label>
                   <RadioGroup 
@@ -318,7 +274,6 @@ export function QuoteGenerator() {
                   </RadioGroup>
                 </div>
 
-                {/* Trechos de Voo */}
                 <div className="space-y-3">
                   {flightSegments.map((segment, index) => (
                     <FlightSegmentForm
@@ -358,9 +313,9 @@ export function QuoteGenerator() {
             <div>
               <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <DollarSign className="h-5 w-5 text-primary" />
-                Valores e Milhas
+                Valores
               </h3>
-              <div className="grid md:grid-cols-3 gap-4">
+              <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="passengers">Nº de Passageiros *</Label>
                   <Input
@@ -370,18 +325,6 @@ export function QuoteGenerator() {
                     placeholder="1"
                     value={passengers}
                     onChange={(e) => setPassengers(e.target.value)}
-                    className="h-11"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="miles-needed">Milhas Necessárias *</Label>
-                  <Input
-                    id="miles-needed"
-                    type="number"
-                    placeholder="50000"
-                    value={milesNeeded}
-                    onChange={(e) => setMilesNeeded(e.target.value)}
                     className="h-11"
                   />
                 </div>
@@ -439,127 +382,6 @@ export function QuoteGenerator() {
                   </p>
                 </div>
               )}
-
-              <div className="space-y-2 mt-4">
-                <Label htmlFor="cost-per-thousand" className="flex items-center gap-2">
-                  Custo do Milheiro (R$/mil)
-                  <Badge variant="secondary" className="ml-2">Interno</Badge>
-                </Label>
-                <Input
-                  id="cost-per-thousand"
-                  type="number"
-                  step="0.01"
-                  placeholder="29.00"
-                  value={costPerThousand}
-                  onChange={(e) => setCostPerThousand(e.target.value)}
-                  className="h-11"
-                />
-                <p className="text-xs text-muted-foreground">
-                  📊 Este valor não será enviado ao cliente. Serve apenas para calcular sua margem de lucro.
-                </p>
-              </div>
-
-              {milesNeeded && totalPrice && costPerThousand && (
-                <Card className="p-4 bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800">
-                  <p className="text-sm font-semibold mb-2">💰 Resumo Financeiro (Interno)</p>
-                  <div className="grid grid-cols-3 gap-2 text-sm">
-                    <div>
-                      <p className="text-muted-foreground">Custo</p>
-                      <p className="font-semibold">
-                        R$ {((parseInt(milesNeeded) / 1000) * parseFloat(costPerThousand)).toFixed(2)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Lucro</p>
-                      <p className="font-semibold text-green-600 dark:text-green-400">
-                        R$ {(parseFloat(totalPrice) - ((parseInt(milesNeeded) / 1000) * parseFloat(costPerThousand))).toFixed(2)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Margem</p>
-                      <p className="font-semibold">
-                        {(((parseFloat(totalPrice) - ((parseInt(milesNeeded) / 1000) * parseFloat(costPerThousand))) / parseFloat(totalPrice)) * 100).toFixed(1)}%
-                      </p>
-                    </div>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    ⚠️ Esta informação não será incluída na mensagem enviada ao cliente.
-                  </p>
-                </Card>
-              )}
-            </div>
-
-            <Separator />
-
-            {/* Parcelamento */}
-            <div>
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-primary" />
-                Parcelamento
-              </h3>
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="installments">Parcelamento (Opcional)</Label>
-                  <Select 
-                    value={installments?.toString()} 
-                    onValueChange={(v) => {
-                      const inst = parseInt(v);
-                      setInstallments(inst);
-
-                      const config = configs.find(c => c.installments === inst && c.payment_type === 'credit');
-                      if (config) {
-                        const effectiveRate = config.config_type === 'per_installment'
-                          ? (config.per_installment_rates?.[inst] ?? 0)
-                          : config.interest_rate;
-                        setSelectedInterestRate(effectiveRate || 0);
-                      } else {
-                        setSelectedInterestRate(0);
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="h-11">
-                      <SelectValue placeholder="À vista" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">À vista</SelectItem>
-                      {configs
-                        .filter(c => c.payment_type === 'credit')
-                        .sort((a, b) => a.installments - b.installments)
-                        .map(config => {
-                          const inst = config.installments;
-                          const rate = config.config_type === 'per_installment'
-                            ? (config.per_installment_rates?.[inst] ?? 0)
-                            : config.interest_rate;
-                          return (
-                            <SelectItem key={config.id} value={inst.toString()}>
-                              {inst}x - Taxa: {rate.toFixed(2)}%
-                            </SelectItem>
-                          );
-                        })}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {installments && installments > 1 && totalPrice && (
-                  <Card className="p-4 bg-blue-50 dark:bg-blue-950/20">
-                    <p className="text-sm font-semibold mb-2">Simulação do Parcelamento</p>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <p className="text-muted-foreground">Parcela</p>
-                        <p className="font-semibold">
-                          R$ {((parseFloat(totalPrice) * (1 + selectedInterestRate / 100)) / installments).toFixed(2)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Total com Juros</p>
-                        <p className="font-semibold">
-                          R$ {(parseFloat(totalPrice) * (1 + selectedInterestRate / 100)).toFixed(2)}
-                        </p>
-                      </div>
-                    </div>
-                  </Card>
-                )}
-              </div>
             </div>
 
             <Separator />
@@ -570,20 +392,83 @@ export function QuoteGenerator() {
                 <DollarSign className="h-5 w-5 text-primary" />
                 Formas de Pagamento
               </h3>
-              <div className="grid md:grid-cols-2 gap-4">
-                {["PIX", "Cartão de Crédito", "Transferência Bancária", "Boleto"].map((method) => (
-                  <div key={method} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={method}
-                      checked={paymentMethods.includes(method)}
-                      onCheckedChange={() => togglePaymentMethod(method)}
-                    />
-                    <Label htmlFor={method} className="cursor-pointer font-normal">
-                      {method}
-                    </Label>
-                  </div>
-                ))}
-              </div>
+              
+              {totalPrice && parseFloat(totalPrice) > 0 ? (
+                <div className="space-y-4">
+                  {/* PIX */}
+                  <Card className="p-4 border-primary/30">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold text-lg">PIX</p>
+                        <p className="text-sm text-muted-foreground">Pagamento instantâneo</p>
+                      </div>
+                      <p className="text-2xl font-bold text-primary">
+                        R$ {parseFloat(totalPrice).toFixed(2)}
+                      </p>
+                    </div>
+                  </Card>
+
+                  {/* Débito */}
+                  {(() => {
+                    const debitConfig = configs.find(c => c.payment_type === 'debit');
+                    const debitTotal = debitConfig && debitConfig.interest_rate > 0
+                      ? parseFloat(totalPrice) * (1 + debitConfig.interest_rate / 100)
+                      : parseFloat(totalPrice);
+                    
+                    return (
+                      <Card className="p-4 border-border">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-semibold text-lg">Débito</p>
+                            {debitConfig && debitConfig.interest_rate > 0 && (
+                              <p className="text-sm text-muted-foreground">
+                                Taxa: {debitConfig.interest_rate.toFixed(2)}%
+                              </p>
+                            )}
+                          </div>
+                          <p className="text-2xl font-bold">
+                            R$ {debitTotal.toFixed(2)}
+                          </p>
+                        </div>
+                      </Card>
+                    );
+                  })()}
+
+                  {/* Crédito Parcelado */}
+                  {configs.filter(c => c.payment_type === 'credit').length > 0 && (
+                    <Card className="p-4 border-border">
+                      <p className="font-semibold text-lg mb-3">Crédito - Opções de Parcelamento</p>
+                      <div className="space-y-2">
+                        {configs
+                          .filter(c => c.payment_type === 'credit')
+                          .sort((a, b) => a.installments - b.installments)
+                          .map(config => {
+                            const rate = config.config_type === 'per_installment'
+                              ? (config.per_installment_rates?.[config.installments] ?? config.interest_rate)
+                              : config.interest_rate;
+                            const finalPrice = parseFloat(totalPrice) * (1 + rate / 100);
+                            const installmentValue = finalPrice / config.installments;
+                            
+                            return (
+                              <div key={config.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                                <div>
+                                  <p className="font-medium">{config.installments}x de R$ {installmentValue.toFixed(2)}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Total: R$ {finalPrice.toFixed(2)} (Taxa: {rate.toFixed(2)}%)
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </Card>
+                  )}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-center py-4">
+                  Preencha o valor total para ver as formas de pagamento
+                </p>
+              )}
             </div>
           </div>
 
@@ -647,33 +532,6 @@ export function QuoteGenerator() {
                       <p className="font-semibold text-lg">{format(new Date(flightSegments[0].date), 'dd/MM/yyyy')}</p>
                     </div>
                   )}
-                  {departureTime && (
-                    <div>
-                      <p className="text-muted-foreground">Partida</p>
-                      <p className="font-semibold">{departureTime}</p>
-                    </div>
-                  )}
-                  {arrivalTime && (
-                    <div>
-                      <p className="text-muted-foreground">Chegada</p>
-                      <p className="font-semibold">{arrivalTime}</p>
-                    </div>
-                  )}
-                  {duration && (
-                    <div>
-                      <p className="text-muted-foreground">Duração</p>
-                      <p className="font-semibold">{duration}</p>
-                    </div>
-                  )}
-                  {stops && (
-                    <div>
-                      <p className="text-muted-foreground">Escalas</p>
-                      <p className="font-semibold">
-                        {parseInt(stops) === 0 ? 'Voo Direto' : `${stops} parada(s)`}
-                        {stopCities && parseInt(stops) > 0 && ` - ${stopCities}`}
-                      </p>
-                    </div>
-                  )}
                 </div>
               </div>
 
@@ -690,10 +548,6 @@ export function QuoteGenerator() {
                     <span className="text-muted-foreground">Passageiros</span>
                     <span className="font-medium">{passengers}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Milhas Necessárias</span>
-                    <span className="font-medium">{parseInt(milesNeeded).toLocaleString('pt-BR')}</span>
-                  </div>
                   {parseInt(passengers) > 1 && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Valor por Passageiro</span>
@@ -704,7 +558,7 @@ export function QuoteGenerator() {
                   <Separator className="my-4" />
                   
                   <div className="flex justify-between items-center bg-gradient-to-r from-primary/20 to-primary/10 p-5 rounded-xl border-2 border-primary/30">
-                    <span className="text-xl font-bold">VALOR TOTAL</span>
+                    <span className="text-xl font-bold">VALOR À VISTA</span>
                     <span className="text-3xl font-bold text-primary">
                       R$ {parseFloat(totalPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
@@ -712,24 +566,78 @@ export function QuoteGenerator() {
                 </div>
               </div>
 
-              {paymentMethods.length > 0 && (
-                <>
-                  <Separator />
-                  <div className="space-y-3">
-                    <h3 className="text-lg font-semibold flex items-center gap-2 pb-2 border-b">
-                      💳 Formas de Pagamento
-                    </h3>
-                    <ul className="space-y-2">
-                      {paymentMethods.map((method) => (
-                        <li key={method} className="flex items-center gap-2">
-                          <span className="text-primary">•</span>
-                          <span>{method}</span>
-                        </li>
-                      ))}
-                    </ul>
+              <Separator />
+              
+              {/* Formas de Pagamento no Preview */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold flex items-center gap-2 pb-2 border-b">
+                  💳 Formas de Pagamento
+                </h3>
+                
+                {/* PIX */}
+                <div className="p-3 bg-primary/5 rounded-lg border border-primary/20">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold">PIX</span>
+                    <span className="text-lg font-bold text-primary">
+                      R$ {parseFloat(totalPrice).toFixed(2)}
+                    </span>
                   </div>
-                </>
-              )}
+                </div>
+
+                {/* Débito */}
+                {(() => {
+                  const debitConfig = configs.find(c => c.payment_type === 'debit');
+                  const debitTotal = debitConfig && debitConfig.interest_rate > 0
+                    ? parseFloat(totalPrice) * (1 + debitConfig.interest_rate / 100)
+                    : parseFloat(totalPrice);
+                  
+                  return (
+                    <div className="p-3 bg-muted/50 rounded-lg border">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="font-semibold">Débito</span>
+                          {debitConfig && debitConfig.interest_rate > 0 && (
+                            <span className="text-xs text-muted-foreground ml-2">
+                              (Taxa: {debitConfig.interest_rate.toFixed(2)}%)
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-lg font-bold">
+                          R$ {debitTotal.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Crédito */}
+                {configs.filter(c => c.payment_type === 'credit').length > 0 && (
+                  <div className="p-3 bg-muted/50 rounded-lg border">
+                    <p className="font-semibold mb-2">Crédito - Parcelamento</p>
+                    <div className="space-y-1.5 text-sm">
+                      {configs
+                        .filter(c => c.payment_type === 'credit')
+                        .sort((a, b) => a.installments - b.installments)
+                        .map(config => {
+                          const rate = config.config_type === 'per_installment'
+                            ? (config.per_installment_rates?.[config.installments] ?? config.interest_rate)
+                            : config.interest_rate;
+                          const finalPrice = parseFloat(totalPrice) * (1 + rate / 100);
+                          const installmentValue = finalPrice / config.installments;
+                          
+                          return (
+                            <div key={config.id} className="flex items-center justify-between">
+                              <span>{config.installments}x de R$ {installmentValue.toFixed(2)}</span>
+                              <span className="text-xs text-muted-foreground">
+                                = R$ {finalPrice.toFixed(2)}
+                              </span>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* Observação */}
               <div className="bg-muted/50 p-4 rounded-lg border">
