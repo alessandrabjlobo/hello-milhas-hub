@@ -1,29 +1,33 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Plane } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
+
+function loadStripeScript() {
+  return new Promise<void>((resolve) => {
+    if (document.querySelector(`script[src="https://js.stripe.com/v3/pricing-table.js"]`)) {
+      return resolve();
+    }
+    const script = document.createElement("script");
+    script.src = "https://js.stripe.com/v3/pricing-table.js";
+    script.async = true;
+    script.onload = () => resolve();
+    document.head.appendChild(script);
+  });
+}
 
 export default function Subscription() {
-  const { user } = useAuth();
   const navigate = useNavigate();
+  const [ready, setReady] = useState(false);
 
-  useEffect(() => {
-    // Adicionar script da Stripe Pricing Table
-    const script = document.createElement('script');
-    script.src = 'https://js.stripe.com/v3/pricing-table.js';
-    script.async = true;
-    document.body.appendChild(script);
-
-    return () => {
-      // Cleanup
-      document.body.removeChild(script);
-    };
-  }, []);
-
-  // Obter variáveis de ambiente
   const pricingTableId = import.meta.env.VITE_STRIPE_PRICING_TABLE_ID;
   const publishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+
+  useEffect(() => {
+    loadStripeScript().then(() => setReady(true));
+  }, []);
+
+  const missing = !pricingTableId || !publishableKey;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5">
@@ -71,18 +75,22 @@ export default function Subscription() {
 
         {/* Stripe Pricing Table */}
         <div className="max-w-5xl mx-auto">
-          {pricingTableId && publishableKey ? (
+          {missing && (
+            <div className="p-6 border-2 border-yellow-500/50 rounded-lg bg-yellow-500/10 text-center">
+              <p className="text-foreground font-medium mb-2">
+                ⚠️ Configuração Necessária
+              </p>
+              <p className="text-muted-foreground text-sm">
+                Defina as variáveis VITE_STRIPE_PRICING_TABLE_ID e VITE_STRIPE_PUBLISHABLE_KEY nas configurações do projeto.
+              </p>
+            </div>
+          )}
+
+          {ready && !missing && (
             <stripe-pricing-table 
               pricing-table-id={pricingTableId}
               publishable-key={publishableKey}
-              customer-email={user?.email || ''}
             />
-          ) : (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground">
-                Configuração do Stripe em andamento...
-              </p>
-            </div>
           )}
         </div>
 
