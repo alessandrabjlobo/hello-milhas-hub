@@ -51,9 +51,10 @@ type FormData = z.infer<typeof formSchema>;
 interface RegisterTicketDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  saleId?: string;
 }
 
-export function RegisterTicketDialog({ open, onOpenChange }: RegisterTicketDialogProps) {
+export function RegisterTicketDialog({ open, onOpenChange, saleId }: RegisterTicketDialogProps) {
   const { sales } = useSales();
   const { createTicket } = useTickets();
   const { toast } = useToast();
@@ -70,6 +71,14 @@ export function RegisterTicketDialog({ open, onOpenChange }: RegisterTicketDialo
 
   const selectedSaleId = form.watch("sale_id");
 
+  // Auto-fill when saleId is provided
+  useEffect(() => {
+    if (saleId && open) {
+      form.setValue("sale_id", saleId);
+    }
+  }, [saleId, open, form]);
+
+  // Check CPF usage when sale is selected
   useEffect(() => {
     const checkCPF = async () => {
       if (!selectedSaleId) {
@@ -84,17 +93,18 @@ export function RegisterTicketDialog({ open, onOpenChange }: RegisterTicketDialo
       }
 
       try {
-        // Check if CPF already exists in registry for this account
+        // Check if CPF already exists using RPC
         const { data, error } = await supabase
-          .from("cpf_registry")
-          .select("id")
-          .eq("airline_company_id", sale.mileage_account_id)
-          .eq("cpf_encrypted", sale.customer_cpf)
-          .maybeSingle();
+          .rpc("check_cpf_exists", {
+            p_airline_company_id: sale.mileage_account_id,
+            p_cpf_encrypted: sale.customer_cpf
+          });
 
-        if (error) throw error;
+      if (error) throw error;
 
-        if (!data) {
+      const existingCPF = data && data.length > 0 ? data[0] : null;
+
+      if (!existingCPF) {
           // CPF is new - will consume a CPF slot
           const { data: accountData } = await supabase
             .from("mileage_accounts")
@@ -148,13 +158,14 @@ export function RegisterTicketDialog({ open, onOpenChange }: RegisterTicketDialo
 
       // CPF consumption logic
       if (sale.customer_cpf && sale.mileage_account_id) {
-        // Check if CPF already exists
-        const { data: existingCPF } = await supabase
-          .from("cpf_registry")
-          .select("id")
-          .eq("airline_company_id", sale.mileage_account_id)
-          .eq("cpf_encrypted", sale.customer_cpf)
-          .maybeSingle();
+        // Check if CPF already exists using RPC
+        const { data: cpfData } = await supabase
+          .rpc("check_cpf_exists", {
+            p_airline_company_id: sale.mileage_account_id,
+            p_cpf_encrypted: sale.customer_cpf
+          });
+
+        const existingCPF = cpfData && cpfData.length > 0 ? cpfData[0] : null;
 
         if (!existingCPF) {
           // CPF is new - insert and increment count
@@ -230,17 +241,18 @@ export function RegisterTicketDialog({ open, onOpenChange }: RegisterTicketDialo
               control={form.control}
               name="sale_id"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Venda *</FormLabel>
-                  <Select
-                    value={field.value}
-                    onValueChange={field.onChange}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione uma venda" />
-                      </SelectTrigger>
-                    </FormControl>
+            <FormItem>
+              <FormLabel>Venda *</FormLabel>
+              <Select
+                value={field.value}
+                onValueChange={field.onChange}
+                disabled={!!saleId}
+              >
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione uma venda" />
+                  </SelectTrigger>
+                </FormControl>
                     <SelectContent>
                       {openSales.length === 0 ? (
                         <div className="p-2 text-sm text-muted-foreground">
@@ -259,6 +271,15 @@ export function RegisterTicketDialog({ open, onOpenChange }: RegisterTicketDialo
                 </FormItem>
               )}
             />
+
+            {saleId && (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  ✓ Venda selecionada automaticamente. Preencha os dados da passagem emitida.
+                </AlertDescription>
+              </Alert>
+            )}
 
             {cpfWarning && (
               <Alert>

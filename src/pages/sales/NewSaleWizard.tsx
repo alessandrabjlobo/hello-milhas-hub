@@ -1284,6 +1284,7 @@ export default function NewSaleWizard() {
             navigate("/sales");
           }
         }}
+        saleId={lastSaleData?.saleId}
       />
     </div>
   );

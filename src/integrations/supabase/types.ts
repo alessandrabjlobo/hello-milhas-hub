@@ -1294,6 +1294,17 @@ export type Database = {
       }
     }
     Functions: {
+      check_cpf_exists: {
+        Args: { p_airline_company_id: string; p_cpf_encrypted: string }
+        Returns: {
+          blocked_until: string
+          first_use_date: string
+          id: string
+          last_used_at: string
+          status: Database["public"]["Enums"]["cpf_status"]
+          usage_count: number
+        }[]
+      }
       decrypt_cpf: { Args: { cpf_encrypted: string }; Returns: string }
       decrypt_password: {
         Args: { password_encrypted: string }
