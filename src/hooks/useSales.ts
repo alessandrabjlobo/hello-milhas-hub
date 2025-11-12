@@ -22,6 +22,7 @@ export interface FlightSegment {
   to: string;
   date: string;
   miles?: number;
+  boardingFee?: number;
   time?: string;
   stops?: number;
   airline?: string;

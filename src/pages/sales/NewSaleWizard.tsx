@@ -74,11 +74,11 @@ export default function NewSaleWizard() {
     { from: "", to: "", date: "" },
   ]);
   const [notes, setNotes] = useState("");
+  const [boardingFeeMode, setBoardingFeeMode] = useState<"total" | "per_segment">("total");
+  const [totalBoardingFee, setTotalBoardingFee] = useState("");
 
   // Step 2 - Calculation
   const [accountId, setAccountId] = useState<string>();
-  const [milesNeeded, setMilesNeeded] = useState("");
-  const [boardingFee, setBoardingFee] = useState("");
   const [pricingType, setPricingType] = useState<"per_passenger" | "total">("total");
   const [pricePerPassenger, setPricePerPassenger] = useState("");
   const [priceTotal, setPriceTotal] = useState("");
@@ -123,8 +123,6 @@ export default function NewSaleWizard() {
           setFlightSegments(data.flight_segments as unknown as FlightSegment[]);
         }
         
-        setMilesNeeded(data.miles_needed?.toString() || '');
-        setBoardingFee(data.boarding_fee?.toString() || '');
         setPriceTotal(data.total_price?.toString() || '');
         
         if (data.installments) {
@@ -250,6 +248,24 @@ export default function NewSaleWizard() {
     const selectedAccount = filteredAccounts.find(a => a.id === accountId);
     const airline = selectedAccount?.airline_companies?.name || counterAirlineProgram || "Companhia";
 
+    // Calculate totals from segments
+    const totalMiles = flightSegments.reduce((sum, seg) => 
+      sum + ((seg.miles || 0) * passengers), 0
+    );
+
+    const getTotalBoardingFee = () => {
+      if (boardingFeeMode === "total") {
+        return parseFloat(totalBoardingFee || "0") * passengers;
+      } else {
+        return flightSegments.reduce((sum, seg) => 
+          sum + ((seg.boardingFee || 0) * passengers), 0
+        );
+      }
+    };
+
+    const totalBoardingFeeAmount = getTotalBoardingFee();
+    const boardingFeePerPassenger = totalBoardingFeeAmount / passengers;
+
     // Calculate interest if applicable
     let finalPrice = parseFloat(priceTotal) || 0;
     let interestRate = 0;
@@ -322,8 +338,8 @@ export default function NewSaleWizard() {
       notes,
       mileage_account_id: saleSource === "internal_account" ? accountId : undefined,
       cpf_used_id: cpfUsedId, // FASE 1: Vincular CPF usado
-      miles_needed: parseFloat(milesNeeded) || 0,
-      boarding_fee: parseFloat(boardingFee) || 0,
+      miles_needed: totalMiles,
+      boarding_fee: boardingFeePerPassenger,
       price_per_passenger: parseFloat(pricePerPassenger) || 0,
       price_total: parseFloat(priceTotal) || 0,
       payment_method: paymentMethod,
@@ -360,9 +376,9 @@ export default function NewSaleWizard() {
         customerName,
         routeText: flightSegments.map(s => `${s.from} → ${s.to}`).join(" / "),
         airline,
-        milesNeeded,
+        milesNeeded: totalMiles.toString(),
         priceTotal: finalPrice.toFixed(2),
-        boardingFee,
+        boardingFee: boardingFeePerPassenger.toString(),
         passengers,
         paymentMethod,
         pnr: pnr || undefined,
@@ -384,11 +400,11 @@ export default function NewSaleWizard() {
     passengers > 0 &&
     passengerCpfs.length === passengers &&
     flightSegments.length > 0 &&
-    flightSegments.every((s) => s.from && s.to && s.date);
+    flightSegments.every((s) => s.from && s.to && s.date && s.miles) &&
+    (boardingFeeMode === "total" ? totalBoardingFee : flightSegments.every(s => s.boardingFee !== undefined));
 
   const canProceedStep2 =
     (saleSource === "mileage_counter" || accountId) &&
-    milesNeeded &&
     (pricePerPassenger || priceTotal) &&
     paymentMethod;
 
@@ -647,6 +663,58 @@ export default function NewSaleWizard() {
                     )}
                   </div>
 
+                  {/* Boarding Fee Mode */}
+                  <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
+                    <Label className="font-semibold">Taxas de Embarque</Label>
+                    <RadioGroup 
+                      value={boardingFeeMode} 
+                      onValueChange={(value: "total" | "per_segment") => setBoardingFeeMode(value)}
+                      className="grid grid-cols-2 gap-4"
+                    >
+                      <div className="flex items-center space-x-2 border rounded p-3 cursor-pointer hover:bg-accent">
+                        <RadioGroupItem value="total" id="fee-total" />
+                        <Label htmlFor="fee-total" className="cursor-pointer flex-1">
+                          <div>
+                            <p className="font-semibold">Taxa Total</p>
+                            <p className="text-xs text-muted-foreground">
+                              Valor único para toda viagem (mais comum)
+                            </p>
+                          </div>
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2 border rounded p-3 cursor-pointer hover:bg-accent">
+                        <RadioGroupItem value="per_segment" id="fee-segment" />
+                        <Label htmlFor="fee-segment" className="cursor-pointer flex-1">
+                          <div>
+                            <p className="font-semibold">Taxa por Trecho</p>
+                            <p className="text-xs text-muted-foreground">
+                              Valores individuais por segmento
+                            </p>
+                          </div>
+                        </Label>
+                      </div>
+                    </RadioGroup>
+
+                    {boardingFeeMode === "total" && (
+                      <div className="space-y-2 mt-3">
+                        <Label htmlFor="total-boarding-fee">
+                          Taxa de Embarque Total (por passageiro) *
+                        </Label>
+                        <Input
+                          id="total-boarding-fee"
+                          type="number"
+                          step="0.01"
+                          placeholder="Ex: 70.00"
+                          value={totalBoardingFee}
+                          onChange={(e) => setTotalBoardingFee(e.target.value)}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Total de taxas para 1 passageiro em todos os trechos
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Flight Segments */}
                   <div className="space-y-4">
                     <Label>Trechos do Voo *</Label>
@@ -658,6 +726,7 @@ export default function NewSaleWizard() {
                         onUpdate={updateFlightSegment}
                         onRemove={tripType === "multi_city" && flightSegments.length > 1 ? removeFlightSegment : undefined}
                         canRemove={tripType === "multi_city" && flightSegments.length > 1}
+                        showBoardingFee={boardingFeeMode === "per_segment"}
                         title={
                           tripType === "round_trip"
                             ? index === 0
@@ -700,190 +769,194 @@ export default function NewSaleWizard() {
                 <div className="space-y-6">
                   <h2 className="text-xl font-semibold">Cálculo</h2>
                   
-                  {/* Account Selection (only for internal) */}
-                  {saleSource === "internal_account" && (
-                    <div>
-                      <Label htmlFor="account">Conta de Milhagem *</Label>
-                      {filteredAccounts.length === 0 ? (
-                        <Alert>
-                          <AlertCircle className="h-4 w-4" />
-                          <AlertDescription>
-                            Nenhuma conta disponível. Configure seus programas em{" "}
-                            <Button
-                              variant="link"
-                              className="p-0 h-auto"
-                              onClick={() => navigate("/settings/programs")}
-                            >
-                              Regras de Programas
-                            </Button>
-                          </AlertDescription>
-                        </Alert>
-                      ) : (
-                        <AccountCombobox
-                          accounts={filteredAccounts}
-                          value={accountId}
-                          onChange={setAccountId}
-                          placeholder="Busque por companhia ou número da conta..."
-                        />
-                      )}
-                    </div>
-                  )}
+                  {/* Calculate totals automatically */}
+                  {(() => {
+                    const totalMiles = flightSegments.reduce((sum, seg) => 
+                      sum + ((seg.miles || 0) * passengers), 0
+                    );
 
-                  {/* Miles and Fees */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="milesNeeded">Milhagem Necessária *</Label>
-                      <Input
-                        id="milesNeeded"
-                        type="number"
-                        value={milesNeeded}
-                        onChange={(e) => setMilesNeeded(e.target.value)}
-                        placeholder="Ex: 50000"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="boardingFee">Taxa de Embarque (por passageiro)</Label>
-                      <Input
-                        id="boardingFee"
-                        type="number"
-                        step="0.01"
-                        value={boardingFee}
-                        onChange={(e) => setBoardingFee(e.target.value)}
-                        placeholder="Ex: 150.00"
-                      />
-                    </div>
-                  </div>
+                    const getTotalBoardingFee = () => {
+                      if (boardingFeeMode === "total") {
+                        return parseFloat(totalBoardingFee || "0") * passengers;
+                      } else {
+                        return flightSegments.reduce((sum, seg) => 
+                          sum + ((seg.boardingFee || 0) * passengers), 0
+                        );
+                      }
+                    };
 
-                  {/* Pricing */}
-                  <div>
-                    <Label>Tipo de Precificação</Label>
-                    <RadioGroup
-                      value={pricingType}
-                      onValueChange={(v) => setPricingType(v as typeof pricingType)}
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="per_passenger" id="per_passenger" />
-                        <Label htmlFor="per_passenger">Preço por Passageiro</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="total" id="total" />
-                        <Label htmlFor="total">Preço Total</Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
+                    const totalBoardingFeeAmount = getTotalBoardingFee();
 
-                  {pricingType === "per_passenger" ? (
-                    <div>
-                      <Label htmlFor="pricePerPassenger">Preço por Passageiro (R$) *</Label>
-                      <Input
-                        id="pricePerPassenger"
-                        type="number"
-                        step="0.01"
-                        value={pricePerPassenger}
-                        onChange={(e) => {
-                          setPricePerPassenger(e.target.value);
-                          const total = parseFloat(e.target.value) * passengers;
-                          setPriceTotal(total.toFixed(2));
-                        }}
-                        placeholder="Ex: 1500.00"
-                      />
-                    </div>
-                  ) : (
-                    <div>
-                      <Label htmlFor="priceTotal">Preço Total (R$) *</Label>
-                      <Input
-                        id="priceTotal"
-                        type="number"
-                        step="0.01"
-                        value={priceTotal}
-                        onChange={(e) => {
-                          setPriceTotal(e.target.value);
-                          const perPassenger = parseFloat(e.target.value) / passengers;
-                          setPricePerPassenger(perPassenger.toFixed(2));
-                        }}
-                        placeholder="Ex: 3000.00"
-                      />
-                    </div>
-                   )}
+                    const getCostPerThousand = () => {
+                      if (saleSource === 'internal_account' && accountId) {
+                        const account = filteredAccounts.find(a => a.id === accountId);
+                        return (account?.cost_per_mile || 0.029) * 1000;
+                      } else if (saleSource === 'mileage_counter' && counterCostPerThousand) {
+                        return parseFloat(counterCostPerThousand);
+                      }
+                      return 0;
+                    };
 
-                   {/* FASE 2: Card de Lucro em Tempo Real */}
-                   {priceTotal && milesNeeded && (saleSource === "internal_account" && accountId || saleSource === "mileage_counter" && counterCostPerThousand) && (
-                     <Card className="p-4 bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800">
-                       <div className="space-y-2">
-                         <h3 className="font-semibold text-green-900 dark:text-green-100 flex items-center gap-2">
-                           💰 Resumo Financeiro
-                         </h3>
-                          <div className="grid grid-cols-3 gap-4 text-sm">
-                            <div>
-                              <p className="text-muted-foreground">Custo</p>
-                              <p className="font-semibold">
-                                R$ {(() => {
-                                  const miles = parseFloat(milesNeeded) || 0;
-                                  const boardingFeeTotal = (parseFloat(boardingFee) || 0) * passengers;
-                                  let milesCost = 0;
-                                  
-                                  if (saleSource === 'internal_account' && accountId) {
-                                    const account = filteredAccounts.find(a => a.id === accountId);
-                                    const costPerThousand = (account?.cost_per_mile || 0.029) * 1000;
-                                    milesCost = (miles / 1000) * costPerThousand;
-                                  } else if (saleSource === 'mileage_counter' && counterCostPerThousand) {
-                                    milesCost = (miles / 1000) * parseFloat(counterCostPerThousand);
+                    const milesCost = (totalMiles / 1000) * getCostPerThousand();
+                    const totalCost = milesCost + totalBoardingFeeAmount;
+
+                    return (
+                      <>
+                        {/* Account Selection (only for internal) */}
+                        {saleSource === "internal_account" && (
+                          <div>
+                            <Label htmlFor="account">Conta de Milhagem *</Label>
+                            {filteredAccounts.length === 0 ? (
+                              <Alert>
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertDescription>
+                                  Nenhuma conta disponível. Configure seus programas em{" "}
+                                  <Button
+                                    variant="link"
+                                    className="p-0 h-auto"
+                                    onClick={() => navigate("/settings/programs")}
+                                  >
+                                    Regras de Programas
+                                  </Button>
+                                </AlertDescription>
+                              </Alert>
+                            ) : (
+                              <AccountCombobox
+                                accounts={filteredAccounts}
+                                value={accountId}
+                                onChange={setAccountId}
+                                placeholder="Busque por companhia ou número da conta..."
+                              />
+                            )}
+                          </div>
+                        )}
+
+                        {/* Resumo Automático dos Trechos */}
+                        <Card className="p-4 bg-blue-50 dark:bg-blue-950/20 border-blue-200">
+                          <div className="space-y-3">
+                            <h3 className="font-semibold text-sm flex items-center gap-2">
+                              ✈️ Resumo da Viagem
+                            </h3>
+                            <div className="grid grid-cols-3 gap-4 text-sm">
+                              <div>
+                                <p className="text-muted-foreground text-xs">Total Milhas</p>
+                                <p className="font-bold text-lg">
+                                  {totalMiles.toLocaleString('pt-BR')}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {flightSegments.reduce((s, seg) => s + (seg.miles || 0), 0).toLocaleString('pt-BR')} × {passengers} pax
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground text-xs">Total Taxas</p>
+                                <p className="font-bold text-lg">
+                                  R$ {totalBoardingFeeAmount.toFixed(2)}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {boardingFeeMode === "total" 
+                                    ? `R$ ${parseFloat(totalBoardingFee || "0").toFixed(2)} × ${passengers} pax`
+                                    : `Soma dos ${flightSegments.length} trechos`
                                   }
-                                  
-                                  return (milesCost + boardingFeeTotal).toFixed(2);
-                                })()}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Lucro</p>
-                              <p className="font-semibold text-green-600 dark:text-green-400">
-                                R$ {(() => {
-                                  const total = parseFloat(priceTotal) || 0;
-                                  const miles = parseFloat(milesNeeded) || 0;
-                                  const boardingFeeTotal = (parseFloat(boardingFee) || 0) * passengers;
-                                  let milesCost = 0;
-                                  
-                                  if (saleSource === 'internal_account' && accountId) {
-                                    const account = filteredAccounts.find(a => a.id === accountId);
-                                    const costPerThousand = (account?.cost_per_mile || 0.029) * 1000;
-                                    milesCost = (miles / 1000) * costPerThousand;
-                                  } else if (saleSource === 'mileage_counter' && counterCostPerThousand) {
-                                    milesCost = (miles / 1000) * parseFloat(counterCostPerThousand);
-                                  }
-                                  
-                                  const totalCost = milesCost + boardingFeeTotal;
-                                  return (total - totalCost).toFixed(2);
-                                })()}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Margem</p>
-                              <p className="font-semibold">
-                                {(() => {
-                                  const total = parseFloat(priceTotal) || 0;
-                                  const miles = parseFloat(milesNeeded) || 0;
-                                  const boardingFeeTotal = (parseFloat(boardingFee) || 0) * passengers;
-                                  let milesCost = 0;
-                                  
-                                  if (saleSource === 'internal_account' && accountId) {
-                                    const account = filteredAccounts.find(a => a.id === accountId);
-                                    const costPerThousand = (account?.cost_per_mile || 0.029) * 1000;
-                                    milesCost = (miles / 1000) * costPerThousand;
-                                  } else if (saleSource === 'mileage_counter' && counterCostPerThousand) {
-                                    milesCost = (miles / 1000) * parseFloat(counterCostPerThousand);
-                                  }
-                                  
-                                  const totalCost = milesCost + boardingFeeTotal;
-                                  const profit = total - totalCost;
-                                  const margin = total > 0 ? (profit / total) * 100 : 0;
-                                  return `${margin.toFixed(1)}%`;
-                                })()}
-                              </p>
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground text-xs">Custo Estimado</p>
+                                <p className="font-bold text-lg text-orange-600">
+                                  R$ {totalCost.toFixed(2)}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  Milhas + Taxas
+                                </p>
+                              </div>
                             </div>
                           </div>
-                       </div>
-                     </Card>
-                   )}
+                        </Card>
+
+                        {/* Pricing */}
+                        <div>
+                          <Label>Tipo de Precificação</Label>
+                          <RadioGroup
+                            value={pricingType}
+                            onValueChange={(v) => setPricingType(v as typeof pricingType)}
+                          >
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="per_passenger" id="per_passenger" />
+                              <Label htmlFor="per_passenger">Preço por Passageiro</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="total" id="total" />
+                              <Label htmlFor="total">Preço Total</Label>
+                            </div>
+                          </RadioGroup>
+                        </div>
+
+                        {pricingType === "per_passenger" ? (
+                          <div>
+                            <Label htmlFor="pricePerPassenger">Preço por Passageiro (R$) *</Label>
+                            <Input
+                              id="pricePerPassenger"
+                              type="number"
+                              step="0.01"
+                              value={pricePerPassenger}
+                              onChange={(e) => {
+                                setPricePerPassenger(e.target.value);
+                                const total = parseFloat(e.target.value) * passengers;
+                                setPriceTotal(total.toFixed(2));
+                              }}
+                              placeholder="Ex: 1500.00"
+                            />
+                          </div>
+                        ) : (
+                          <div>
+                            <Label htmlFor="priceTotal">Preço Total (R$) *</Label>
+                            <Input
+                              id="priceTotal"
+                              type="number"
+                              step="0.01"
+                              value={priceTotal}
+                              onChange={(e) => {
+                                setPriceTotal(e.target.value);
+                                const perPassenger = parseFloat(e.target.value) / passengers;
+                                setPricePerPassenger(perPassenger.toFixed(2));
+                              }}
+                              placeholder="Ex: 3000.00"
+                            />
+                          </div>
+                        )}
+
+                        {/* Análise de Lucro Compacta */}
+                        {priceTotal && totalMiles > 0 && (saleSource === "internal_account" && accountId || saleSource === "mileage_counter") && (
+                          <Card className="p-3 bg-green-50 dark:bg-green-950/20 border-green-200">
+                            <h3 className="font-semibold text-xs text-green-900 dark:text-green-100 mb-2">
+                              💰 Análise de Lucro
+                            </h3>
+                            <div className="grid grid-cols-4 gap-3 text-xs">
+                              <div>
+                                <p className="text-muted-foreground">Custo/pax</p>
+                                <p className="font-bold">R$ {(totalCost / passengers).toFixed(2)}</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Custo Total</p>
+                                <p className="font-bold text-orange-600">R$ {totalCost.toFixed(2)}</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Lucro</p>
+                                <p className="font-bold text-green-600">
+                                  R$ {(parseFloat(priceTotal) - totalCost).toFixed(2)}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Margem</p>
+                                <p className="font-bold text-blue-600">
+                                  {(((parseFloat(priceTotal) - totalCost) / parseFloat(priceTotal)) * 100).toFixed(1)}%
+                                </p>
+                              </div>
+                            </div>
+                          </Card>
+                        )}
+                      </>
+                    );
+                  })()}
 
                    {/* Payment Method */}
                   <div>
@@ -1084,8 +1157,12 @@ export default function NewSaleWizard() {
                     {/* Values */}
                     <div>
                       <p className="font-semibold">Valores</p>
-                      <p>Milhagem: {milesNeeded} milhas</p>
-                      {boardingFee && <p>Taxa de embarque: R$ {boardingFee} por passageiro</p>}
+                      <p>Milhagem: {flightSegments.reduce((sum, seg) => sum + ((seg.miles || 0) * passengers), 0).toLocaleString('pt-BR')} milhas</p>
+                      <p>Taxa de embarque: R$ {
+                        boardingFeeMode === "total" 
+                          ? (parseFloat(totalBoardingFee || "0") * passengers).toFixed(2)
+                          : flightSegments.reduce((sum, seg) => sum + ((seg.boardingFee || 0) * passengers), 0).toFixed(2)
+                      }</p>
                       <p>Forma de pagamento: {paymentMethod}</p>
                       {installmentDetails && installments && installments > 1 ? (
                         <>
@@ -1148,7 +1225,7 @@ export default function NewSaleWizard() {
               departureDate={flightSegments[0]?.date}
               returnDate={flightSegments[1]?.date}
               passengers={passengers}
-              milesNeeded={milesNeeded}
+              milesNeeded={flightSegments.reduce((sum, seg) => sum + ((seg.miles || 0) * passengers), 0).toString()}
               priceTotal={installmentDetails?.finalPrice.toFixed(2) || priceTotal}
             />
           </div>

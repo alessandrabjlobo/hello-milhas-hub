@@ -8,6 +8,7 @@ export interface FlightSegment {
   to: string;
   date: string;
   miles?: number;
+  boardingFee?: number;
 }
 
 interface FlightSegmentFormProps {
@@ -17,6 +18,7 @@ interface FlightSegmentFormProps {
   onRemove?: (index: number) => void;
   canRemove?: boolean;
   title?: string;
+  showBoardingFee?: boolean;
 }
 
 export function FlightSegmentForm({
@@ -26,6 +28,7 @@ export function FlightSegmentForm({
   onRemove,
   canRemove = false,
   title,
+  showBoardingFee = false,
 }: FlightSegmentFormProps) {
   return (
     <div className="p-4 border rounded-lg space-y-3 bg-muted/30">
@@ -46,7 +49,7 @@ export function FlightSegmentForm({
         )}
       </div>
 
-      <div className="grid md:grid-cols-4 gap-3">
+      <div className={`grid gap-3 ${showBoardingFee ? 'md:grid-cols-5' : 'md:grid-cols-4'}`}>
         <div className="space-y-2">
           <Label htmlFor={`from-${index}`}>Origem *</Label>
           <Input
@@ -90,6 +93,25 @@ export function FlightSegmentForm({
             Milhas necessárias para 1 passageiro neste trecho
           </p>
         </div>
+
+        {showBoardingFee && (
+          <div className="space-y-2">
+            <Label htmlFor={`boarding-fee-${index}`}>
+              Taxa/pax (R$) *
+            </Label>
+            <Input
+              id={`boarding-fee-${index}`}
+              type="number"
+              step="0.01"
+              placeholder="35.00"
+              value={segment.boardingFee || ""}
+              onChange={(e) => onUpdate(index, "boardingFee", parseFloat(e.target.value) || 0)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Taxa para 1 passageiro
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
