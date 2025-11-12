@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { PlusCircle, Eye, Calendar, MoreHorizontal, Edit, Trash2, Ticket as TicketIcon } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PlusCircle, Eye, Calendar, MoreHorizontal, Edit, Trash2, Ticket as TicketIcon, Filter, X } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,6 +39,107 @@ export default function Tickets() {
   const [deletingTicket, setDeletingTicket] = useState<typeof tickets[0] | null>(null);
   const [detailTicket, setDetailTicket] = useState<typeof tickets[0] | null>(null);
   const { toast } = useToast();
+
+  // Estados dos filtros
+  const [searchTerm, setSearchTerm] = useState(() => 
+    localStorage.getItem("tickets_filter_search") || ""
+  );
+  const [selectedAirline, setSelectedAirline] = useState(() => 
+    localStorage.getItem("tickets_filter_airline") || "all"
+  );
+  const [selectedStatus, setSelectedStatus] = useState(() => 
+    localStorage.getItem("tickets_filter_status") || "all"
+  );
+  const [dateFrom, setDateFrom] = useState(() => 
+    localStorage.getItem("tickets_filter_date_from") || ""
+  );
+  const [dateTo, setDateTo] = useState(() => 
+    localStorage.getItem("tickets_filter_date_to") || ""
+  );
+
+  // Persistir filtros
+  useEffect(() => {
+    localStorage.setItem("tickets_filter_search", searchTerm);
+    localStorage.setItem("tickets_filter_airline", selectedAirline);
+    localStorage.setItem("tickets_filter_status", selectedStatus);
+    localStorage.setItem("tickets_filter_date_from", dateFrom);
+    localStorage.setItem("tickets_filter_date_to", dateTo);
+  }, [searchTerm, selectedAirline, selectedStatus, dateFrom, dateTo]);
+
+  // Extrair companhias únicas
+  const airlines = useMemo(() => {
+    const uniqueAirlines = new Set<string>();
+    tickets.forEach(t => {
+      const code = t.sales?.mileage_accounts?.airline_companies?.code;
+      if (code) uniqueAirlines.add(code);
+    });
+    return Array.from(uniqueAirlines).sort();
+  }, [tickets]);
+
+  // Função para obter status do voo
+  const getFlightStatus = (departureDate: string | null) => {
+    if (!departureDate) return "unknown";
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const flightDate = new Date(departureDate);
+    flightDate.setHours(0, 0, 0, 0);
+    
+    if (flightDate < today) return "past";
+    if (flightDate.getTime() === today.getTime()) return "today";
+    return "future";
+  };
+
+  // Aplicar filtros
+  const filteredTickets = useMemo(() => {
+    return tickets.filter(ticket => {
+      // Busca
+      if (searchTerm) {
+        const search = searchTerm.toLowerCase();
+        const matchesPNR = ticket.pnr?.toLowerCase().includes(search);
+        const matchesTicket = ticket.ticket_number?.toLowerCase().includes(search);
+        const matchesCustomer = ticket.sales?.customer_name?.toLowerCase().includes(search);
+        if (!matchesPNR && !matchesTicket && !matchesCustomer) return false;
+      }
+
+      // Companhia
+      if (selectedAirline !== "all") {
+        const airlineCode = ticket.sales?.mileage_accounts?.airline_companies?.code;
+        if (airlineCode !== selectedAirline) return false;
+      }
+
+      // Status
+      if (selectedStatus !== "all") {
+        const status = getFlightStatus(ticket.departure_date);
+        if (status !== selectedStatus) return false;
+      }
+
+      // Data from
+      if (dateFrom && ticket.departure_date) {
+        const ticketDate = new Date(ticket.departure_date);
+        const fromDate = new Date(dateFrom);
+        if (ticketDate < fromDate) return false;
+      }
+
+      // Data to
+      if (dateTo && ticket.departure_date) {
+        const ticketDate = new Date(ticket.departure_date);
+        const toDate = new Date(dateTo);
+        if (ticketDate > toDate) return false;
+      }
+
+      return true;
+    });
+  }, [tickets, searchTerm, selectedAirline, selectedStatus, dateFrom, dateTo]);
+
+  const clearFilters = () => {
+    setSearchTerm("");
+    setSelectedAirline("all");
+    setSelectedStatus("all");
+    setDateFrom("");
+    setDateTo("");
+  };
+
+  const hasActiveFilters = searchTerm || selectedAirline !== "all" || selectedStatus !== "all" || dateFrom || dateTo;
 
   const getFlightStatusDot = (ticket: typeof tickets[0]) => {
     if (!ticket.departure_date) {
@@ -109,7 +213,7 @@ export default function Tickets() {
           <div>
             <h1 className="text-3xl font-bold">Passagens</h1>
             <p className="text-muted-foreground">
-              {tickets.length} passagem(ns) registrada(s)
+              {filteredTickets.length} de {tickets.length} passagem(ns)
             </p>
           </div>
           <Button onClick={() => setRegisterDialogOpen(true)}>
@@ -118,14 +222,85 @@ export default function Tickets() {
           </Button>
         </div>
 
+        {/* Painel de Filtros */}
+        <Card className="p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <Filter className="h-4 w-4" />
+            <h3 className="font-semibold">Filtros</h3>
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="ml-auto">
+                <X className="h-4 w-4 mr-2" />
+                Limpar Filtros
+              </Button>
+            )}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div>
+              <Label htmlFor="search">Buscar</Label>
+              <Input
+                id="search"
+                placeholder="PNR, bilhete, cliente..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="airline">Companhia</Label>
+              <Select value={selectedAirline} onValueChange={setSelectedAirline}>
+                <SelectTrigger id="airline">
+                  <SelectValue placeholder="Todas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  {airlines.map(code => (
+                    <SelectItem key={code} value={code}>{code}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="status">Status</Label>
+              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                <SelectTrigger id="status">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="past">🟢 Já voado</SelectItem>
+                  <SelectItem value="today">🟡 Voa hoje</SelectItem>
+                  <SelectItem value="future">🔵 Próximo voo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="dateFrom">Data De</Label>
+              <Input
+                id="dateFrom"
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="dateTo">Data Até</Label>
+              <Input
+                id="dateTo"
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+              />
+            </div>
+          </div>
+        </Card>
+
         <Card>
-          {tickets.length === 0 ? (
+          {filteredTickets.length === 0 ? (
             <EmptyState
               icon={TicketIcon}
-              title="Nenhuma passagem registrada"
-              description="Registre a primeira emissão de passagem para começar."
-              actionLabel="Registrar Emissão"
-              onAction={() => setRegisterDialogOpen(true)}
+              title={tickets.length === 0 ? "Nenhuma passagem registrada" : "Nenhuma passagem encontrada"}
+              description={tickets.length === 0 ? "Registre a primeira emissão de passagem para começar." : "Ajuste os filtros para ver mais resultados."}
+              actionLabel={tickets.length === 0 ? "Registrar Emissão" : undefined}
+              onAction={tickets.length === 0 ? () => setRegisterDialogOpen(true) : undefined}
             />
           ) : (
             <Table>
@@ -142,7 +317,7 @@ export default function Tickets() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {tickets.map((ticket) => (
+                {filteredTickets.map((ticket) => (
                   <TableRow key={ticket.id}>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -212,7 +387,7 @@ export default function Tickets() {
               </TableBody>
             </Table>
           )}
-          {tickets.length > 0 && (
+          {filteredTickets.length > 0 && (
             <div className="border-t px-6 py-4">
               <p className="text-sm font-medium text-muted-foreground mb-3">
                 Legenda de Status:
