@@ -41,7 +41,10 @@ interface SaleSuccessDialogProps {
     accountInfo?: {
       airlineName: string;
       accountNumber: string;
+      accountHolderName: string;
+      supplierName: string;
       costPerThousand: number;
+      cpfsUsed: number;
     };
   };
 }
@@ -122,10 +125,9 @@ export function SaleSuccessDialog({
             if (config.interest_rate === 0) {
               creditSection += `\n• ${config.installments}x de R$ ${result.installmentValue.toFixed(2)} (sem juros)`;
             } else {
-              creditSection += `\n• ${config.installments}x de R$ ${result.installmentValue.toFixed(2)} (cliente paga)`;
+              creditSection += `\n• ${config.installments}x de R$ ${result.installmentValue.toFixed(2)}`;
             }
           });
-          creditSection += `\n\n💡 Obs: Você receberá R$ ${totalPrice.toFixed(2)} (os juros ficam com a operadora)`;
         }
         sections.push(creditSection);
       }
@@ -164,18 +166,37 @@ Qualquer dúvida, estamos à disposição! 😊`;
 
   // Supplier message
   const supplierMessage = saleData.saleSource === 'internal_account' && saleData.accountInfo ? `
-🔔 NOTIFICAÇÃO DE USO - ${saleData.accountInfo.airlineName}
+🔔 NOTIFICAÇÃO DE USO - ${saleData.accountInfo.supplierName}
 
-Conta: ${saleData.accountInfo.accountNumber}
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 DADOS DA OPERAÇÃO
+
+Conta: ${saleData.accountInfo.airlineName}
+Titular: ${saleData.accountInfo.accountHolderName}
+Nº Conta: ${saleData.accountInfo.accountNumber}
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+✈️ CONSUMO
+
 Milhas utilizadas: ${parseInt(saleData.milesNeeded).toLocaleString('pt-BR')}
+CPFs utilizados: ${saleData.accountInfo.cpfsUsed} CPF(s)
 
-💰 VALOR A DEPOSITAR:
-• Custo por milheiro: R$ ${saleData.accountInfo.costPerThousand.toFixed(2)}
-• Total de milheiros: ${(parseInt(saleData.milesNeeded) / 1000).toFixed(1)}
-• Valor total: R$ ${((parseInt(saleData.milesNeeded) / 1000) * saleData.accountInfo.costPerThousand).toFixed(2)}
-
-📅 Utilização: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}
 Cliente: ${saleData.customerName}
+Passageiros: ${saleData.passengers}
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+💰 VALOR A DEPOSITAR
+
+Custo por milheiro: R$ ${saleData.accountInfo.costPerThousand.toFixed(2)}
+Total de milheiros: ${(parseInt(saleData.milesNeeded) / 1000).toFixed(1)}
+Valor total: R$ ${((parseInt(saleData.milesNeeded) / 1000) * saleData.accountInfo.costPerThousand).toFixed(2)}
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+📅 Data: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}
 
 Por favor, confirme o recebimento desta notificação.
 ` : null;

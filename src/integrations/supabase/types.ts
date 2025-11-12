@@ -1320,6 +1320,10 @@ export type Database = {
         Args: { account_id: string; miles_delta: number }
         Returns: undefined
       }
+      update_account_cpf_count: {
+        Args: { p_account_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       account_status: "active" | "inactive"

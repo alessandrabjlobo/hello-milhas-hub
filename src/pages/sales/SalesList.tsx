@@ -1,7 +1,16 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -18,7 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle, Eye, ShoppingCart, MoreHorizontal } from "lucide-react";
+import { PlusCircle, Eye, ShoppingCart, MoreHorizontal, Filter, X } from "lucide-react";
 import { useSales } from "@/hooks/useSales";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { exportToCSV } from "@/lib/csv-export";
@@ -33,6 +42,85 @@ export default function SalesList() {
   const { toast } = useToast();
   const [editingSale, setEditingSale] = useState<typeof sales[0] | null>(null);
   const [deletingSale, setDeletingSale] = useState<typeof sales[0] | null>(null);
+  
+  // Filter states
+  const [searchTerm, setSearchTerm] = useState(() => 
+    localStorage.getItem("sales_filter_search") || ""
+  );
+  const [selectedPaymentStatus, setSelectedPaymentStatus] = useState(() => 
+    localStorage.getItem("sales_filter_payment_status") || "all"
+  );
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(() => 
+    localStorage.getItem("sales_filter_payment_method") || "all"
+  );
+  const [dateFrom, setDateFrom] = useState(() => 
+    localStorage.getItem("sales_filter_date_from") || ""
+  );
+  const [dateTo, setDateTo] = useState(() => 
+    localStorage.getItem("sales_filter_date_to") || ""
+  );
+
+  // Save filters to localStorage
+  useEffect(() => {
+    localStorage.setItem("sales_filter_search", searchTerm);
+    localStorage.setItem("sales_filter_payment_status", selectedPaymentStatus);
+    localStorage.setItem("sales_filter_payment_method", selectedPaymentMethod);
+    localStorage.setItem("sales_filter_date_from", dateFrom);
+    localStorage.setItem("sales_filter_date_to", dateTo);
+  }, [searchTerm, selectedPaymentStatus, selectedPaymentMethod, dateFrom, dateTo]);
+
+  // Apply filters
+  const filteredSales = useMemo(() => {
+    return sales.filter((sale) => {
+      // Search filter
+      if (searchTerm) {
+        const search = searchTerm.toLowerCase();
+        const matchesName = (sale.customer_name || sale.client_name || "").toLowerCase().includes(search);
+        const matchesCpf = (sale.customer_cpf || sale.client_cpf_encrypted || "").toLowerCase().includes(search);
+        if (!matchesName && !matchesCpf) return false;
+      }
+
+      // Payment status filter
+      if (selectedPaymentStatus !== "all" && sale.payment_status !== selectedPaymentStatus) {
+        return false;
+      }
+
+      // Payment method filter
+      if (selectedPaymentMethod !== "all") {
+        const method = sale.payment_method || "";
+        if (selectedPaymentMethod === "pix" && method !== "pix") return false;
+        if (selectedPaymentMethod === "credit" && method !== "credit_card") return false;
+        if (selectedPaymentMethod === "debit" && method !== "debit_card") return false;
+      }
+
+      // Date filters
+      if (dateFrom) {
+        const saleDate = new Date(sale.created_at);
+        const fromDate = new Date(dateFrom);
+        if (saleDate < fromDate) return false;
+      }
+
+      if (dateTo) {
+        const saleDate = new Date(sale.created_at);
+        const toDate = new Date(dateTo);
+        toDate.setHours(23, 59, 59);
+        if (saleDate > toDate) return false;
+      }
+
+      return true;
+    });
+  }, [sales, searchTerm, selectedPaymentStatus, selectedPaymentMethod, dateFrom, dateTo]);
+
+  const hasActiveFilters = searchTerm || selectedPaymentStatus !== "all" || 
+    selectedPaymentMethod !== "all" || dateFrom || dateTo;
+
+  const clearFilters = () => {
+    setSearchTerm("");
+    setSelectedPaymentStatus("all");
+    setSelectedPaymentMethod("all");
+    setDateFrom("");
+    setDateTo("");
+  };
 
   const handleDeleteSale = async () => {
     if (!deletingSale) return;
@@ -62,7 +150,7 @@ export default function SalesList() {
   };
 
   const handleExportCSV = () => {
-    const data = sales.map((sale) => ({
+    const data = filteredSales.map((sale) => ({
       Data: new Date(sale.created_at).toLocaleDateString("pt-BR"),
       Cliente: sale.customer_name || sale.client_name,
       Rota: sale.route_text,
@@ -74,37 +162,6 @@ export default function SalesList() {
     exportToCSV(data, `vendas-${new Date().toISOString().split("T")[0]}`);
   };
 
-  const getFlightStatus = (sale: typeof sales[0]) => {
-    // Tentar extrair a data do voo de flight_segments ou travel_dates
-    let departureDate: Date | null = null;
-    
-    if (sale.flight_segments && Array.isArray(sale.flight_segments) && sale.flight_segments.length > 0) {
-      const firstSegment = sale.flight_segments[0] as { date?: string };
-      if (firstSegment.date) {
-        departureDate = new Date(firstSegment.date);
-      }
-    } else if (sale.travel_dates) {
-      departureDate = new Date(String(sale.travel_dates));
-    }
-    
-    if (!departureDate || isNaN(departureDate.getTime())) {
-      return <Badge variant="secondary">Sem Data</Badge>;
-    }
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const flightDate = new Date(departureDate);
-    flightDate.setHours(0, 0, 0, 0);
-    
-    if (flightDate < today) {
-      return <Badge className="bg-green-500 text-white hover:bg-green-600">✓ Já Voado</Badge>;
-    } else if (flightDate.getTime() === today.getTime()) {
-      return <Badge className="bg-blue-500 text-white hover:bg-blue-600">✈️ Voa Hoje</Badge>;
-    } else {
-      return <Badge className="bg-yellow-500 text-black hover:bg-yellow-600">📅 Próximo Voo</Badge>;
-    }
-  };
 
   if (loading) {
     return (
@@ -133,11 +190,11 @@ export default function SalesList() {
           <div>
             <h1 className="text-3xl font-bold">Todas as Vendas</h1>
             <p className="text-muted-foreground">
-              {sales.length} venda(s) registrada(s)
+              {filteredSales.length} de {sales.length} venda(s)
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={handleExportCSV} disabled={sales.length === 0}>
+            <Button variant="outline" onClick={handleExportCSV} disabled={filteredSales.length === 0}>
               Exportar CSV
             </Button>
             <Link to="/sales/new">
@@ -149,8 +206,77 @@ export default function SalesList() {
           </div>
         </div>
 
+        {/* Filtros */}
+        <Card className="p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <Filter className="h-4 w-4" />
+            <h3 className="font-semibold">Filtros</h3>
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="ml-auto">
+                <X className="h-4 w-4 mr-2" />
+                Limpar Filtros
+              </Button>
+            )}
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div>
+              <Label>Buscar</Label>
+              <Input
+                placeholder="Cliente, CPF..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label>Status Pagamento</Label>
+              <Select value={selectedPaymentStatus} onValueChange={setSelectedPaymentStatus}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="pending">Pendente</SelectItem>
+                  <SelectItem value="partial">Parcial</SelectItem>
+                  <SelectItem value="paid">Pago</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Forma de Pagamento</Label>
+              <Select value={selectedPaymentMethod} onValueChange={setSelectedPaymentMethod}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  <SelectItem value="pix">PIX</SelectItem>
+                  <SelectItem value="credit">Crédito</SelectItem>
+                  <SelectItem value="debit">Débito</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Data Início</Label>
+              <Input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label>Data Fim</Label>
+              <Input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+              />
+            </div>
+          </div>
+        </Card>
+
         <Card>
-          {sales.length === 0 ? (
+          {filteredSales.length === 0 ? (
             <EmptyState
               icon={ShoppingCart}
               title="Nenhuma venda registrada"
@@ -167,14 +293,15 @@ export default function SalesList() {
                   <TableHead>Passageiros</TableHead>
                   <TableHead>Companhia</TableHead>
                   <TableHead>Valor</TableHead>
-                  <TableHead>Pagamento</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>% Lucro</TableHead>
+                  <TableHead>Forma Pagamento</TableHead>
+                  <TableHead>Status Pagamento</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sales.map((sale) => (
+                {filteredSales.map((sale) => (
                   <TableRow key={sale.id}>
                     <TableCell>
                       {new Date(sale.created_at).toLocaleDateString("pt-BR")}
@@ -182,10 +309,27 @@ export default function SalesList() {
                     <TableCell>{sale.customer_name || sale.client_name}</TableCell>
                     <TableCell>{sale.passengers}</TableCell>
                     <TableCell>
-                      {sale.mileage_accounts?.airline_companies?.code || "-"}
+                      {sale.mileage_accounts?.airline_companies?.code || 
+                       (sale.sale_source === 'mileage_counter' ? sale.counter_airline_program : '-')}
                     </TableCell>
                     <TableCell>
                       R$ {(sale.price_total || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={
+                        (sale.margin_percentage || 0) >= 20 ? "default" : 
+                        (sale.margin_percentage || 0) >= 10 ? "secondary" : "destructive"
+                      }>
+                        {(sale.margin_percentage || 0).toFixed(1)}%
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">
+                        {sale.payment_method === 'pix' ? '📱 PIX' : 
+                         sale.payment_method === 'credit_card' ? '💳 Crédito' : 
+                         sale.payment_method === 'debit_card' ? '💳 Débito' : 
+                         sale.payment_method || '-'}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       <PaymentStatusBadge
@@ -194,7 +338,6 @@ export default function SalesList() {
                         totalAmount={sale.sale_price || 0}
                       />
                     </TableCell>
-                    <TableCell>{getFlightStatus(sale)}</TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon" asChild>
                         <Link to={`/sales/${sale.id}`}>

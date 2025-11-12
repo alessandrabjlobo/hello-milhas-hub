@@ -145,7 +145,7 @@ export function ProfitCalculator() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="cost" className="text-xs">Custo/mil (R$) *</Label>
+                  <Label htmlFor="cost" className="text-xs">Custo/milheiro (R$) *</Label>
                   <Input
                     id="cost"
                     type="number"
@@ -307,7 +307,7 @@ export function ProfitCalculator() {
                     </Card>
                     
                     <Card className="p-3">
-                      <p className="text-xs text-muted-foreground mb-1">R$/mil</p>
+                      <p className="text-xs text-muted-foreground mb-1">R$/milheiro</p>
                       <p className="text-lg font-bold">R$ {pricePerThousand.toFixed(2)}</p>
                     </Card>
                   </div>
@@ -380,7 +380,7 @@ export function ProfitCalculator() {
                     {accounts.map((account) => (
                       <SelectItem key={account.id} value={account.id}>
                         {account.airline_companies.name} - {formatNumber(account.balance.toString())} milhas - 
-                        R$ {account.cost_per_mile.toFixed(2)}/mil
+                        R$ {(account.cost_per_mile * 1000).toFixed(2)}/milheiro
                       </SelectItem>
                     ))}
                   </SelectContent>

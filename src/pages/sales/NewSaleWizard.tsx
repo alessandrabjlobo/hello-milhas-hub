@@ -379,7 +379,7 @@ export default function NewSaleWizard() {
         flightSegments,
         airline,
         milesNeeded: totalMiles.toString(),
-        priceTotal: priceTotal, // Valor base SEM juros
+        priceTotal: priceTotal,
         boardingFee: boardingFeePerPassenger.toString(),
         passengers,
         paymentMethod,
@@ -390,7 +390,10 @@ export default function NewSaleWizard() {
         accountInfo: saleSource === 'internal_account' && selectedAccount ? {
           airlineName: selectedAccount.airline_companies?.name || '',
           accountNumber: selectedAccount.account_number || '',
+          accountHolderName: selectedAccount.account_holder_name || 'Não informado',
+          supplierName: 'Fornecedor', // TODO: Buscar do suppliers se necessário
           costPerThousand: (selectedAccount.cost_per_mile || 0.029) * 1000,
+          cpfsUsed: passengerCpfs.length,
         } : undefined,
       });
       setShowSuccessDialog(true);
@@ -1037,12 +1040,12 @@ export default function NewSaleWizard() {
                                   <span>R$ {installmentDetails.installmentValue.toFixed(2)}</span>
                                 </div>
                                 <div className="flex justify-between">
-                                  <span>Total cliente:</span>
+                                  <span>Total cliente (com juros):</span>
                                   <span>R$ {installmentDetails.finalPrice.toFixed(2)}</span>
                                 </div>
-                                <p className="text-xs text-muted-foreground mt-2">
-                                  💡 Os juros de {installmentDetails.interestRate}% ficam com a operadora do cartão
-                                </p>
+                                <div className="text-xs text-muted-foreground mt-2">
+                                  💡 Juros de {installmentDetails.interestRate}% ficam com a operadora do cartão
+                                </div>
                               </div>
                             </div>
                           )}
@@ -1216,23 +1219,17 @@ export default function NewSaleWizard() {
                     Próximo
                     <ArrowRight className="h-4 w-4 ml-2" />
                   </Button>
-                  ) : (
-                  <div className="flex gap-2">
-                    <Button onClick={handleSave} disabled={saving} variant="outline">
-                      <Check className="h-4 w-4 mr-2" />
-                      {saving ? "Salvando..." : "Salvar Venda"}
-                    </Button>
-                    <Button 
-                      onClick={async () => {
-                        setAutoCreateTickets(true);
-                        await handleSave();
-                      }} 
-                      disabled={saving}
-                    >
-                      <Check className="h-4 w-4 mr-2" />
-                      {saving ? "Salvando..." : "Salvar e Emitir Passagens"}
-                    </Button>
-                  </div>
+                ) : (
+                  <Button 
+                    onClick={async () => {
+                      setAutoCreateTickets(true);
+                      await handleSave();
+                    }} 
+                    disabled={saving}
+                  >
+                    <Check className="h-4 w-4 mr-2" />
+                    {saving ? "Salvando e Emitindo..." : "Finalizar e Emitir Passagens"}
+                  </Button>
                 )}
               </div>
             </Card>

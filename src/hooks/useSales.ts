@@ -161,6 +161,63 @@ export const useSales = () => {
         if (balanceError) {
           console.error("Failed to update balance:", balanceError);
         }
+        
+        // Registrar uso de CPFs e atualizar contador
+        const passengerCPFs = (saleData as any).passenger_cpfs as PassengerCPF[] || [];
+        
+        if (passengerCPFs.length > 0) {
+          // Buscar airline_company_id da conta
+          const { data: accountData } = await supabase
+            .from('mileage_accounts')
+            .select('airline_company_id')
+            .eq('id', saleData.mileage_account_id)
+            .single();
+          
+          if (accountData) {
+            for (const passengerCPF of passengerCPFs) {
+              if (!passengerCPF.cpf) continue;
+              
+              // Verificar se CPF já existe no registro
+              const { data: existingCPF } = await supabase
+                .from("cpf_registry")
+                .select("*")
+                .eq("cpf_encrypted", passengerCPF.cpf)
+                .eq("airline_company_id", accountData.airline_company_id)
+                .maybeSingle();
+              
+              if (existingCPF) {
+                // Incrementar contador de uso
+                await supabase
+                  .from("cpf_registry")
+                  .update({
+                    usage_count: (existingCPF.usage_count || 0) + 1,
+                    last_used_at: new Date().toISOString(),
+                    first_use_date: existingCPF.first_use_date || new Date().toISOString(),
+                  })
+                  .eq("id", existingCPF.id);
+              } else {
+                // Criar novo registro de CPF
+                await supabase
+                  .from("cpf_registry")
+                  .insert({
+                    user_id: userData.user.id,
+                    airline_company_id: accountData.airline_company_id,
+                    full_name: passengerCPF.name,
+                    cpf_encrypted: passengerCPF.cpf,
+                    usage_count: 1,
+                    first_use_date: new Date().toISOString(),
+                    last_used_at: new Date().toISOString(),
+                    status: 'available',
+                  });
+              }
+            }
+            
+            // Atualizar contador de CPFs na conta usando função RPC
+            await supabase.rpc("update_account_cpf_count", {
+              p_account_id: saleData.mileage_account_id,
+            });
+          }
+        }
       }
 
       toast({
