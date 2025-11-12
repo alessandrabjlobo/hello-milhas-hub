@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
+const TICKETS_BUCKET = "ticket-pdfs";
+
 interface Attachment {
   fileName: string;
   filePath: string;
@@ -65,14 +67,19 @@ export function TicketPDFUpload({
         const filePath = `${userData.user.id}/${ticketId || "temp"}/${fileName}`;
 
         const { error: uploadError } = await supabase.storage
-          .from("ticket-pdfs")
+          .from(TICKETS_BUCKET)
           .upload(filePath, file);
 
-        if (uploadError) throw uploadError;
+        if (uploadError) {
+          if (uploadError.message.includes("Bucket not found")) {
+            throw new Error("Bucket de anexos não configurado. Contate o suporte.");
+          }
+          throw uploadError;
+        }
 
         const {
           data: { publicUrl },
-        } = supabase.storage.from("ticket-pdfs").getPublicUrl(filePath);
+        } = supabase.storage.from(TICKETS_BUCKET).getPublicUrl(filePath);
 
         newAttachments.push({
           fileName: file.name,
@@ -90,9 +97,13 @@ export function TicketPDFUpload({
         description: `${newAttachments.length} arquivo(s) enviado(s).`,
       });
     } catch (error: any) {
+      const errorMessage = error.message.includes("Bucket")
+        ? error.message
+        : "Falha ao enviar arquivo. Tente novamente.";
+      
       toast({
         title: "Erro no upload",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -104,7 +115,7 @@ export function TicketPDFUpload({
   const handleRemove = async (filePath: string) => {
     try {
       const { error } = await supabase.storage
-        .from("ticket-pdfs")
+        .from(TICKETS_BUCKET)
         .remove([filePath]);
 
       if (error) throw error;

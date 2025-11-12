@@ -65,6 +65,7 @@ export function RegisterTicketDialog({ open, onOpenChange, saleId }: RegisterTic
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      sale_id: saleId ?? "",
       verification_status: "pending",
     },
   });
@@ -93,31 +94,32 @@ export function RegisterTicketDialog({ open, onOpenChange, saleId }: RegisterTic
       }
 
       try {
+        // Buscar airline_company_id da conta
+        const { data: accountData } = await supabase
+          .from("mileage_accounts")
+          .select("airline_company_id, cpf_count, cpf_limit")
+          .eq("id", sale.mileage_account_id)
+          .single();
+
+        if (!accountData) return;
+
         // Check if CPF already exists using RPC
         const { data, error } = await supabase
           .rpc("check_cpf_exists", {
-            p_airline_company_id: sale.mileage_account_id,
+            p_airline_company_id: accountData.airline_company_id,
             p_cpf_encrypted: sale.customer_cpf
           });
 
-      if (error) throw error;
+        if (error) throw error;
 
-      const existingCPF = data && data.length > 0 ? data[0] : null;
+        const existingCPF = data && data.length > 0 ? data[0] : null;
 
-      if (!existingCPF) {
+        if (!existingCPF) {
           // CPF is new - will consume a CPF slot
-          const { data: accountData } = await supabase
-            .from("mileage_accounts")
-            .select("cpf_count, cpf_limit")
-            .eq("id", sale.mileage_account_id)
-            .single();
-
-          if (accountData) {
-            const remaining = (accountData.cpf_limit || 25) - (accountData.cpf_count || 0);
-            setCpfWarning(
-              `⚠️ Este CPF é novo nesta conta. Será consumido 1 CPF. Restantes: ${remaining - 1}/${accountData.cpf_limit || 25}`
-            );
-          }
+          const remaining = (accountData.cpf_limit || 25) - (accountData.cpf_count || 0);
+          setCpfWarning(
+            `⚠️ Este CPF é novo nesta conta. Será consumido 1 CPF. Restantes: ${remaining - 1}/${accountData.cpf_limit || 25}`
+          );
         } else {
           setCpfWarning("✓ CPF já cadastrado. Não será consumido.");
         }
@@ -158,42 +160,48 @@ export function RegisterTicketDialog({ open, onOpenChange, saleId }: RegisterTic
 
       // CPF consumption logic
       if (sale.customer_cpf && sale.mileage_account_id) {
+        // Buscar airline_company_id da conta
+        const { data: accountData } = await supabase
+          .from("mileage_accounts")
+          .select("airline_company_id")
+          .eq("id", sale.mileage_account_id)
+          .single();
+
+        if (!accountData) {
+          console.error("Account not found for CPF registration");
+          return;
+        }
+
         // Check if CPF already exists using RPC
         const { data: cpfData } = await supabase
           .rpc("check_cpf_exists", {
-            p_airline_company_id: sale.mileage_account_id,
+            p_airline_company_id: accountData.airline_company_id,
             p_cpf_encrypted: sale.customer_cpf
           });
 
         const existingCPF = cpfData && cpfData.length > 0 ? cpfData[0] : null;
 
         if (!existingCPF) {
-          // CPF is new - insert and increment count
+          // CPF is new - insert and call RPC to update count
           const { data: userData } = await supabase.auth.getUser();
           const { error: cpfError } = await supabase
             .from("cpf_registry")
             .insert({
-              airline_company_id: sale.mileage_account_id,
+              airline_company_id: accountData.airline_company_id,
               cpf_encrypted: sale.customer_cpf,
               full_name: sale.customer_name || "",
               user_id: userData.user?.id || "",
             });
 
-          if (cpfError) throw cpfError;
-
-          // Increment cpf_count on account
-          const { data: account } = await supabase
-            .from("mileage_accounts")
-            .select("cpf_count")
-            .eq("id", sale.mileage_account_id)
-            .single();
-
-          if (account) {
-            await supabase
-              .from("mileage_accounts")
-              .update({ cpf_count: (account.cpf_count || 0) + 1 })
-              .eq("id", sale.mileage_account_id);
+          if (cpfError) {
+            console.error("Failed to insert CPF:", cpfError);
+            throw cpfError;
           }
+
+          // Atualizar contador usando RPC
+          await supabase.rpc("update_account_cpf_count", {
+            p_account_id: sale.mileage_account_id,
+          });
 
           toast({
             title: "CPF consumido",
