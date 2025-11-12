@@ -516,7 +516,7 @@ export function QuoteGenerator() {
                 <DollarSign className="h-5 w-5 text-primary" />
                 Valores
               </h3>
-              <div className="grid md:grid-cols-3 gap-4">
+              <div className="grid md:grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="passengers">Nº de Passageiros *</Label>
                   <Input
@@ -528,6 +528,22 @@ export function QuoteGenerator() {
                     onChange={(e) => setPassengers(e.target.value)}
                     className="h-11"
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="boarding-fee">Taxa de Embarque/pax (R$)</Label>
+                  <Input
+                    id="boarding-fee"
+                    type="number"
+                    step="0.01"
+                    placeholder="35.00"
+                    value={boardingFee}
+                    onChange={(e) => setBoardingFee(e.target.value)}
+                    className="h-11"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Taxa por passageiro (ex: R$ 35,00)
+                  </p>
                 </div>
 
                 <div className="space-y-2">
@@ -560,8 +576,29 @@ export function QuoteGenerator() {
                 </div>
               </div>
 
+              {/* Badge informativo: Total das Taxas */}
+              {boardingFee && parseFloat(boardingFee) > 0 && (
+                <Alert className="bg-muted/50 border-muted-foreground/20">
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Total de Taxas de Embarque:</strong> R$ {(parseFloat(boardingFee) * parseInt(passengers || "1")).toFixed(2)}
+                    <span className="text-muted-foreground ml-2">
+                      ({passengers} passageiro{parseInt(passengers) > 1 ? "s" : ""})
+                    </span>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {parseInt(passengers) > 1 && totalPrice && (
+                <div className="p-3 bg-muted/50 rounded-lg border">
+                  <p className="text-sm text-muted-foreground">
+                    Valor por passageiro: <span className="font-semibold text-foreground">R$ {pricePerPassenger}</span>
+                  </p>
+                </div>
+              )}
+
               {/* Calculadora Automática de Preço */}
-              <div className="mt-4 p-4 bg-muted/50 rounded-lg border">
+              <div className="p-4 bg-muted/50 rounded-lg border">
                 <h4 className="font-semibold mb-2 flex items-center gap-2">
                   <DollarSign className="h-4 w-4 text-primary" />
                   💡 Não sabe qual preço cobrar?
@@ -707,46 +744,6 @@ export function QuoteGenerator() {
                       })()
                     )}
                   </div>
-                </div>
-              )}
-
-              <div className="grid md:grid-cols-2 gap-4 mt-4">
-                <div className="space-y-2">
-                  <Label htmlFor="boarding-fee">Taxa de Embarque por Passageiro (R$)</Label>
-                  <Input
-                    id="boarding-fee"
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={boardingFee}
-                    onChange={(e) => setBoardingFee(e.target.value)}
-                    className="h-11"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Taxa cobrada por passageiro (ex: R$ 35,00)
-                  </p>
-                </div>
-
-                {boardingFee && parseFloat(boardingFee) > 0 && (
-                  <div className="space-y-2">
-                    <Label>Total das Taxas de Embarque</Label>
-                    <div className="h-11 px-3 flex items-center rounded-md border bg-muted/50">
-                      <span className="font-semibold">
-                        R$ {(parseFloat(boardingFee) * parseInt(passengers || "1")).toFixed(2)}
-                      </span>
-                      <span className="text-xs text-muted-foreground ml-2">
-                        ({passengers} passageiro{parseInt(passengers) > 1 ? "s" : ""})
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {parseInt(passengers) > 1 && totalPrice && (
-                <div className="mt-4 p-4 bg-muted/50 rounded-lg border">
-                  <p className="text-sm text-muted-foreground">
-                    Valor por passageiro: <span className="font-semibold text-foreground">R$ {pricePerPassenger}</span>
-                  </p>
                 </div>
               )}
             </div>

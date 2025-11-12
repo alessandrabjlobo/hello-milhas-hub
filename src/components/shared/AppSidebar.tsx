@@ -49,8 +49,9 @@ const operationsNavItems = [
 ];
 
 const toolsNavItems = [
-  { title: "Calculadora & Orçamentos", url: "/calculator", icon: Calculator },
-  { title: "Histórico de Orçamentos", url: "/quotes", icon: FileText },
+  { title: "Calculadora de Milhas", url: "/calculator", icon: Calculator },
+  { title: "Gerar Orçamento", url: "/quotes/new", icon: FileText },
+  { title: "Histórico de Orçamentos", url: "/quotes", icon: List },
 ];
 
 const reportsNavItems = [

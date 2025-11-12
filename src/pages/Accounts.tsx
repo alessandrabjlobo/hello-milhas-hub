@@ -16,7 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Eye, CreditCard, TrendingUp, AlertTriangle, Filter, X } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Eye, CreditCard, TrendingUp, AlertTriangle, Filter, X, ChevronDown } from "lucide-react";
 import { useMileageAccounts } from "@/hooks/useMileageAccounts";
 import { AddAccountDialog } from "@/components/accounts/AddAccountDialog";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -59,6 +60,7 @@ export default function Accounts() {
   const [cpfNormal, setCpfNormal] = useState(() => 
     localStorage.getItem("accounts_filter_cpf_normal") === "true"
   );
+  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
 
   // Persistir filtros
   useEffect(() => {
@@ -166,6 +168,15 @@ export default function Accounts() {
   const hasActiveFilters = searchTerm || selectedProgram !== "all" || selectedSupplier !== "all" || 
     selectedStatus !== "all" || balanceZero || balanceUnder10k || balance10to50k || balanceOver50k || 
     cpfCritical || cpfWarning || cpfNormal;
+  
+  const advancedFiltersCount = 
+    (balanceZero ? 1 : 0) + 
+    (balanceUnder10k ? 1 : 0) + 
+    (balance10to50k ? 1 : 0) + 
+    (balanceOver50k ? 1 : 0) + 
+    (cpfCritical ? 1 : 0) + 
+    (cpfWarning ? 1 : 0) + 
+    (cpfNormal ? 1 : 0);
 
   const getCPFBadge = (used: number, limit: number) => {
     const percentage = (used / limit) * 100;
@@ -223,7 +234,9 @@ export default function Accounts() {
               </Button>
             )}
           </div>
+          
           <div className="space-y-4">
+            {/* Filtros Básicos */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <Label htmlFor="search">Buscar</Label>
@@ -277,47 +290,66 @@ export default function Accounts() {
               </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label className="mb-3 block">Saldo</Label>
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox id="balance-zero" checked={balanceZero} onCheckedChange={(checked) => setBalanceZero(checked as boolean)} />
-                    <label htmlFor="balance-zero" className="text-sm cursor-pointer">Zeradas (0)</label>
+            {/* Filtros Avançados (Collapsible) */}
+            <Collapsible open={advancedFiltersOpen} onOpenChange={setAdvancedFiltersOpen}>
+              <CollapsibleTrigger asChild>
+                <Button variant="outline" size="sm" className="w-full flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    <Filter className="h-4 w-4" />
+                    Filtros Avançados
+                    {advancedFiltersCount > 0 && (
+                      <span className="px-2 py-0.5 text-xs bg-primary text-primary-foreground rounded-full">
+                        {advancedFiltersCount}
+                      </span>
+                    )}
+                  </span>
+                  <ChevronDown className={`h-4 w-4 transition-transform ${advancedFiltersOpen ? 'rotate-180' : ''}`} />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-lg bg-muted/30">
+                  <div>
+                    <Label className="mb-3 block font-semibold">Saldo</Label>
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox id="balance-zero" checked={balanceZero} onCheckedChange={(checked) => setBalanceZero(checked as boolean)} />
+                        <label htmlFor="balance-zero" className="text-sm cursor-pointer">Zeradas (0)</label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox id="balance-under10k" checked={balanceUnder10k} onCheckedChange={(checked) => setBalanceUnder10k(checked as boolean)} />
+                        <label htmlFor="balance-under10k" className="text-sm cursor-pointer">Abaixo de 10k</label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox id="balance-10to50k" checked={balance10to50k} onCheckedChange={(checked) => setBalance10to50k(checked as boolean)} />
+                        <label htmlFor="balance-10to50k" className="text-sm cursor-pointer">Entre 10k-50k</label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox id="balance-over50k" checked={balanceOver50k} onCheckedChange={(checked) => setBalanceOver50k(checked as boolean)} />
+                        <label htmlFor="balance-over50k" className="text-sm cursor-pointer">Acima de 50k</label>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox id="balance-under10k" checked={balanceUnder10k} onCheckedChange={(checked) => setBalanceUnder10k(checked as boolean)} />
-                    <label htmlFor="balance-under10k" className="text-sm cursor-pointer">Abaixo de 10k</label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox id="balance-10to50k" checked={balance10to50k} onCheckedChange={(checked) => setBalance10to50k(checked as boolean)} />
-                    <label htmlFor="balance-10to50k" className="text-sm cursor-pointer">Entre 10k-50k</label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox id="balance-over50k" checked={balanceOver50k} onCheckedChange={(checked) => setBalanceOver50k(checked as boolean)} />
-                    <label htmlFor="balance-over50k" className="text-sm cursor-pointer">Acima de 50k</label>
+                  
+                  <div>
+                    <Label className="mb-3 block font-semibold">Uso de CPF</Label>
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox id="cpf-critical" checked={cpfCritical} onCheckedChange={(checked) => setCpfCritical(checked as boolean)} />
+                        <label htmlFor="cpf-critical" className="text-sm cursor-pointer">Crítico (≥90%)</label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox id="cpf-warning" checked={cpfWarning} onCheckedChange={(checked) => setCpfWarning(checked as boolean)} />
+                        <label htmlFor="cpf-warning" className="text-sm cursor-pointer">Alerta (≥75%)</label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox id="cpf-normal" checked={cpfNormal} onCheckedChange={(checked) => setCpfNormal(checked as boolean)} />
+                        <label htmlFor="cpf-normal" className="text-sm cursor-pointer">Normal (&lt;75%)</label>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-              
-              <div>
-                <Label className="mb-3 block">Uso de CPF</Label>
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox id="cpf-critical" checked={cpfCritical} onCheckedChange={(checked) => setCpfCritical(checked as boolean)} />
-                    <label htmlFor="cpf-critical" className="text-sm cursor-pointer">Crítico (≥90%)</label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox id="cpf-warning" checked={cpfWarning} onCheckedChange={(checked) => setCpfWarning(checked as boolean)} />
-                    <label htmlFor="cpf-warning" className="text-sm cursor-pointer">Alerta (≥75%)</label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox id="cpf-normal" checked={cpfNormal} onCheckedChange={(checked) => setCpfNormal(checked as boolean)} />
-                    <label htmlFor="cpf-normal" className="text-sm cursor-pointer">Normal (&lt;75%)</label>
-                  </div>
-                </div>
-              </div>
-            </div>
+              </CollapsibleContent>
+            </Collapsible>
           </div>
         </Card>
 

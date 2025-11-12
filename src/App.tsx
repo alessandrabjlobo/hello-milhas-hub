@@ -30,6 +30,7 @@ import Billing from "./pages/Billing";
 import PaymentInterestSettings from "./pages/settings/PaymentInterestSettings";
 import PaymentSettings from "./pages/settings/PaymentSettings";
 import QuoteHistory from "./pages/QuoteHistory";
+import QuoteGenerator from "./pages/QuoteGenerator";
 import Customers from "./pages/Customers";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
@@ -75,6 +76,7 @@ const App = () => (
                         <Route path="/tickets" element={<Tickets />} />
                         <Route path="/reports" element={<Reports />} />
                         <Route path="/calculator" element={<Calculator />} />
+                        <Route path="/quotes/new" element={<QuoteGenerator />} />
                         <Route path="/quotes" element={<QuoteHistory />} />
                         <Route path="/customers" element={<Customers />} />
                         <Route path="/settings/my-airlines" element={<MyAirlines />} />
