@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calculator, TrendingUp, DollarSign, Plane, Users, Percent } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/hooks/use-toast";
 
 type MileageAccount = {
   id: string;
@@ -30,7 +29,8 @@ export function ProfitCalculator() {
   const [pricingMode, setPricingMode] = useState<"total" | "per_passenger">("total");
   const [selectedAccount, setSelectedAccount] = useState<string>("");
   const [accounts, setAccounts] = useState<MileageAccount[]>([]);
-  const [showResults, setShowResults] = useState(false);
+  const [targetMargin, setTargetMargin] = useState("20");
+  const [useManualPrice, setUseManualPrice] = useState(false);
 
   useEffect(() => {
     loadAccounts();
@@ -64,57 +64,35 @@ export function ProfitCalculator() {
   const boardingFeeNum = parseFloat(boardingFee) || 0;
   const passengersNum = parseInt(passengers) || 1;
   const pricePerPass = parseFloat(pricePerPassenger) || 0;
-
-  // Cálculo do preço total baseado no modo selecionado
-  const price = pricingMode === "per_passenger" 
-    ? pricePerPass * passengersNum 
-    : parseFloat(salePrice) || 0;
+  const targetMarginNum = parseFloat(targetMargin) || 0;
 
   // Cálculo: ((milhas/1000) * custo do milheiro + taxa de embarque) * passageiros
   const costPerPassenger = (miles / 1000) * costPerThousand + boardingFeeNum;
   const totalCost = costPerPassenger * passengersNum;
+
+  // Cálculo automático do preço sugerido baseado na margem alvo
+  const suggestedPrice = totalCost > 0 && targetMarginNum > 0 && targetMarginNum < 100
+    ? totalCost / (1 - targetMarginNum / 100)
+    : totalCost * 1.2; // fallback 20%
+
+  // Preço usado nos cálculos (sugerido ou manual)
+  const price = useManualPrice 
+    ? (pricingMode === "per_passenger" ? pricePerPass * passengersNum : parseFloat(salePrice) || 0)
+    : suggestedPrice;
+
   const profit = price - totalCost;
   const profitMargin = price > 0 ? (profit / price) * 100 : 0;
   const effectiveCostPerMile = miles > 0 ? totalCost / miles : 0;
+  const pricePerThousand = miles > 0 ? (price / (miles / 1000)) : 0;
 
-  const handleCalculate = () => {
-    if (!milesUsed || !costPerMile) {
-      toast({
-        title: "Campos obrigatórios",
-        description: "Preencha milhas e custo para calcular.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    if (pricingMode === "per_passenger" && !pricePerPassenger) {
-      toast({
-        title: "Preço necessário",
-        description: "Informe o preço por passageiro.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    if (pricingMode === "total" && !salePrice) {
-      toast({
-        title: "Preço necessário",
-        description: "Informe o preço total de venda.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    if (passengersNum <= 0) {
-      toast({
-        title: "Número de passageiros inválido",
-        description: "O número de passageiros deve ser maior que zero.",
-        variant: "destructive",
-      });
-      return;
-    }
-    setShowResults(true);
-  };
+  // Cenários de margem
+  const scenarios = [
+    { margin: 0, label: "Break-even (0%)", price: totalCost },
+    { margin: 15, label: "Margem 15%", price: totalCost / 0.85 },
+    { margin: 20, label: "Margem 20%", price: totalCost / 0.80 },
+    { margin: 25, label: "Margem 25%", price: totalCost / 0.75 },
+    { margin: 30, label: "Margem 30%", price: totalCost / 0.70 },
+  ];
 
   const selectedAccountData = accounts.find(a => a.id === selectedAccount);
   const insufficientBalance = selectedAccountData && miles > selectedAccountData.balance;
@@ -124,10 +102,10 @@ export function ProfitCalculator() {
       <CardHeader>
         <div className="flex items-center gap-2">
           <Calculator className="h-5 w-5 text-primary" />
-          <CardTitle>Calculadora de Lucro</CardTitle>
+          <CardTitle>Calculadora Inteligente de Milhas</CardTitle>
         </div>
         <CardDescription>
-          Calcule o lucro de suas vendas de milhas
+          Calcule automaticamente o preço ideal com base na margem desejada
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -194,67 +172,23 @@ export function ProfitCalculator() {
               />
             </div>
 
-            <div className="space-y-2 md:col-span-2">
-              <Label>Modo de Precificação</Label>
-              <div className="flex gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    checked={pricingMode === "total"}
-                    onChange={() => setPricingMode("total")}
-                    className="w-4 h-4"
-                  />
-                  <span>Preço Total</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    checked={pricingMode === "per_passenger"}
-                    onChange={() => setPricingMode("per_passenger")}
-                    className="w-4 h-4"
-                  />
-                  <span>Preço por Passageiro</span>
-                </label>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="target-margin">
+                <Percent className="inline mr-2 h-4 w-4" />
+                Margem Alvo (%)
+              </Label>
+              <Input
+                id="target-margin"
+                type="number"
+                step="0.1"
+                placeholder="20"
+                value={targetMargin}
+                onChange={(e) => setTargetMargin(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                💡 Margem de lucro desejada
+              </p>
             </div>
-
-            {pricingMode === "total" ? (
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="manual-price">Preço Total de Venda (R$)</Label>
-                <Input
-                  id="manual-price"
-                  type="number"
-                  step="0.01"
-                  placeholder="1450.00"
-                  value={salePrice}
-                  onChange={(e) => setSalePrice(e.target.value)}
-                />
-              </div>
-            ) : (
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="price-per-passenger">Preço por Passageiro (R$)</Label>
-                <Input
-                  id="price-per-passenger"
-                  type="number"
-                  step="0.01"
-                  placeholder="725.00"
-                  value={pricePerPassenger}
-                  onChange={(e) => setPricePerPassenger(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Preço total: R$ {(pricePerPass * passengersNum).toFixed(2)}
-                </p>
-              </div>
-            )}
-
-            <Button 
-              onClick={handleCalculate}
-              className="w-full mt-4"
-              size="lg"
-            >
-              <Calculator className="mr-2 h-4 w-4" />
-              Calcular
-            </Button>
           </TabsContent>
 
           <TabsContent value="account" className="space-y-4">
@@ -320,85 +254,83 @@ export function ProfitCalculator() {
               />
             </div>
 
-            <div className="space-y-2 md:col-span-2">
-              <Label>Modo de Precificação</Label>
-              <div className="flex gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    checked={pricingMode === "total"}
-                    onChange={() => setPricingMode("total")}
-                    className="w-4 h-4"
-                  />
-                  <span>Preço Total</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    checked={pricingMode === "per_passenger"}
-                    onChange={() => setPricingMode("per_passenger")}
-                    className="w-4 h-4"
-                  />
-                  <span>Preço por Passageiro</span>
-                </label>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="account-target-margin">
+                <Percent className="inline mr-2 h-4 w-4" />
+                Margem Alvo (%)
+              </Label>
+              <Input
+                id="account-target-margin"
+                type="number"
+                step="0.1"
+                placeholder="20"
+                value={targetMargin}
+                onChange={(e) => setTargetMargin(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                💡 Margem de lucro desejada
+              </p>
             </div>
-
-            {pricingMode === "total" ? (
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="account-price">Preço Total de Venda (R$)</Label>
-                <Input
-                  id="account-price"
-                  type="number"
-                  step="0.01"
-                  placeholder="1450.00"
-                  value={salePrice}
-                  onChange={(e) => setSalePrice(e.target.value)}
-                />
-              </div>
-            ) : (
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="account-price-per-passenger">Preço por Passageiro (R$)</Label>
-                <Input
-                  id="account-price-per-passenger"
-                  type="number"
-                  step="0.01"
-                  placeholder="725.00"
-                  value={pricePerPassenger}
-                  onChange={(e) => setPricePerPassenger(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Preço total: R$ {(pricePerPass * passengersNum).toFixed(2)}
-                </p>
-              </div>
-            )}
-
-            <Button 
-              onClick={handleCalculate}
-              className="w-full mt-4"
-              size="lg"
-            >
-              <Calculator className="mr-2 h-4 w-4" />
-              Calcular
-            </Button>
           </TabsContent>
         </Tabs>
 
-        {showResults && (miles > 0 && costPerThousand > 0 && price > 0) && (
+        {(miles > 0 && costPerThousand > 0) && (
           <div className="mt-6 space-y-4">
-            <h4 className="font-semibold text-lg mb-4">💰 Resultados do Cálculo</h4>
-            
-            <Card className="p-4 bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Custo do Milheiro</p>
-                  <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
-                    R$ {costPerThousand.toFixed(2)}/mil
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="font-semibold text-lg">💰 Análise Automática</h4>
+              {!useManualPrice && totalCost > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setUseManualPrice(true)}
+                >
+                  ✏️ Editar Preço Manualmente
+                </Button>
+              )}
+            </div>
+
+            {useManualPrice && (
+              <Card className="p-4 bg-muted/50 border-dashed">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="manual-override">Valor de Venda Manual (R$)</Label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setUseManualPrice(false);
+                        setSalePrice("");
+                        setPricePerPassenger("");
+                      }}
+                    >
+                      💡 Voltar para Sugestão
+                    </Button>
+                  </div>
+                  <Input
+                    id="manual-override"
+                    type="number"
+                    step="0.01"
+                    placeholder={suggestedPrice.toFixed(2)}
+                    value={salePrice}
+                    onChange={(e) => setSalePrice(e.target.value)}
+                  />
+                </div>
+              </Card>
+            )}
+
+            {!useManualPrice && totalCost > 0 && (
+              <Card className="p-6 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">💡 Valor Sugerido para Margem de {targetMarginNum}%</p>
+                  <p className="text-4xl font-bold text-primary">
+                    R$ {suggestedPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    R$ {pricePerThousand.toFixed(2)}/mil milhas
                   </p>
                 </div>
-                <DollarSign className="h-8 w-8 text-blue-600" />
-              </div>
-            </Card>
+              </Card>
+            )}
             
             <div className="bg-muted/50 p-4 rounded-lg space-y-2 mb-4">
               <h5 className="font-semibold text-sm mb-2">📊 Breakdown do Cálculo:</h5>
@@ -440,27 +372,27 @@ export function ProfitCalculator() {
                 </CardContent>
               </Card>
 
-              <Card className={`border-2 ${profitMargin >= 0 ? 'border-green-500/50 bg-green-500/5' : 'border-red-500/50 bg-red-500/5'}`}>
+              <Card className={`border-2 ${profitMargin >= 15 ? 'border-green-500/50 bg-green-500/5' : profitMargin >= 0 ? 'border-orange-500/50 bg-orange-500/5' : 'border-red-500/50 bg-red-500/5'}`}>
                 <CardContent className="p-4 space-y-2">
                   <div className="flex items-center gap-1">
                     <TrendingUp className="h-4 w-4 text-primary" />
                     <p className="text-xs text-muted-foreground uppercase tracking-wide">Margem</p>
                   </div>
-                  <p className={`text-2xl font-bold ${profitMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  <p className={`text-2xl font-bold ${profitMargin >= 15 ? 'text-green-600' : profitMargin >= 0 ? 'text-orange-600' : 'text-red-600'}`}>
                     {profitMargin.toFixed(1)}%
                   </p>
-                  <div className="w-full bg-muted rounded-full h-2 mt-2">
-                    <div 
-                      className={`h-2 rounded-full transition-all ${profitMargin >= 0 ? 'bg-green-500' : 'bg-red-500'}`}
-                      style={{ width: `${Math.min(Math.abs(profitMargin), 100)}%` }}
-                    />
-                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {profitMargin >= 20 ? '🎯 Ótima margem!' : profitMargin >= 10 ? '✅ Boa margem' : profitMargin >= 0 ? '⚠️ Margem baixa' : '❌ Prejuízo'}
+                  </p>
                 </CardContent>
               </Card>
 
               <Card className="border-2 border-border/50">
                 <CardContent className="p-4 space-y-2">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Custo Efetivo/Milha</p>
+                  <div className="flex items-center gap-1">
+                    <Calculator className="h-4 w-4 text-primary" />
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Custo/Milha</p>
+                  </div>
                   <p className="text-2xl font-bold text-foreground">
                     R$ {effectiveCostPerMile.toFixed(4)}
                   </p>
@@ -471,16 +403,55 @@ export function ProfitCalculator() {
               </Card>
             </div>
 
-            <Card className="bg-primary/5 border-primary/20">
-              <CardContent className="p-4">
-                <h5 className="font-semibold text-sm mb-2">📊 Como funciona o cálculo?</h5>
-                <p className="text-xs text-muted-foreground">
-                  1. Divide-se as milhas por 1.000 para obter o número de milheiros<br/>
-                  2. Multiplica-se pelos custos do milheiro: <strong>{(miles / 1000).toFixed(1)} milheiros × R$ {costPerThousand.toFixed(2)} = R$ {totalCost.toFixed(2)}</strong><br/>
-                  3. Subtrai-se o custo total do preço de venda: <strong>R$ {price.toFixed(2)} - R$ {totalCost.toFixed(2)} = R$ {profit.toFixed(2)}</strong>
-                </p>
-              </CardContent>
-            </Card>
+            {totalCost > 0 && (
+              <Card className="mt-6 border-2 border-primary/20">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5 text-primary" />
+                    🎯 Cenários de Margem
+                  </CardTitle>
+                  <CardDescription>
+                    Veja quanto cobrar para diferentes margens de lucro
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {scenarios.map((scenario) => {
+                      const scenarioProfit = scenario.price - totalCost;
+                      const isTarget = Math.abs(scenario.margin - targetMarginNum) < 0.5;
+                      return (
+                        <div
+                          key={scenario.margin}
+                          className={`flex items-center justify-between p-3 rounded-lg ${
+                            isTarget 
+                              ? 'bg-primary/10 border-2 border-primary' 
+                              : 'bg-muted/50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            {isTarget && <span className="text-lg">⭐</span>}
+                            <div>
+                              <p className="font-semibold text-sm">{scenario.label}</p>
+                              <p className="text-xs text-muted-foreground">
+                                Lucro: R$ {scenarioProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-lg font-bold">
+                              R$ {scenario.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              R$ {((scenario.price / (miles / 1000))).toFixed(2)}/mil
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
       </CardContent>

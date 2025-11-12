@@ -22,7 +22,6 @@ import { maskCPF, maskPhone } from "@/lib/input-masks";
 import { ArrowLeft, ArrowRight, Check, Plus, Users, Building2, AlertCircle } from "lucide-react";
 import { SalesSummaryCard } from "@/components/sales/SaleSummaryCard";
 import { SaleSuccessDialog } from "@/components/sales/SaleSuccessDialog";
-import { MarginCalculator } from "@/components/calculator/MarginCalculator";
 import { PassengerCPFDialog } from "@/components/sales/PassengerCPFDialog";
 import { FlightSegmentForm } from "@/components/sales/FlightSegmentForm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -1152,41 +1151,6 @@ export default function NewSaleWizard() {
               milesNeeded={milesNeeded}
               priceTotal={installmentDetails?.finalPrice.toFixed(2) || priceTotal}
             />
-            {currentStep === 2 && (
-              <Dialog open={showCalculatorDialog} onOpenChange={setShowCalculatorDialog}>
-                <DialogTrigger asChild>
-                  <div className="w-full">
-                    <Button 
-                      variant="outline" 
-                      className="w-full"
-                      disabled={saleSource !== "internal_account" || !accountId}
-                      title={
-                        saleSource !== "internal_account" 
-                          ? "Simulador disponível apenas para vendas de conta interna"
-                          : !accountId
-                          ? "Selecione uma conta para usar o simulador"
-                          : "Calcular margem de lucro"
-                      }
-                    >
-                      <Calculator className="h-4 w-4 mr-2" />
-                      Simulador de Lucro
-                    </Button>
-                  </div>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl">
-                  <DialogHeader>
-                    <DialogTitle>Simulador de Margem de Lucro</DialogTitle>
-                  </DialogHeader>
-                  <MarginCalculator
-                    costPerMile={
-                      filteredAccounts.find(a => a.id === accountId)?.cost_per_mile
-                        ? Number(filteredAccounts.find(a => a.id === accountId)?.cost_per_mile)
-                        : 0.029
-                    }
-                  />
-                </DialogContent>
-              </Dialog>
-            )}
           </div>
         </div>
       </div>
