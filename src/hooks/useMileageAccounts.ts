@@ -91,9 +91,21 @@ export const useMileageAccounts = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
 
+      // Buscar supplier_id do perfil do usuário
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("supplier_id")
+        .eq("id", user.id)
+        .single();
+
+      if (!profile?.supplier_id) {
+        throw new Error("Perfil sem supplier_id configurado");
+      }
+
       const { error } = await supabase.from("mileage_accounts").insert({
         ...accountData,
         user_id: user.id,
+        supplier_id: profile.supplier_id,
       });
 
       if (error) throw error;

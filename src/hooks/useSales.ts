@@ -197,7 +197,7 @@ export const useSales = () => {
                   .eq("id", existingCPF.id);
               } else {
                 // Criar novo registro de CPF
-                await supabase
+                const { data: newCPF, error: cpfError } = await supabase
                   .from("cpf_registry")
                   .insert({
                     user_id: userData.user.id,
@@ -208,7 +208,20 @@ export const useSales = () => {
                     first_use_date: new Date().toISOString(),
                     last_used_at: new Date().toISOString(),
                     status: 'available',
+                  })
+                  .select()
+                  .single();
+                
+                if (cpfError) {
+                  console.error("❌ Falha ao inserir CPF:", cpfError);
+                  toast({
+                    title: "Aviso",
+                    description: `CPF ${passengerCPF.name} não foi registrado: ${cpfError.message}`,
+                    variant: "destructive",
                   });
+                } else {
+                  console.log("✅ CPF registrado com sucesso:", newCPF);
+                }
               }
             }
             

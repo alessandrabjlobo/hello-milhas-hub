@@ -1294,6 +1294,7 @@ export type Database = {
       }
     }
     Functions: {
+      backfill_cpf_registry: { Args: never; Returns: undefined }
       check_cpf_exists: {
         Args: { p_airline_company_id: string; p_cpf_encrypted: string }
         Returns: {
