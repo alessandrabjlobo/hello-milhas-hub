@@ -2,12 +2,15 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calculator, TrendingUp, DollarSign, Plane, Users, Percent } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
+import { Calculator, TrendingUp, AlertCircle, Info, ChevronDown, ChevronUp } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 type MileageAccount = {
   id: string;
@@ -19,18 +22,34 @@ type MileageAccount = {
   };
 };
 
+// Formatação de números
+const formatNumber = (value: string): string => {
+  const numbers = value.replace(/\D/g, '');
+  return numbers.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+};
+
+const parseFormattedNumber = (value: string): number => {
+  return parseFloat(value.replace(/\./g, '')) || 0;
+};
+
+const formatCurrency = (value: number): string => {
+  return value.toLocaleString('pt-BR', { 
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2 
+  });
+};
+
 export function ProfitCalculator() {
-  const [milesUsed, setMilesUsed] = useState("");
-  const [costPerMile, setCostPerMile] = useState("");
-  const [salePrice, setSalePrice] = useState("");
-  const [boardingFee, setBoardingFee] = useState("");
-  const [passengers, setPassengers] = useState("1");
-  const [pricePerPassenger, setPricePerPassenger] = useState("");
-  const [pricingMode, setPricingMode] = useState<"total" | "per_passenger">("total");
-  const [selectedAccount, setSelectedAccount] = useState<string>("");
-  const [accounts, setAccounts] = useState<MileageAccount[]>([]);
+  const [milesUsed, setMilesUsed] = useState("50000");
+  const [costPerMile, setCostPerMile] = useState("29.00");
+  const [boardingFee, setBoardingFee] = useState("35.00");
+  const [passengers, setPassengers] = useState("2");
   const [targetMargin, setTargetMargin] = useState("20");
-  const [useManualPrice, setUseManualPrice] = useState(false);
+  const [manualPrice, setManualPrice] = useState("");
+  const [accounts, setAccounts] = useState<MileageAccount[]>([]);
+  const [selectedAccount, setSelectedAccount] = useState("");
+  const [activeTab, setActiveTab] = useState("manual");
+  const [showScenarios, setShowScenarios] = useState(false);
 
   useEffect(() => {
     loadAccounts();
@@ -59,401 +78,544 @@ export function ProfitCalculator() {
     }
   }, [selectedAccount, accounts]);
 
-  const miles = parseFloat(milesUsed) || 0;
-  const costPerThousand = parseFloat(costPerMile) || 0;
+  // Cálculos
+  const milesNum = parseFormattedNumber(milesUsed);
+  const costPerMileNum = parseFloat(costPerMile) || 0;
   const boardingFeeNum = parseFloat(boardingFee) || 0;
   const passengersNum = parseInt(passengers) || 1;
-  const pricePerPass = parseFloat(pricePerPassenger) || 0;
   const targetMarginNum = parseFloat(targetMargin) || 0;
+  const manualPriceNum = parseFloat(manualPrice) || 0;
 
-  // Cálculo: ((milhas/1000) * custo do milheiro + taxa de embarque) * passageiros
-  const costPerPassenger = (miles / 1000) * costPerThousand + boardingFeeNum;
+  const costPerPassenger = (milesNum / 1000) * costPerMileNum + boardingFeeNum;
   const totalCost = costPerPassenger * passengersNum;
-
-  // Cálculo automático do preço sugerido baseado na margem alvo
-  const suggestedPrice = totalCost > 0 && targetMarginNum > 0 && targetMarginNum < 100
-    ? totalCost / (1 - targetMarginNum / 100)
-    : totalCost * 1.2; // fallback 20%
-
-  // Preço usado nos cálculos (sugerido ou manual)
-  const price = useManualPrice 
-    ? (pricingMode === "per_passenger" ? pricePerPass * passengersNum : parseFloat(salePrice) || 0)
-    : suggestedPrice;
-
+  const suggestedPrice = targetMarginNum > 0 && targetMarginNum < 100 
+    ? totalCost / (1 - targetMarginNum / 100) 
+    : totalCost;
+  
+  const price = manualPriceNum > 0 ? manualPriceNum : suggestedPrice;
   const profit = price - totalCost;
   const profitMargin = price > 0 ? (profit / price) * 100 : 0;
-  const effectiveCostPerMile = miles > 0 ? totalCost / miles : 0;
-  const pricePerThousand = miles > 0 ? (price / (miles / 1000)) : 0;
+  const effectiveCostPerMile = milesNum > 0 ? totalCost / milesNum : 0;
+  const pricePerThousand = milesNum > 0 ? (price / milesNum) * 1000 : 0;
 
   // Cenários de margem
   const scenarios = [
-    { margin: 0, label: "Break-even (0%)", price: totalCost },
-    { margin: 15, label: "Margem 15%", price: totalCost / 0.85 },
-    { margin: 20, label: "Margem 20%", price: totalCost / 0.80 },
-    { margin: 25, label: "Margem 25%", price: totalCost / 0.75 },
-    { margin: 30, label: "Margem 30%", price: totalCost / 0.70 },
+    { margin: 0, price: totalCost },
+    { margin: 15, price: totalCost / 0.85 },
+    { margin: 20, price: totalCost / 0.80 },
+    { margin: 25, price: totalCost / 0.75 },
+    { margin: 30, price: totalCost / 0.70 },
   ];
 
   const selectedAccountData = accounts.find(a => a.id === selectedAccount);
-  const insufficientBalance = selectedAccountData && miles > selectedAccountData.balance;
+  const insufficientBalance = selectedAccountData && milesNum > selectedAccountData.balance;
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <Calculator className="h-5 w-5 text-primary" />
-          <CardTitle>Calculadora Inteligente de Milhas</CardTitle>
-        </div>
+    <Card className="w-full">
+      <CardHeader className="pb-4">
+        <CardTitle className="flex items-center gap-2 text-xl">
+          <Calculator className="h-5 w-5" />
+          Calculadora Inteligente de Milhas
+        </CardTitle>
         <CardDescription>
-          Calcule automaticamente o preço ideal com base na margem desejada
+          Preencha os campos e veja os resultados instantaneamente
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <Tabs defaultValue="manual" className="w-full">
+      <CardContent className="space-y-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="manual">Cálculo Manual</TabsTrigger>
             <TabsTrigger value="account">Por Conta</TabsTrigger>
           </TabsList>
 
           <TabsContent value="manual" className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="manual-miles">Milhas Utilizadas</Label>
-              <Input
-                id="manual-miles"
-                type="number"
-                placeholder="50000"
-                value={milesUsed}
-                onChange={(e) => setMilesUsed(e.target.value)}
-              />
+            <div>
+              <h3 className="text-sm font-medium mb-3">DADOS DE ENTRADA</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="miles" className="text-xs">Milhas *</Label>
+                  <Input
+                    id="miles"
+                    type="text"
+                    value={formatNumber(milesUsed)}
+                    onChange={(e) => setMilesUsed(e.target.value.replace(/\./g, '').replace(/\D/g, ''))}
+                    placeholder="50.000"
+                    className="h-9"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="cost" className="text-xs">Custo/mil (R$) *</Label>
+                  <Input
+                    id="cost"
+                    type="number"
+                    step="0.01"
+                    value={costPerMile}
+                    onChange={(e) => setCostPerMile(e.target.value)}
+                    placeholder="29.00"
+                    className="h-9"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="boarding" className="text-xs">Taxa/pax (R$)</Label>
+                  <Input
+                    id="boarding"
+                    type="number"
+                    step="0.01"
+                    value={boardingFee}
+                    onChange={(e) => setBoardingFee(e.target.value)}
+                    placeholder="35.00"
+                    className="h-9"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="passengers" className="text-xs">Passageiros *</Label>
+                  <Input
+                    id="passengers"
+                    type="number"
+                    value={passengers}
+                    onChange={(e) => setPassengers(e.target.value)}
+                    placeholder="2"
+                    className="h-9"
+                  />
+                </div>
+              </div>
+              
+              <div className="mt-3 space-y-1.5">
+                <Label htmlFor="target-margin" className="text-xs">🎯 Margem Alvo (%)</Label>
+                <Input
+                  id="target-margin"
+                  type="number"
+                  step="1"
+                  value={targetMargin}
+                  onChange={(e) => setTargetMargin(e.target.value)}
+                  placeholder="20"
+                  className="h-9 max-w-[200px]"
+                />
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="manual-cost">Custo do Milheiro (R$/mil)</Label>
-              <Input
-                id="manual-cost"
-                type="number"
-                step="0.01"
-                placeholder="29.00"
-                value={costPerMile}
-                onChange={(e) => setCostPerMile(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                💡 Custo por cada 1.000 milhas
-              </p>
-            </div>
+            {(milesNum > 0 && costPerMileNum > 0) && (
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-medium mb-3">VALORES</h3>
+                  <div className="grid md:grid-cols-2 gap-3">
+                    <Card className="bg-primary/5 border-primary/20">
+                      <CardContent className="p-4">
+                        <p className="text-xs text-muted-foreground mb-1">💡 VALOR SUGERIDO</p>
+                        <p className="text-2xl font-bold text-primary">
+                          R$ {formatCurrency(suggestedPrice)}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Para margem de {targetMargin}%
+                        </p>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card>
+                      <CardContent className="p-4">
+                        <Label htmlFor="manual-price" className="text-xs">✏️ SEU PREÇO</Label>
+                        <Input
+                          id="manual-price"
+                          type="number"
+                          step="0.01"
+                          value={manualPrice}
+                          onChange={(e) => setManualPrice(e.target.value)}
+                          placeholder={`R$ ${formatCurrency(suggestedPrice)}`}
+                          className="h-9 mt-1.5 mb-2"
+                        />
+                        {manualPriceNum > 0 && (
+                          <div className="text-sm space-y-0.5">
+                            <p className="flex justify-between">
+                              <span className="text-muted-foreground">→ Lucro:</span>
+                              <span className="font-semibold text-green-600">R$ {formatCurrency(profit)}</span>
+                            </p>
+                            <p className="flex justify-between">
+                              <span className="text-muted-foreground">→ Margem:</span>
+                              <span className="font-semibold">
+                                {profitMargin.toFixed(1)}%
+                                {profitMargin >= 20 && <span className="ml-1">🎯</span>}
+                                {profitMargin >= 10 && profitMargin < 20 && <span className="ml-1">⚠️</span>}
+                                {profitMargin < 10 && <span className="ml-1">❌</span>}
+                              </span>
+                            </p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="boarding-fee">
-                <Plane className="inline mr-2 h-4 w-4" />
-                Taxa de Embarque (R$)
-              </Label>
-              <Input
-                id="boarding-fee"
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                value={boardingFee}
-                onChange={(e) => setBoardingFee(e.target.value)}
-              />
-            </div>
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-medium">RESULTADO</h3>
+                    <HoverCard>
+                      <HoverCardTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs">
+                          <Info className="h-3 w-3 mr-1" />
+                          Ver cálculo
+                        </Button>
+                      </HoverCardTrigger>
+                      <HoverCardContent className="w-80">
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Milhas:</span>
+                            <span className="font-medium">{formatNumber(milesUsed)} → {(milesNum / 1000).toFixed(1)} milheiros</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Custo do Milheiro:</span>
+                            <span className="font-medium">R$ {costPerMileNum.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Taxa de embarque:</span>
+                            <span className="font-medium">R$ {boardingFeeNum.toFixed(2)} × {passengersNum} pax</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Subtotal/passageiro:</span>
+                            <span className="font-medium">R$ {formatCurrency(costPerPassenger)}</span>
+                          </div>
+                          <div className="flex justify-between pt-2 border-t">
+                            <span className="font-semibold">Custo Total:</span>
+                            <span className="font-bold">R$ {formatCurrency(totalCost)}</span>
+                          </div>
+                        </div>
+                      </HoverCardContent>
+                    </HoverCard>
+                  </div>
+                  
+                  <div className="grid grid-cols-4 gap-2">
+                    <Card className="p-3">
+                      <p className="text-xs text-muted-foreground mb-1">Custo Total</p>
+                      <p className="text-lg font-bold">R$ {formatCurrency(totalCost)}</p>
+                    </Card>
+                    
+                    <Card className="p-3">
+                      <p className="text-xs text-muted-foreground mb-1">Lucro</p>
+                      <p className="text-lg font-bold text-green-600">R$ {formatCurrency(profit)}</p>
+                    </Card>
+                    
+                    <Card className="p-3">
+                      <p className="text-xs text-muted-foreground mb-1">Margem</p>
+                      <p className="text-lg font-bold flex items-center gap-1">
+                        {profitMargin.toFixed(1)}%
+                        {profitMargin >= 20 && <span className="text-sm">✅</span>}
+                        {profitMargin >= 10 && profitMargin < 20 && <span className="text-sm">⚠️</span>}
+                        {profitMargin < 10 && <span className="text-sm">❌</span>}
+                      </p>
+                    </Card>
+                    
+                    <Card className="p-3">
+                      <p className="text-xs text-muted-foreground mb-1">R$/mil</p>
+                      <p className="text-lg font-bold">R$ {pricePerThousand.toFixed(2)}</p>
+                    </Card>
+                  </div>
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="passengers">
-                <Users className="inline mr-2 h-4 w-4" />
-                Número de Passageiros
-              </Label>
-              <Input
-                id="passengers"
-                type="number"
-                min="1"
-                placeholder="1"
-                value={passengers}
-                onChange={(e) => setPassengers(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="target-margin">
-                <Percent className="inline mr-2 h-4 w-4" />
-                Margem Alvo (%)
-              </Label>
-              <Input
-                id="target-margin"
-                type="number"
-                step="0.1"
-                placeholder="20"
-                value={targetMargin}
-                onChange={(e) => setTargetMargin(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                💡 Margem de lucro desejada
-              </p>
-            </div>
+                <Collapsible open={showScenarios} onOpenChange={setShowScenarios}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="outline" className="w-full h-9" size="sm">
+                      {showScenarios ? (
+                        <>
+                          <ChevronUp className="h-4 w-4 mr-2" />
+                          Ocultar Cenários de Margem
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="h-4 w-4 mr-2" />
+                          Ver Cenários de Margem
+                        </>
+                      )}
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-3">
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm flex items-center gap-2">
+                          <TrendingUp className="h-4 w-4" />
+                          🎯 Cenários de Margem
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        {scenarios.map((scenario) => {
+                          const isTarget = scenario.margin === targetMarginNum;
+                          return (
+                            <div
+                              key={scenario.margin}
+                              className={`flex items-center justify-between p-2.5 rounded-md border text-sm ${
+                                isTarget ? 'bg-primary/10 border-primary' : 'bg-muted/30'
+                              }`}
+                            >
+                              <span className="font-medium">
+                                {scenario.margin}% {isTarget && <span className="text-primary">⭐</span>}
+                              </span>
+                              <div className="text-right">
+                                <div className="font-bold">R$ {formatCurrency(scenario.price)}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  +R$ {formatCurrency(scenario.price - totalCost)}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </CardContent>
+                    </Card>
+                  </CollapsibleContent>
+                </Collapsible>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="account" className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="account-select">Conta de Milhagem</Label>
-              <Select value={selectedAccount} onValueChange={setSelectedAccount}>
-                <SelectTrigger id="account-select">
-                  <SelectValue placeholder="Selecione uma conta" />
-                </SelectTrigger>
-                <SelectContent>
-                  {accounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.airline_companies.name} - {account.account_number} ({account.balance.toLocaleString('pt-BR')} milhas)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="account-miles">Milhas Utilizadas</Label>
-              <Input
-                id="account-miles"
-                type="number"
-                placeholder="50000"
-                value={milesUsed}
-                onChange={(e) => setMilesUsed(e.target.value)}
-              />
-              {insufficientBalance && (
-                <Badge variant="destructive" className="text-xs">
-                  Saldo insuficiente
-                </Badge>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="account-boarding-fee">
-                <Plane className="inline mr-2 h-4 w-4" />
-                Taxa de Embarque (R$)
-              </Label>
-              <Input
-                id="account-boarding-fee"
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                value={boardingFee}
-                onChange={(e) => setBoardingFee(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="account-passengers">
-                <Users className="inline mr-2 h-4 w-4" />
-                Número de Passageiros
-              </Label>
-              <Input
-                id="account-passengers"
-                type="number"
-                min="1"
-                placeholder="1"
-                value={passengers}
-                onChange={(e) => setPassengers(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="account-target-margin">
-                <Percent className="inline mr-2 h-4 w-4" />
-                Margem Alvo (%)
-              </Label>
-              <Input
-                id="account-target-margin"
-                type="number"
-                step="0.1"
-                placeholder="20"
-                value={targetMargin}
-                onChange={(e) => setTargetMargin(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                💡 Margem de lucro desejada
-              </p>
-            </div>
-          </TabsContent>
-        </Tabs>
-
-        {(miles > 0 && costPerThousand > 0) && (
-          <div className="mt-6 space-y-4">
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="font-semibold text-lg">💰 Análise Automática</h4>
-              {!useManualPrice && totalCost > 0 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setUseManualPrice(true)}
-                >
-                  ✏️ Editar Preço Manualmente
-                </Button>
-              )}
-            </div>
-
-            {useManualPrice && (
-              <Card className="p-4 bg-muted/50 border-dashed">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="manual-override">Valor de Venda Manual (R$)</Label>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setUseManualPrice(false);
-                        setSalePrice("");
-                        setPricePerPassenger("");
-                      }}
-                    >
-                      💡 Voltar para Sugestão
-                    </Button>
-                  </div>
+            <div>
+              <h3 className="text-sm font-medium mb-3">SELECIONAR CONTA</h3>
+              <div className="space-y-2">
+                <Label htmlFor="account-select" className="text-xs">Conta *</Label>
+                <Select value={selectedAccount} onValueChange={setSelectedAccount}>
+                  <SelectTrigger id="account-select" className="h-9">
+                    <SelectValue placeholder="Escolha uma conta de milhagem" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        {account.airline_companies.name} - {formatNumber(account.balance.toString())} milhas - 
+                        R$ {account.cost_per_mile.toFixed(2)}/mil
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <h3 className="text-sm font-medium mb-3 mt-4">DADOS DE ENTRADA</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="miles-account" className="text-xs">Milhas *</Label>
                   <Input
-                    id="manual-override"
+                    id="miles-account"
+                    type="text"
+                    value={formatNumber(milesUsed)}
+                    onChange={(e) => setMilesUsed(e.target.value.replace(/\./g, '').replace(/\D/g, ''))}
+                    placeholder="50.000"
+                    className="h-9"
+                  />
+                  {insufficientBalance && (
+                    <Badge variant="destructive" className="text-xs">
+                      Saldo insuficiente
+                    </Badge>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="boarding-account" className="text-xs">Taxa/pax (R$)</Label>
+                  <Input
+                    id="boarding-account"
                     type="number"
                     step="0.01"
-                    placeholder={suggestedPrice.toFixed(2)}
-                    value={salePrice}
-                    onChange={(e) => setSalePrice(e.target.value)}
+                    value={boardingFee}
+                    onChange={(e) => setBoardingFee(e.target.value)}
+                    placeholder="35.00"
+                    className="h-9"
                   />
                 </div>
-              </Card>
-            )}
 
-            {!useManualPrice && totalCost > 0 && (
-              <Card className="p-6 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
-                <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">💡 Valor Sugerido para Margem de {targetMarginNum}%</p>
-                  <p className="text-4xl font-bold text-primary">
-                    R$ {suggestedPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    R$ {pricePerThousand.toFixed(2)}/mil milhas
-                  </p>
+                <div className="space-y-1.5">
+                  <Label htmlFor="passengers-account" className="text-xs">Passageiros *</Label>
+                  <Input
+                    id="passengers-account"
+                    type="number"
+                    value={passengers}
+                    onChange={(e) => setPassengers(e.target.value)}
+                    placeholder="2"
+                    className="h-9"
+                  />
                 </div>
-              </Card>
-            )}
-            
-            <div className="bg-muted/50 p-4 rounded-lg space-y-2 mb-4">
-              <h5 className="font-semibold text-sm mb-2">📊 Breakdown do Cálculo:</h5>
-              <div className="text-sm space-y-1 text-muted-foreground">
-                <p>• Milhas: {miles.toLocaleString('pt-BR')} → {(miles / 1000).toFixed(1)} milheiros</p>
-                <p>• Custo do Milheiro: R$ {costPerThousand.toFixed(2)}</p>
-                <p>• Taxa de embarque: R$ {boardingFeeNum.toFixed(2)} × {passengersNum} passageiro(s)</p>
-                <p>• Subtotal por passageiro: R$ {costPerPassenger.toFixed(2)}</p>
-                <p>• × Número de passageiros: {passengersNum}</p>
-                <p className="font-semibold text-foreground pt-1 border-t">= Custo Total: R$ {totalCost.toFixed(2)}</p>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="target-margin-account" className="text-xs">🎯 Margem (%)</Label>
+                  <Input
+                    id="target-margin-account"
+                    type="number"
+                    step="1"
+                    value={targetMargin}
+                    onChange={(e) => setTargetMargin(e.target.value)}
+                    placeholder="20"
+                    className="h-9"
+                  />
+                </div>
               </div>
             </div>
-            
-            <div className="grid md:grid-cols-4 gap-4">
-              <Card className="border-2 border-border/50">
-                <CardContent className="p-4 space-y-2">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Custo Total</p>
-                  <p className="text-2xl font-bold text-foreground">
-                    R$ {totalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {(miles / 1000).toFixed(1)} milheiros × R$ {costPerThousand.toFixed(2)}
-                  </p>
-                </CardContent>
-              </Card>
 
-              <Card className={`border-2 ${profit >= 0 ? 'border-green-500/50 bg-green-500/5' : 'border-red-500/50 bg-red-500/5'}`}>
-                <CardContent className="p-4 space-y-2">
-                  <div className="flex items-center gap-1">
-                    <DollarSign className="h-4 w-4 text-primary" />
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Lucro</p>
-                  </div>
-                  <p className={`text-2xl font-bold ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    R$ {profit.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {profit >= 0 ? '✅ Operação rentável' : '⚠️ Operação com prejuízo'}
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className={`border-2 ${profitMargin >= 15 ? 'border-green-500/50 bg-green-500/5' : profitMargin >= 0 ? 'border-orange-500/50 bg-orange-500/5' : 'border-red-500/50 bg-red-500/5'}`}>
-                <CardContent className="p-4 space-y-2">
-                  <div className="flex items-center gap-1">
-                    <TrendingUp className="h-4 w-4 text-primary" />
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Margem</p>
-                  </div>
-                  <p className={`text-2xl font-bold ${profitMargin >= 15 ? 'text-green-600' : profitMargin >= 0 ? 'text-orange-600' : 'text-red-600'}`}>
-                    {profitMargin.toFixed(1)}%
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {profitMargin >= 20 ? '🎯 Ótima margem!' : profitMargin >= 10 ? '✅ Boa margem' : profitMargin >= 0 ? '⚠️ Margem baixa' : '❌ Prejuízo'}
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="border-2 border-border/50">
-                <CardContent className="p-4 space-y-2">
-                  <div className="flex items-center gap-1">
-                    <Calculator className="h-4 w-4 text-primary" />
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Custo/Milha</p>
-                  </div>
-                  <p className="text-2xl font-bold text-foreground">
-                    R$ {effectiveCostPerMile.toFixed(4)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Custo efetivo por milha
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {totalCost > 0 && (
-              <Card className="mt-6 border-2 border-primary/20">
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5 text-primary" />
-                    🎯 Cenários de Margem
-                  </CardTitle>
-                  <CardDescription>
-                    Veja quanto cobrar para diferentes margens de lucro
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {scenarios.map((scenario) => {
-                      const scenarioProfit = scenario.price - totalCost;
-                      const isTarget = Math.abs(scenario.margin - targetMarginNum) < 0.5;
-                      return (
-                        <div
-                          key={scenario.margin}
-                          className={`flex items-center justify-between p-3 rounded-lg ${
-                            isTarget 
-                              ? 'bg-primary/10 border-2 border-primary' 
-                              : 'bg-muted/50'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            {isTarget && <span className="text-lg">⭐</span>}
-                            <div>
-                              <p className="font-semibold text-sm">{scenario.label}</p>
-                              <p className="text-xs text-muted-foreground">
-                                Lucro: R$ {scenarioProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                              </p>
-                            </div>
+            {(milesNum > 0 && costPerMileNum > 0) && (
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-medium mb-3">VALORES</h3>
+                  <div className="grid md:grid-cols-2 gap-3">
+                    <Card className="bg-primary/5 border-primary/20">
+                      <CardContent className="p-4">
+                        <p className="text-xs text-muted-foreground mb-1">💡 VALOR SUGERIDO</p>
+                        <p className="text-2xl font-bold text-primary">
+                          R$ {formatCurrency(suggestedPrice)}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Para margem de {targetMargin}%
+                        </p>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card>
+                      <CardContent className="p-4">
+                        <Label htmlFor="manual-price-account" className="text-xs">✏️ SEU PREÇO</Label>
+                        <Input
+                          id="manual-price-account"
+                          type="number"
+                          step="0.01"
+                          value={manualPrice}
+                          onChange={(e) => setManualPrice(e.target.value)}
+                          placeholder={`R$ ${formatCurrency(suggestedPrice)}`}
+                          className="h-9 mt-1.5 mb-2"
+                        />
+                        {manualPriceNum > 0 && (
+                          <div className="text-sm space-y-0.5">
+                            <p className="flex justify-between">
+                              <span className="text-muted-foreground">→ Lucro:</span>
+                              <span className="font-semibold text-green-600">R$ {formatCurrency(profit)}</span>
+                            </p>
+                            <p className="flex justify-between">
+                              <span className="text-muted-foreground">→ Margem:</span>
+                              <span className="font-semibold">
+                                {profitMargin.toFixed(1)}%
+                                {profitMargin >= 20 && <span className="ml-1">🎯</span>}
+                                {profitMargin >= 10 && profitMargin < 20 && <span className="ml-1">⚠️</span>}
+                                {profitMargin < 10 && <span className="ml-1">❌</span>}
+                              </span>
+                            </p>
                           </div>
-                          <div className="text-right">
-                            <p className="text-lg font-bold">
-                              R$ {scenario.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              R$ {((scenario.price / (miles / 1000))).toFixed(2)}/mil
-                            </p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-medium">RESULTADO</h3>
+                    <HoverCard>
+                      <HoverCardTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs">
+                          <Info className="h-3 w-3 mr-1" />
+                          Ver cálculo
+                        </Button>
+                      </HoverCardTrigger>
+                      <HoverCardContent className="w-80">
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Milhas:</span>
+                            <span className="font-medium">{formatNumber(milesUsed)} → {(milesNum / 1000).toFixed(1)} milheiros</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Custo do Milheiro:</span>
+                            <span className="font-medium">R$ {costPerMileNum.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Taxa de embarque:</span>
+                            <span className="font-medium">R$ {boardingFeeNum.toFixed(2)} × {passengersNum} pax</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Subtotal/passageiro:</span>
+                            <span className="font-medium">R$ {formatCurrency(costPerPassenger)}</span>
+                          </div>
+                          <div className="flex justify-between pt-2 border-t">
+                            <span className="font-semibold">Custo Total:</span>
+                            <span className="font-bold">R$ {formatCurrency(totalCost)}</span>
                           </div>
                         </div>
-                      );
-                    })}
+                      </HoverCardContent>
+                    </HoverCard>
                   </div>
-                </CardContent>
-              </Card>
+                  
+                  <div className="grid grid-cols-4 gap-2">
+                    <Card className="p-3">
+                      <p className="text-xs text-muted-foreground mb-1">Custo Total</p>
+                      <p className="text-lg font-bold">R$ {formatCurrency(totalCost)}</p>
+                    </Card>
+                    
+                    <Card className="p-3">
+                      <p className="text-xs text-muted-foreground mb-1">Lucro</p>
+                      <p className="text-lg font-bold text-green-600">R$ {formatCurrency(profit)}</p>
+                    </Card>
+                    
+                    <Card className="p-3">
+                      <p className="text-xs text-muted-foreground mb-1">Margem</p>
+                      <p className="text-lg font-bold flex items-center gap-1">
+                        {profitMargin.toFixed(1)}%
+                        {profitMargin >= 20 && <span className="text-sm">✅</span>}
+                        {profitMargin >= 10 && profitMargin < 20 && <span className="text-sm">⚠️</span>}
+                        {profitMargin < 10 && <span className="text-sm">❌</span>}
+                      </p>
+                    </Card>
+                    
+                    <Card className="p-3">
+                      <p className="text-xs text-muted-foreground mb-1">R$/mil</p>
+                      <p className="text-lg font-bold">R$ {pricePerThousand.toFixed(2)}</p>
+                    </Card>
+                  </div>
+                </div>
+
+                <Collapsible open={showScenarios} onOpenChange={setShowScenarios}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="outline" className="w-full h-9" size="sm">
+                      {showScenarios ? (
+                        <>
+                          <ChevronUp className="h-4 w-4 mr-2" />
+                          Ocultar Cenários de Margem
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="h-4 w-4 mr-2" />
+                          Ver Cenários de Margem
+                        </>
+                      )}
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-3">
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm flex items-center gap-2">
+                          <TrendingUp className="h-4 w-4" />
+                          🎯 Cenários de Margem
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        {scenarios.map((scenario) => {
+                          const isTarget = scenario.margin === targetMarginNum;
+                          return (
+                            <div
+                              key={scenario.margin}
+                              className={`flex items-center justify-between p-2.5 rounded-md border text-sm ${
+                                isTarget ? 'bg-primary/10 border-primary' : 'bg-muted/30'
+                              }`}
+                            >
+                              <span className="font-medium">
+                                {scenario.margin}% {isTarget && <span className="text-primary">⭐</span>}
+                              </span>
+                              <div className="text-right">
+                                <div className="font-bold">R$ {formatCurrency(scenario.price)}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  +R$ {formatCurrency(scenario.price - totalCost)}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </CardContent>
+                    </Card>
+                  </CollapsibleContent>
+                </Collapsible>
+              </div>
             )}
-          </div>
-        )}
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   );
