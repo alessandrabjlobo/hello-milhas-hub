@@ -6,6 +6,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { FileText } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
@@ -166,20 +167,19 @@ export function TicketDetailDialog({
           {ticket.attachments && Array.isArray(ticket.attachments) && ticket.attachments.length > 0 && (
             <>
               <Separator />
-              <div>
-                <Label className="text-muted-foreground">Anexos</Label>
-                <div className="space-y-2 mt-2">
+              <div className="space-y-2">
+                <Label className="text-muted-foreground">📎 Anexos</Label>
+                <div className="flex flex-wrap gap-2">
                   {ticket.attachments.map((att: any, idx: number) => (
-                    <a
+                    <Button
                       key={idx}
-                      href={att.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 text-sm text-primary hover:underline"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(att.url, '_blank')}
                     >
-                      <FileText className="h-4 w-4" />
-                      {att.name || `Anexo ${idx + 1}`}
-                    </a>
+                      <FileText className="h-4 w-4 mr-2" />
+                      Ver {att.fileName?.endsWith('.pdf') ? 'PDF' : 'Imagem'}
+                    </Button>
                   ))}
                 </div>
               </div>

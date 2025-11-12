@@ -375,15 +375,23 @@ export default function NewSaleWizard() {
       setLastSaleData({
         customerName,
         routeText: flightSegments.map(s => `${s.from} → ${s.to}`).join(" / "),
+        tripType,
+        flightSegments,
         airline,
         milesNeeded: totalMiles.toString(),
-        priceTotal: finalPrice.toFixed(2),
+        priceTotal: priceTotal, // Valor base SEM juros
         boardingFee: boardingFeePerPassenger.toString(),
         passengers,
         paymentMethod,
         pnr: pnr || undefined,
         ticketsCreated: autoCreateTickets,
         saleId: saleId,
+        saleSource,
+        accountInfo: saleSource === 'internal_account' && selectedAccount ? {
+          airlineName: selectedAccount.airline_companies?.name || '',
+          accountNumber: selectedAccount.account_number || '',
+          costPerThousand: (selectedAccount.cost_per_mile || 0.029) * 1000,
+        } : undefined,
       });
       setShowSuccessDialog(true);
     }
@@ -1017,23 +1025,24 @@ export default function NewSaleWizard() {
                             </SelectContent>
                           </Select>
 
-                          {installmentDetails && installments && installments > 1 && (
-                            <div className="space-y-2 text-sm">
-                              <div className="flex justify-between">
-                                <span>Valor original:</span>
+                           {installmentDetails && installments && installments > 1 && (
+                            <div className="space-y-2 text-sm p-3 bg-blue-50 dark:bg-blue-950/20 rounded-md">
+                              <div className="flex justify-between font-semibold text-green-600">
+                                <span>💰 Você recebe:</span>
                                 <span>R$ {parseFloat(priceTotal).toFixed(2)}</span>
                               </div>
-                              <div className="flex justify-between">
-                                <span>Taxa de juros:</span>
-                                <span>{installmentDetails.interestRate}%</span>
-                              </div>
-                              <div className="flex justify-between font-semibold text-primary">
-                                <span>Valor final:</span>
-                                <span>R$ {installmentDetails.finalPrice.toFixed(2)}</span>
-                              </div>
-                              <div className="flex justify-between text-muted-foreground">
-                                <span>{installments}x de:</span>
-                                <span>R$ {installmentDetails.installmentValue.toFixed(2)}</span>
+                              <div className="text-xs text-muted-foreground space-y-1 border-t pt-2 mt-2">
+                                <div className="flex justify-between">
+                                  <span>Cliente paga ({installments}x):</span>
+                                  <span>R$ {installmentDetails.installmentValue.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Total cliente:</span>
+                                  <span>R$ {installmentDetails.finalPrice.toFixed(2)}</span>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-2">
+                                  💡 Os juros de {installmentDetails.interestRate}% ficam com a operadora do cartão
+                                </p>
                               </div>
                             </div>
                           )}
@@ -1207,11 +1216,23 @@ export default function NewSaleWizard() {
                     Próximo
                     <ArrowRight className="h-4 w-4 ml-2" />
                   </Button>
-                ) : (
-                  <Button onClick={handleSave} disabled={saving}>
-                    <Check className="h-4 w-4 mr-2" />
-                    {saving ? "Salvando..." : "Salvar Venda"}
-                  </Button>
+                  ) : (
+                  <div className="flex gap-2">
+                    <Button onClick={handleSave} disabled={saving} variant="outline">
+                      <Check className="h-4 w-4 mr-2" />
+                      {saving ? "Salvando..." : "Salvar Venda"}
+                    </Button>
+                    <Button 
+                      onClick={async () => {
+                        setAutoCreateTickets(true);
+                        await handleSave();
+                      }} 
+                      disabled={saving}
+                    >
+                      <Check className="h-4 w-4 mr-2" />
+                      {saving ? "Salvando..." : "Salvar e Emitir Passagens"}
+                    </Button>
+                  </div>
                 )}
               </div>
             </Card>

@@ -81,7 +81,7 @@ export function FlightSegmentForm({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor={`miles-${index}`}>Milhas por Passageiro *</Label>
+          <Label htmlFor={`miles-${index}`}>Milhas/pax *</Label>
           <Input
             id={`miles-${index}`}
             type="number"
@@ -89,16 +89,11 @@ export function FlightSegmentForm({
             value={segment.miles || ""}
             onChange={(e) => onUpdate(index, "miles", parseInt(e.target.value) || 0)}
           />
-          <p className="text-xs text-muted-foreground">
-            Milhas necessárias para 1 passageiro neste trecho
-          </p>
         </div>
 
         {showBoardingFee && (
           <div className="space-y-2">
-            <Label htmlFor={`boarding-fee-${index}`}>
-              Taxa/pax (R$) *
-            </Label>
+            <Label htmlFor={`boarding-fee-${index}`}>Taxa/pax (R$) *</Label>
             <Input
               id={`boarding-fee-${index}`}
               type="number"
@@ -107,9 +102,6 @@ export function FlightSegmentForm({
               value={segment.boardingFee || ""}
               onChange={(e) => onUpdate(index, "boardingFee", parseFloat(e.target.value) || 0)}
             />
-            <p className="text-xs text-muted-foreground">
-              Taxa para 1 passageiro
-            </p>
           </div>
         )}
       </div>

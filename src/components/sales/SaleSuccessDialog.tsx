@@ -13,6 +13,14 @@ import { useToast } from "@/hooks/use-toast";
 import { usePaymentInterestConfig } from "@/hooks/usePaymentInterestConfig";
 import { usePaymentMethods } from "@/hooks/usePaymentMethods";
 
+interface FlightSegment {
+  from: string;
+  to: string;
+  date: string;
+  miles?: number;
+  boardingFee?: number;
+}
+
 interface SaleSuccessDialogProps {
   open: boolean;
   onClose: () => void;
@@ -20,6 +28,8 @@ interface SaleSuccessDialogProps {
   saleData: {
     customerName: string;
     routeText: string;
+    tripType?: string;
+    flightSegments?: FlightSegment[];
     airline: string;
     milesNeeded: string;
     priceTotal: string;
@@ -27,6 +37,12 @@ interface SaleSuccessDialogProps {
     passengers: number;
     paymentMethod?: string;
     pnr?: string;
+    saleSource?: string;
+    accountInfo?: {
+      airlineName: string;
+      accountNumber: string;
+      costPerThousand: number;
+    };
   };
 }
 
@@ -39,10 +55,26 @@ export function SaleSuccessDialog({
   const { toast } = useToast();
   const [copiedFull, setCopiedFull] = useState(false);
   const [copiedShort, setCopiedShort] = useState(false);
+  const [copiedSupplier, setCopiedSupplier] = useState(false);
   const { configs, calculateInstallmentValue, getDebitRate, getCreditConfigs } = usePaymentInterestConfig();
   const { activeMethods } = usePaymentMethods();
 
   const totalPrice = parseFloat(saleData.priceTotal);
+
+  // Format route based on trip type
+  const formatRoute = () => {
+    if (!saleData.flightSegments || saleData.flightSegments.length === 0) {
+      return saleData.routeText;
+    }
+
+    if (saleData.tripType === "round_trip" && saleData.flightSegments.length === 2) {
+      return `📍 Ida: ${saleData.flightSegments[0].from} → ${saleData.flightSegments[0].to} (${new Date(saleData.flightSegments[0].date).toLocaleDateString('pt-BR')})\n📍 Volta: ${saleData.flightSegments[1].from} → ${saleData.flightSegments[1].to} (${new Date(saleData.flightSegments[1].date).toLocaleDateString('pt-BR')})`;
+    } else {
+      return saleData.flightSegments.map((seg, idx) => 
+        `📍 Trecho ${idx + 1}: ${seg.from} → ${seg.to} (${new Date(seg.date).toLocaleDateString('pt-BR')})`
+      ).join('\n');
+    }
+  };
 
   // Build payment methods sections
   const buildPaymentMethodsSection = () => {
@@ -54,8 +86,10 @@ export function SaleSuccessDialog({
 
     activeMethods.forEach((method) => {
       if (method.method_type === "pix") {
+        const pixKey = method.additional_info?.pix_key || "A configurar";
+        const holderName = method.additional_info?.holder_name || method.additional_info?.account_holder || "A configurar";
         sections.push(
-          `📱 PIX (Aprovação Imediata)\n• Chave: ${method.additional_info?.pix_key || "A configurar"}\n• Titular: ${method.additional_info?.holder_name || "A configurar"}`
+          `📱 PIX (Aprovação Imediata)\n• Chave: ${pixKey}\n• Titular: ${holderName}`
         );
       }
 
@@ -88,9 +122,10 @@ export function SaleSuccessDialog({
             if (config.interest_rate === 0) {
               creditSection += `\n• ${config.installments}x de R$ ${result.installmentValue.toFixed(2)} (sem juros)`;
             } else {
-              creditSection += `\n• ${config.installments}x de R$ ${result.installmentValue.toFixed(2)} - Total: R$ ${result.finalPrice.toFixed(2)} (${config.interest_rate}%)`;
+              creditSection += `\n• ${config.installments}x de R$ ${result.installmentValue.toFixed(2)} (cliente paga)`;
             }
           });
+          creditSection += `\n\n💡 Obs: Você receberá R$ ${totalPrice.toFixed(2)} (os juros ficam com a operadora)`;
         }
         sections.push(creditSection);
       }
@@ -114,7 +149,8 @@ export function SaleSuccessDialog({
 ${saleData.pnr ? `Localizador (PNR): ${saleData.pnr}` : "⏳ Localizador será enviado em breve"}
 Companhia: ${saleData.airline}
 Passageiro(s): ${saleData.customerName}${saleData.passengers > 1 ? ` +${saleData.passengers - 1}` : ""}
-Rota: ${saleData.routeText}
+
+${formatRoute()}
 
 💰 Valor Total: R$ ${totalPrice.toFixed(2)}
 
@@ -126,19 +162,40 @@ Rota: ${saleData.routeText}
 
 Qualquer dúvida, estamos à disposição! 😊`;
 
+  // Supplier message
+  const supplierMessage = saleData.saleSource === 'internal_account' && saleData.accountInfo ? `
+🔔 NOTIFICAÇÃO DE USO - ${saleData.accountInfo.airlineName}
+
+Conta: ${saleData.accountInfo.accountNumber}
+Milhas utilizadas: ${parseInt(saleData.milesNeeded).toLocaleString('pt-BR')}
+
+💰 VALOR A DEPOSITAR:
+• Custo por milheiro: R$ ${saleData.accountInfo.costPerThousand.toFixed(2)}
+• Total de milheiros: ${(parseInt(saleData.milesNeeded) / 1000).toFixed(1)}
+• Valor total: R$ ${((parseInt(saleData.milesNeeded) / 1000) * saleData.accountInfo.costPerThousand).toFixed(2)}
+
+📅 Utilização: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}
+Cliente: ${saleData.customerName}
+
+Por favor, confirme o recebimento desta notificação.
+` : null;
+
   const shortMessage = saleData.pnr
     ? `PNR ${saleData.pnr} • Total R$ ${totalPrice.toFixed(2)}`
     : `Venda confirmada • Total R$ ${totalPrice.toFixed(2)} • PNR em breve`;
 
-  const copyToClipboard = async (text: string, type: "full" | "short") => {
+  const copyToClipboard = async (text: string, type: "full" | "short" | "supplier") => {
     try {
       await navigator.clipboard.writeText(text);
       if (type === "full") {
         setCopiedFull(true);
         setTimeout(() => setCopiedFull(false), 2000);
-      } else {
+      } else if (type === "short") {
         setCopiedShort(true);
         setTimeout(() => setCopiedShort(false), 2000);
+      } else {
+        setCopiedSupplier(true);
+        setTimeout(() => setCopiedSupplier(false), 2000);
       }
       toast({
         title: "Copiado!",
@@ -167,9 +224,12 @@ Qualquer dúvida, estamos à disposição! 😊`;
         </DialogHeader>
 
         <Tabs defaultValue="full" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className={`grid w-full ${supplierMessage ? 'grid-cols-3' : 'grid-cols-2'}`}>
             <TabsTrigger value="full">Mensagem Completa</TabsTrigger>
             <TabsTrigger value="short">Versão Curta</TabsTrigger>
+            {supplierMessage && (
+              <TabsTrigger value="supplier">Para Fornecedor</TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="full" className="space-y-4">
@@ -217,6 +277,31 @@ Qualquer dúvida, estamos à disposição! 😊`;
               )}
             </Button>
           </TabsContent>
+
+          {supplierMessage && (
+            <TabsContent value="supplier" className="space-y-4">
+              <div className="bg-muted rounded-md p-4 text-sm whitespace-pre-wrap font-mono max-h-96 overflow-y-auto">
+                {supplierMessage}
+              </div>
+              <Button
+                onClick={() => copyToClipboard(supplierMessage, "supplier")}
+                className="w-full"
+                variant={copiedSupplier ? "secondary" : "default"}
+              >
+                {copiedSupplier ? (
+                  <>
+                    <Check className="h-4 w-4 mr-2" />
+                    Copiado!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copiar Mensagem para Fornecedor
+                  </>
+                )}
+              </Button>
+            </TabsContent>
+          )}
         </Tabs>
 
         <div className="flex justify-end gap-2 pt-4">

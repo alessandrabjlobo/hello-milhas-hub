@@ -96,17 +96,9 @@ export const useSales = () => {
       }
 
       const milesUsed = Number(saleData.miles_needed) || 0;
-      let priceTotal = Number(saleData.price_total) || 0;
+      const priceTotal = Number(saleData.price_total) || 0; // Valor base SEM juros
       
-      // Apply interest if installments are used
-      const installments = (saleData as any).installments;
-      const interestRate = (saleData as any).interest_rate;
-      if (installments && installments > 1 && interestRate) {
-        const rate = Number(interestRate) / 100;
-        priceTotal = priceTotal * (1 + rate);
-      }
-      
-      // Calculate costs and margins
+      // Calculate costs and margins (sempre usando valor base)
       let totalCost = 0;
       let marginValue = 0;
       let marginPercentage = 0;
@@ -147,8 +139,8 @@ export const useSales = () => {
         cost_per_mile_snapshot: saleSource === 'internal_account' ? costPerMileSnapshot : null,
         counter_cost_per_thousand: saleSource === 'mileage_counter' ? Number((saleData as any).counter_cost_per_thousand) : null,
         total_cost: totalCost,
-        sale_price: Number(saleData.price_total) || 0,
-        final_price_with_interest: priceTotal,
+        sale_price: priceTotal, // Valor base que o vendedor recebe
+        final_price_with_interest: (saleData as any).final_price_with_interest || priceTotal,
         margin_value: marginValue,
         margin_percentage: marginPercentage,
         profit: marginValue,

@@ -41,10 +41,10 @@ export function TicketPDFUpload({
 
       for (const file of Array.from(files)) {
         // Validate file type
-        if (file.type !== "application/pdf") {
+        if (!["application/pdf", "image/jpeg", "image/jpg"].includes(file.type)) {
           toast({
             title: "Tipo de arquivo inválido",
-            description: "Apenas arquivos PDF são permitidos.",
+            description: "Apenas arquivos PDF e JPEG são permitidos.",
             variant: "destructive",
           });
           continue;
@@ -60,7 +60,7 @@ export function TicketPDFUpload({
           continue;
         }
 
-        const fileExt = "pdf";
+        const fileExt = file.type === "application/pdf" ? "pdf" : "jpg";
         const fileName = `${Date.now()}-${file.name}`;
         const filePath = `${userData.user.id}/${ticketId || "temp"}/${fileName}`;
 
@@ -148,19 +148,19 @@ export function TicketPDFUpload({
           ) : (
             <>
               <Upload className="h-4 w-4 mr-2" />
-              Anexar PDF
+              Anexar PDF/JPEG
             </>
           )}
         </Button>
         <span className="text-xs text-muted-foreground">
-          Máximo 10MB por arquivo
+          Máximo 10MB por arquivo (PDF ou JPEG)
         </span>
       </div>
 
       <input
         id="pdf-upload"
         type="file"
-        accept="application/pdf"
+        accept="application/pdf,image/jpeg,image/jpg"
         multiple
         onChange={handleFileSelect}
         className="hidden"
