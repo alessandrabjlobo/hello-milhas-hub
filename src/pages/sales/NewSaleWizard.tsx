@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -32,8 +33,11 @@ import { RegisterTicketDialog } from "@/components/tickets/RegisterTicketDialog"
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { BilheteTicketExtractor } from "@/components/tickets/BilheteTicketExtractor";
+import { AutoFilledInput } from "@/components/ui/auto-filled-input";
+import { FileUp, Edit3 } from "lucide-react";
 
-const steps = ["Origem", "Cliente & Voo", "Cálculo", "Confirmar"];
+const steps = ["Método de Entrada", "Dados da Venda", "Finalização"];
 
 export default function NewSaleWizard() {
   const navigate = useNavigate();
@@ -47,6 +51,12 @@ export default function NewSaleWizard() {
   const { supplierId } = useUserRole();
   const { linkedAirlines } = useSupplierAirlines(supplierId);
   const { configs, calculateInstallmentValue } = usePaymentInterestConfig();
+
+  // Step 0: Entry method
+  const [entryMethod, setEntryMethod] = useState<"pdf" | "manual" | null>(null);
+  const [pdfExtracted, setPdfExtracted] = useState(false);
+  const [extractedData, setExtractedData] = useState<any>(null);
+  const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(new Set());
 
   // Fase 2: Quote conversion
   const [isConvertingQuote, setIsConvertingQuote] = useState(false);
@@ -85,6 +95,8 @@ export default function NewSaleWizard() {
   const [paymentMethod, setPaymentMethod] = useState<string>();
   const [installments, setInstallments] = useState<number>();
   const [pnr, setPnr] = useState("");
+  const [ticketNumber, setTicketNumber] = useState("");
+  const [issueDate, setIssueDate] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
@@ -230,11 +242,89 @@ export default function NewSaleWizard() {
     setFlightSegments(updated);
   };
 
+  const handlePDFDataExtracted = (data: any) => {
+    setPdfExtracted(true);
+    setExtractedData(data);
+    
+    const newAutoFilled = new Set<string>();
+    
+    if (data.passengerName) {
+      setCustomerName(data.passengerName);
+      newAutoFilled.add("customerName");
+    }
+    if (data.cpf) {
+      setCustomerCpf(data.cpf);
+      newAutoFilled.add("customerCpf");
+    }
+    if (data.pnr) {
+      setPnr(data.pnr);
+      newAutoFilled.add("pnr");
+    }
+    if (data.ticketNumber) {
+      setTicketNumber(data.ticketNumber);
+      newAutoFilled.add("ticketNumber");
+    }
+    if (data.departureDate) {
+      setIssueDate(data.departureDate);
+      newAutoFilled.add("issueDate");
+    }
+    if (data.route) {
+      const [from, to] = data.route.split(/[-\/]/);
+      if (from && to) {
+        setFlightSegments([{ from: from.trim(), to: to.trim(), date: data.departureDate || "" }]);
+        newAutoFilled.add("flightSegments");
+      }
+    }
+    
+    setAutoFilledFields(newAutoFilled);
+  };
+
+  const validateStep1 = () => {
+    const missing: string[] = [];
+    if (!customerName) missing.push("Nome do cliente");
+    if (!customerCpf) missing.push("CPF do cliente");
+    if (!saleSource) missing.push("Origem da venda");
+    if (passengers === 0) missing.push("Número de passageiros");
+    if (passengerCpfs.length !== passengers) missing.push("CPFs dos passageiros");
+    if (flightSegments.length === 0 || !flightSegments.every(s => s.from && s.to && s.date)) {
+      missing.push("Trechos de voo completos");
+    }
+    
+    if (missing.length > 0) {
+      toast({
+        title: "Campos obrigatórios faltando",
+        description: missing.join(", "),
+        variant: "destructive",
+      });
+      return false;
+    }
+    return true;
+  };
+
   const handleNext = () => {
-    if (currentStep === 0 && !canProceedStep0) {
-      toast.error("Preencha todos os campos obrigatórios");
+    if (currentStep === 0) {
+      if (!entryMethod) {
+        toast({
+          title: "Selecione um método",
+          description: "Escolha entre Upload de PDF ou Entrada Manual",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (entryMethod === "pdf" && !pdfExtracted) {
+        toast({
+          title: "PDF não processado",
+          description: "Faça upload e extraia os dados do PDF primeiro",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+    
+    if (currentStep === 1 && !validateStep1()) {
       return;
     }
+    
     if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1);
     }
@@ -405,9 +495,7 @@ export default function NewSaleWizard() {
   };
 
   // Validation
-  const canProceedStep0 =
-    saleSource === "internal_account" ||
-    (saleSource === "mileage_counter" && counterSellerName && counterAirlineProgram && counterCostPerThousand);
+  const canProceedStep0 = entryMethod && (entryMethod === "manual" || pdfExtracted);
 
   const canProceedStep1 =
     customerName &&
@@ -416,12 +504,26 @@ export default function NewSaleWizard() {
     passengerCpfs.length === passengers &&
     flightSegments.length > 0 &&
     flightSegments.every((s) => s.from && s.to && s.date && s.miles) &&
-    (boardingFeeMode === "total" ? totalBoardingFee : flightSegments.every(s => s.boardingFee !== undefined));
+    (boardingFeeMode === "total" ? totalBoardingFee : flightSegments.every(s => s.boardingFee !== undefined)) &&
+    (saleSource === "internal_account" || (saleSource === "mileage_counter" && counterSellerName && counterAirlineProgram && counterCostPerThousand));
 
   const canProceedStep2 =
     (saleSource === "mileage_counter" || accountId) &&
     (pricePerPassenger || priceTotal) &&
     paymentMethod;
+  
+  // Progress calculation
+  const extractedFieldsStatus = {
+    pnr: extractedData?.pnr ? "✓" : "⚠",
+    passengerName: extractedData?.passengerName ? "✓" : "⚠",
+    cpf: extractedData?.cpf ? "✓" : "⚠",
+    route: extractedData?.route ? "✓" : "⚠",
+    ticketNumber: extractedData?.ticketNumber ? "✓" : "⚠",
+  };
+  
+  const extractedCount = Object.values(extractedFieldsStatus).filter(v => v === "✓").length;
+  const totalFields = Object.keys(extractedFieldsStatus).length;
+  const completionPercentage = Math.round((extractedCount / totalFields) * 100);
 
   // Calculate installment details
   const installmentDetails =
@@ -471,9 +573,106 @@ export default function NewSaleWizard() {
           {/* Main Form */}
           <div className="lg:col-span-2">
             <Card className="p-6">
-              {/* STEP 0: Sale Source */}
-            {/* STEP 0: SALES DATA */}
-            {currentStep === 0 && (
+              {/* STEP 0: Entry Method Selection */}
+              {currentStep === 0 && (
+                <div className="space-y-6">
+                  <h2 className="text-xl font-semibold">Como deseja registrar a venda?</h2>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Card 
+                      className={`p-6 cursor-pointer transition-all hover:shadow-lg ${
+                        entryMethod === "pdf" ? "border-primary ring-2 ring-primary/20 bg-primary/5" : ""
+                      }`}
+                      onClick={() => setEntryMethod("pdf")}
+                    >
+                      <div className="flex flex-col items-center text-center space-y-4">
+                        <div className="p-4 rounded-full bg-primary/10">
+                          <FileUp className="h-8 w-8 text-primary" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-lg mb-2">Upload de PDF</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Envie o bilhete em PDF e extraia automaticamente os dados da passagem
+                          </p>
+                        </div>
+                      </div>
+                    </Card>
+
+                    <Card 
+                      className={`p-6 cursor-pointer transition-all hover:shadow-lg ${
+                        entryMethod === "manual" ? "border-primary ring-2 ring-primary/20 bg-primary/5" : ""
+                      }`}
+                      onClick={() => setEntryMethod("manual")}
+                    >
+                      <div className="flex flex-col items-center text-center space-y-4">
+                        <div className="p-4 rounded-full bg-primary/10">
+                          <Edit3 className="h-8 w-8 text-primary" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-lg mb-2">Entrada Manual</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Preencha manualmente todos os campos do formulário de venda
+                          </p>
+                        </div>
+                      </div>
+                    </Card>
+                  </div>
+
+                  {entryMethod === "pdf" && (
+                    <div className="space-y-4 animate-in fade-in slide-in-from-top-4">
+                      <BilheteTicketExtractor onDataExtracted={handlePDFDataExtracted} />
+                      
+                      {pdfExtracted && extractedData && (
+                        <Card className="p-4 border-primary bg-primary/5">
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <h3 className="font-semibold flex items-center gap-2">
+                                📊 Progresso da Extração
+                              </h3>
+                              <Badge variant="secondary">{completionPercentage}% completo</Badge>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg">{extractedFieldsStatus.pnr}</span>
+                                <span className="text-muted-foreground">PNR</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg">{extractedFieldsStatus.passengerName}</span>
+                                <span className="text-muted-foreground">Passageiro</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg">{extractedFieldsStatus.cpf}</span>
+                                <span className="text-muted-foreground">CPF</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg">{extractedFieldsStatus.route}</span>
+                                <span className="text-muted-foreground">Rota</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg">{extractedFieldsStatus.ticketNumber}</span>
+                                <span className="text-muted-foreground">Bilhete</span>
+                              </div>
+                            </div>
+                            
+                            {completionPercentage < 100 && (
+                              <Alert>
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertDescription>
+                                  Alguns campos não foram extraídos automaticamente. Você poderá preenchê-los manualmente nas próximas etapas.
+                                </AlertDescription>
+                              </Alert>
+                            )}
+                          </div>
+                        </Card>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* STEP 1: SALES DATA */}
+              {currentStep === 1 && (
                 <div className="space-y-6">
                   <h2 className="text-xl font-semibold">Origem da Venda</h2>
                   <RadioGroup
@@ -585,23 +784,23 @@ export default function NewSaleWizard() {
                 </div>
               )}
 
-              {/* STEP 1: Client & Flight */}
-              {currentStep === 1 && (
+              {/* STEP 2: Finalization */}
+              {currentStep === 2 && (
                 <div className="space-y-6">
                   <h2 className="text-xl font-semibold">Cliente & Voo</h2>
                   
                   {/* Client Info */}
                   <div className="space-y-4 p-4 border rounded-lg">
                     <p className="font-medium">Dados do Cliente</p>
-                    <div>
-                      <Label htmlFor="customerName">Nome do Cliente *</Label>
-                      <Input
-                        id="customerName"
-                        value={customerName}
-                        onChange={(e) => setCustomerName(e.target.value)}
-                        placeholder="Nome completo"
-                      />
-                    </div>
+                  <AutoFilledInput
+                    id="customerName"
+                    label="Nome do Cliente"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    placeholder="Nome completo"
+                    autoFilled={autoFilledFields.has("customerName")}
+                    isRequired={true}
+                  />
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label htmlFor="customerPhone">Telefone</Label>
@@ -612,15 +811,16 @@ export default function NewSaleWizard() {
                           placeholder="(11) 99999-9999"
                         />
                       </div>
-                      <div>
-                        <Label htmlFor="customerCpf">CPF *</Label>
-                        <Input
-                          id="customerCpf"
-                          value={customerCpf}
-                          onChange={(e) => setCustomerCpf(maskCPF(e.target.value))}
-                          placeholder="000.000.000-00"
-                        />
-                      </div>
+                      <AutoFilledInput
+                        id="customerCpf"
+                        label="CPF"
+                        value={customerCpf}
+                        onChange={(e) => setCustomerCpf(maskCPF(e.target.value))}
+                        placeholder="000.000.000-00"
+                        maxLength={14}
+                        autoFilled={autoFilledFields.has("customerCpf")}
+                        isRequired={true}
+                      />
                     </div>
                   </div>
 
@@ -1060,24 +1260,46 @@ export default function NewSaleWizard() {
                   )}
 
                   {/* PNR */}
-                  <div>
-                    <Label htmlFor="pnr">PNR / Localizador (opcional)</Label>
+                  <AutoFilledInput
+                    id="pnr"
+                    label="PNR / Localizador"
+                    value={pnr}
+                    onChange={(e) => setPnr(e.target.value.toUpperCase())}
+                    placeholder="Ex: ABC123"
+                    maxLength={10}
+                    autoFilled={autoFilledFields.has("pnr") || (extractedData?.pnr ? true : false)}
+                    isRequired={false}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Pode ser preenchido depois, se ainda não disponível
+                  </p>
+
+                  {/* Ticket Number */}
+                  <AutoFilledInput
+                    id="ticketNumber"
+                    label="Número do Bilhete"
+                    value={ticketNumber}
+                    onChange={(e) => setTicketNumber(e.target.value)}
+                    placeholder="Ex: 000-0000000000"
+                    autoFilled={autoFilledFields.has("ticketNumber") || (extractedData?.ticketNumber ? true : false)}
+                    isRequired={false}
+                  />
+                  
+                  {/* Issue Date */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Data de Emissão</label>
                     <Input
-                      id="pnr"
-                      value={pnr}
-                      onChange={(e) => setPnr(e.target.value.toUpperCase())}
-                      placeholder="Ex: ABC123"
-                      maxLength={10}
+                      type="date"
+                      value={issueDate}
+                      onChange={(e) => setIssueDate(e.target.value)}
+                      className={autoFilledFields.has("issueDate") ? "border-primary bg-primary/5 ring-1 ring-primary/20" : ""}
                     />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Pode ser preenchido depois, se ainda não disponível
-                    </p>
                   </div>
                 </div>
               )}
 
-              {/* STEP 3: Confirmation */}
-              {currentStep === 3 && (
+              {/* STEP 4: Removed */}
+              {currentStep === 99 && (
                 <div className="space-y-6">
                   <h2 className="text-xl font-semibold">Confirmar</h2>
                   
@@ -1217,8 +1439,7 @@ export default function NewSaleWizard() {
                     onClick={handleNext}
                     disabled={
                       (currentStep === 0 && !canProceedStep0) ||
-                      (currentStep === 1 && !canProceedStep1) ||
-                      (currentStep === 2 && !canProceedStep2)
+                      (currentStep === 1 && !canProceedStep1)
                     }
                   >
                     Próximo
@@ -1230,7 +1451,7 @@ export default function NewSaleWizard() {
                       setAutoCreateTickets(true);
                       await handleSave();
                     }} 
-                    disabled={saving}
+                    disabled={saving || !canProceedStep2}
                   >
                     <Check className="h-4 w-4 mr-2" />
                     {saving ? "Salvando e Emitindo..." : "Finalizar e Emitir Passagens"}
