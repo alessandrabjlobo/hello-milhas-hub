@@ -42,7 +42,16 @@ export function BilheteTicketExtractor({ onDataExtracted }: BilheteTicketExtract
     try {
       const data = await parseDocument(file);
       setExtractedData(data);
-      toast.success("Dados extraídos com sucesso!");
+      
+      const extractedCount = Object.values(data).filter(v => v).length;
+      
+      if (extractedCount === 0) {
+        toast.error("Nenhum dado encontrado no PDF. Tente preencher manualmente ou use outro arquivo.");
+      } else if (extractedCount < 4) {
+        toast.success(`${extractedCount} campos extraídos. Complete os dados faltantes manualmente.`);
+      } else {
+        toast.success(`${extractedCount} campos extraídos do bilhete!`);
+      }
     } catch (error) {
       console.error("Erro ao extrair dados:", error);
       toast.error("Não foi possível extrair dados do PDF");

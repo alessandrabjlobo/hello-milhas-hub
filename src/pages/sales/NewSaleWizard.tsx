@@ -313,11 +313,9 @@ export default function NewSaleWizard() {
       }
       if (entryMethod === "pdf" && !pdfExtracted) {
         toast({
-          title: "PDF não processado",
-          description: "Faça upload e extraia os dados do PDF primeiro",
-          variant: "destructive",
+          title: "Aviso",
+          description: "PDF não extraído. Você pode preencher os dados manualmente no próximo passo.",
         });
-        return;
       }
     }
     
@@ -621,6 +619,26 @@ export default function NewSaleWizard() {
                   {entryMethod === "pdf" && (
                     <div className="space-y-4 animate-in fade-in slide-in-from-top-4">
                       <BilheteTicketExtractor onDataExtracted={handlePDFDataExtracted} />
+                      
+                      {!pdfExtracted && (
+                        <Alert>
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription className="flex items-center justify-between">
+                            <span>Extração ainda não realizada ou falhou</span>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => {
+                                setEntryMethod("manual");
+                                setExtractedData(null);
+                                setPdfExtracted(false);
+                              }}
+                            >
+                              Mudar para Manual
+                            </Button>
+                          </AlertDescription>
+                        </Alert>
+                      )}
                       
                       {pdfExtracted && extractedData && (
                         <Card className="p-4 border-primary bg-primary/5">
