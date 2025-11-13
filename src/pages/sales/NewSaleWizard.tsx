@@ -231,6 +231,10 @@ export default function NewSaleWizard() {
   };
 
   const handleNext = () => {
+    if (currentStep === 0 && !canProceedStep0) {
+      toast.error("Preencha todos os campos obrigatórios");
+      return;
+    }
     if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1);
     }
@@ -468,7 +472,8 @@ export default function NewSaleWizard() {
           <div className="lg:col-span-2">
             <Card className="p-6">
               {/* STEP 0: Sale Source */}
-              {currentStep === 0 && (
+            {/* STEP 0: SALES DATA */}
+            {currentStep === 0 && (
                 <div className="space-y-6">
                   <h2 className="text-xl font-semibold">Origem da Venda</h2>
                   <RadioGroup
