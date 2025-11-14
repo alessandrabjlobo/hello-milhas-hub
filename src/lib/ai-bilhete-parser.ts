@@ -13,13 +13,25 @@ export interface ExtractedData {
 
 /**
  * Usa OpenAI para interpretar o texto do bilhete e devolver um JSON estruturado.
- * IMPORTANTE: isso usa a chave VITE_OPENAI_API_KEY no front-end.
+ *
+ * ⚠️ IMPORTANTE:
+ * - TEMPORARIAMENTE a chave está definida direto no código.
+ * - Isso é apenas para testes / ambiente controlado.
+ * - Em produção, o ideal é mover essa chamada para um backend (edge function)
+ *   e NUNCA deixar a chave exposta no front-end.
  */
 export async function parseWithAI(text: string): Promise<ExtractedData> {
-  const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+  // ❗ COLE SUA CHAVE AQUI (formato: "sk-..."):
+  const apiKey = "SUA_CHAVE_DA_OPENAI_AQUI";
 
-  if (!apiKey) {
-    console.warn("VITE_OPENAI_API_KEY não está definida. Pulando IA.");
+  if (!apiKey || apiKey === "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") {
+    console.warn(
+      "OpenAI API Key não configurada em ai-bilhete-parser.ts. Pulando IA."
+    );
+    return {};
+  }
+
+  if (!text || !text.trim()) {
     return {};
   }
 
@@ -28,7 +40,7 @@ export async function parseWithAI(text: string): Promise<ExtractedData> {
   const trimmedText = text.slice(0, maxChars);
 
   const body = {
-    model: "gpt-4.1-mini",
+    model: "gpt-4.1-mini", // modelo mais barato
     response_format: { type: "json_object" as const },
     messages: [
       {
@@ -75,46 +87,55 @@ Texto do bilhete:
     ],
   };
 
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    const errText = await response.text();
-    console.error("Erro na chamada OpenAI:", errText);
-    throw new Error("Erro ao chamar OpenAI");
-  }
-
-  const json = await response.json();
-  const content = json.choices?.[0]?.message?.content;
-
-  if (!content) {
-    throw new Error("Resposta vazia da OpenAI");
-  }
-
-  let parsed: any;
   try {
-    parsed = JSON.parse(content);
-  } catch (e) {
-    console.error("Falha ao fazer JSON.parse no retorno da OpenAI:", content);
-    throw new Error("OpenAI não retornou JSON válido");
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error("Erro na chamada OpenAI:", errText);
+      throw new Error("Erro ao chamar OpenAI");
+    }
+
+    const json = await response.json();
+    const content = json?.choices?.[0]?.message?.content;
+
+    if (!content) {
+      throw new Error("Resposta vazia da OpenAI");
+    }
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(content);
+    } catch (e) {
+      console.error(
+        "Falha ao fazer JSON.parse no retorno da OpenAI. Conteúdo bruto:",
+        content
+      );
+      throw new Error("OpenAI não retornou JSON válido");
+    }
+
+    const result: ExtractedData = {
+      pnr: parsed.pnr ?? undefined,
+      ticketNumber: parsed.ticketNumber ?? undefined,
+      passengerName: parsed.passengerName ?? undefined,
+      cpf: parsed.cpf ?? undefined,
+      route: parsed.route ?? undefined,
+      departureDate: parsed.departureDate ?? undefined,
+      airline: parsed.airline ?? undefined,
+      flightNumber: parsed.flightNumber ?? undefined,
+    };
+
+    return result;
+  } catch (error) {
+    console.error("Erro em parseWithAI:", error);
+    // Em caso de erro, não quebra o fluxo – só volta vazio
+    return {};
   }
-
-  const result: ExtractedData = {
-    pnr: parsed.pnr ?? undefined,
-    ticketNumber: parsed.ticketNumber ?? undefined,
-    passengerName: parsed.passengerName ?? undefined,
-    cpf: parsed.cpf ?? undefined,
-    route: parsed.route ?? undefined,
-    departureDate: parsed.departureDate ?? undefined,
-    airline: parsed.airline ?? undefined,
-    flightNumber: parsed.flightNumber ?? undefined,
-  };
-
-  return result;
 }
