@@ -1,4 +1,4 @@
-// supabase/functions/parse-bilhete/index.ts
+// supabase/functions/parse-ticket/index.ts
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 Deno.serve(async (req: Request): Promise<Response> => {
-  // 1) Preflight CORS (OPTIONS)
+  // 1) Preflight CORS
   if (req.method === "OPTIONS") {
     return new Response("ok", { status: 200, headers: corsHeaders });
   }
@@ -29,10 +29,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // ⚠️ COLE SUA CHAVE AQUI PARA TESTE
-    // Depois o ideal é usar Deno.env.get("OPENAI_API_KEY")
+    // 👉 AQUI VAI SUA CHAVE DE TESTE (depois movemos para variável de ambiente)
     const apiKey =
-      "SUA_CHAVE_AQUI";
+      "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";
 
     if (!apiKey || !apiKey.startsWith("sk-")) {
       return new Response(
@@ -170,9 +169,9 @@ Texto do bilhete:
       },
     });
   } catch (err) {
-    console.error("Erro inesperado em parse-bilhete:", err);
+    console.error("Erro inesperado em parse-ticket:", err);
     return new Response(
-      JSON.stringify({ error: "Erro interno na função parse-bilhete" }),
+      JSON.stringify({ error: "Erro interno na função parse-ticket" }),
       {
         status: 500,
         headers: {
