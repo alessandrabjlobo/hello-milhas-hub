@@ -15,18 +15,17 @@ export interface ExtractedData {
  * Usa OpenAI para interpretar o texto do bilhete e devolver um JSON estruturado.
  *
  * ⚠️ IMPORTANTE:
- * - TEMPORARIAMENTE a chave está definida direto no código.
- * - Isso é apenas para testes / ambiente controlado.
- * - Em produção, o ideal é mover essa chamada para um backend (edge function)
- *   e NUNCA deixar a chave exposta no front-end.
+ * - Aqui a chave está definida direto no código apenas para TESTE.
+ * - Em produção, o ideal é usar backend/edge function e NUNCA expor a chave no front.
  */
 export async function parseWithAI(text: string): Promise<ExtractedData> {
-  // ❗ COLE SUA CHAVE AQUI (formato: "sk-..."):
-  const apiKey = "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";
+  // 🔑 COLE SUA CHAVE COMPLETA AQUI (ex: "sk-proj-...")
+  const apiKey = "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";
 
-  if (!apiKey || apiKey === "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") {
+  // Se não tiver chave ou estiver obviamente errada, não chama a IA
+  if (!apiKey || !apiKey.startsWith("sk-")) {
     console.warn(
-      "OpenAI API Key não configurada em ai-bilhete-parser.ts. Pulando IA."
+      "OpenAI API Key não configurada ou inválida em ai-bilhete-parser.ts. Pulando IA."
     );
     return {};
   }
