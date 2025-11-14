@@ -13,7 +13,7 @@ const patterns = {
   airline: /(?:AIRLINE|CIA\s*AEREA|COMPANHIA)[:\s]*([A-Z\s]{3,30})/i,
   date: /(\d{2}[-\/]\d{2}[-\/]\d{4})/g,
 };
-
+// TODO: ajuste futuro do parser de bilhete
 async function extractTextFromPDF(file: File): Promise<string> {
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
