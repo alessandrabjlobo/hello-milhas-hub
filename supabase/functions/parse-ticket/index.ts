@@ -1,16 +1,31 @@
 // supabase/functions/parse-ticket/index.ts
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
 const corsHeaders = {
+  // ✅ libera o seu front (pode deixar * por enquanto)
   "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-Deno.serve(async (req: Request): Promise<Response> => {
-  // 1) Preflight CORS
+serve(async (req) => {
+  // 🔹 1) Responder o preflight (OPTIONS) com 200 + CORS
   if (req.method === "OPTIONS") {
-    return new Response("ok", { status: 200, headers: corsHeaders });
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  if (req.method !== "POST") {
+    return new Response(
+      JSON.stringify({ error: "Method not allowed" }),
+      {
+        status: 405,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+      },
+    );
   }
 
   try {
@@ -25,33 +40,32 @@ Deno.serve(async (req: Request): Promise<Response> => {
             ...corsHeaders,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
     }
 
-    // 👉 AQUI VAI SUA CHAVE DE TESTE (depois movemos para variável de ambiente)
-    const apiKey =
-      "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";
-
-    if (!apiKey || !apiKey.startsWith("sk-")) {
+    const apiKey = Deno.env.get("OPENAI_API_KEY");
+    if (!apiKey) {
+      console.error("OPENAI_API_KEY não configurada no Supabase");
       return new Response(
-        JSON.stringify({ error: "OPENAI_API_KEY não configurada." }),
+        JSON.stringify({ error: "OPENAI_API_KEY não configurada" }),
         {
           status: 500,
           headers: {
             ...corsHeaders,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
     }
 
+    // Limita o tamanho do texto
     const maxChars = 8000;
     const trimmedText = text.slice(0, maxChars);
 
     const body = {
       model: "gpt-4.1-mini",
-      response_format: { type: "json_object" },
+      response_format: { type: "json_object" as const },
       messages: [
         {
           role: "system",
@@ -97,7 +111,7 @@ Texto do bilhete:
       ],
     };
 
-    const openaiResp = await fetch(
+    const openaiRes = await fetch(
       "https://api.openai.com/v1/chat/completions",
       {
         method: "POST",
@@ -106,47 +120,57 @@ Texto do bilhete:
           "Content-Type": "application/json",
         },
         body: JSON.stringify(body),
-      }
+      },
     );
 
-    if (!openaiResp.ok) {
-      const errText = await openaiResp.text();
-      console.error("Erro da OpenAI:", errText);
+    if (!openaiRes.ok) {
+      const errText = await openaiRes.text();
+      console.error("Erro na chamada OpenAI:", errText);
       return new Response(
-        JSON.stringify({
-          error: "Erro ao chamar OpenAI",
-          details: errText,
-        }),
+        JSON.stringify({ error: "Erro ao chamar OpenAI" }),
         {
           status: 500,
           headers: {
             ...corsHeaders,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
     }
 
-    const json = await openaiResp.json();
-    const content = json?.choices?.[0]?.message?.content ?? "{}";
+    const json = await openaiRes.json();
+    const content = json?.choices?.[0]?.message?.content;
 
-    let parsed: any = {};
-    try {
-      parsed = JSON.parse(content);
-    } catch (_e) {
-      console.error("JSON inválido da OpenAI, conteúdo:", content);
+    if (!content) {
       return new Response(
-        JSON.stringify({
-          error: "OpenAI não retornou JSON válido",
-          raw: content,
-        }),
+        JSON.stringify({ error: "Resposta vazia da OpenAI" }),
         {
           status: 500,
           headers: {
             ...corsHeaders,
             "Content-Type": "application/json",
           },
-        }
+        },
+      );
+    }
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(content);
+    } catch (e) {
+      console.error(
+        "Falha ao fazer JSON.parse no retorno da OpenAI. Conteúdo bruto:",
+        content,
+      );
+      return new Response(
+        JSON.stringify({ error: "OpenAI não retornou JSON válido" }),
+        {
+          status: 500,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        },
       );
     }
 
@@ -178,7 +202,7 @@ Texto do bilhete:
           ...corsHeaders,
           "Content-Type": "application/json",
         },
-      }
+      },
     );
   }
 });
