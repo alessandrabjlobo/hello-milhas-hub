@@ -22,7 +22,7 @@ export interface ExtractedData {
  */
 export async function parseWithAI(text: string): Promise<ExtractedData> {
   // ❗ COLE SUA CHAVE AQUI (formato: "sk-..."):
-  const apiKey = "SUA_CHAVE_DA_OPENAI_AQUI";
+  const apiKey = "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";
 
   if (!apiKey || apiKey === "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") {
     console.warn(
