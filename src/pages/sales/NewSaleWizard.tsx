@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { useSales, type FlightSegment, type PassengerCPF } from "@/hooks/useSales";
+import { type PassengerCPF as PassengerCPFType } from "@/hooks/useSales";
 import { useMileageAccounts } from "@/hooks/useMileageAccounts";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useSupplierAirlines } from "@/hooks/useSupplierAirlines";
@@ -36,6 +36,26 @@ import { useToast } from "@/hooks/use-toast";
 import { BilheteTicketExtractor } from "@/components/tickets/BilheteTicketExtractor";
 import { AutoFilledInput } from "@/components/ui/auto-filled-input";
 import { FileUp, Edit3 } from "lucide-react";
+import { createSaleWithSegments } from "@/services/saleService";
+import { saleSchema, type SaleFormData } from "@/schemas/saleSchema";
+import { getSupplierId } from "@/lib/getSupplierId";
+
+// Type definitions
+export type FlightSegment = {
+  from: string;
+  to: string;
+  date: string;
+  miles?: number;
+  boardingFee?: number;
+  time?: string;
+  stops?: number;
+  airline?: string;
+};
+
+export type PassengerCPF = {
+  name: string;
+  cpf: string;
+};
 
 const steps = ["Método de Entrada", "Dados da Venda", "Finalização"];
 
@@ -46,7 +66,6 @@ export default function NewSaleWizard() {
   const { toast } = useToast();
   
   const [currentStep, setCurrentStep] = useState(0);
-  const { createSale } = useSales();
   const { accounts } = useMileageAccounts();
   const { supplierId } = useUserRole();
   const { linkedAirlines } = useSupplierAirlines(supplierId);
@@ -65,11 +84,10 @@ export default function NewSaleWizard() {
   // Fase 3: Auto ticket creation
   const [autoCreateTickets, setAutoCreateTickets] = useState(false);
 
-  // Step 0 - Sale Source
-  const [saleSource, setSaleSource] = useState<"internal_account" | "mileage_counter">("internal_account");
-  const [counterSellerName, setCounterSellerName] = useState("");
-  const [counterSellerContact, setCounterSellerContact] = useState("");
-  const [counterAirlineProgram, setCounterAirlineProgram] = useState("");
+  // Step 0 - Channel (internal or balcao)
+  const [channel, setChannel] = useState<"internal" | "balcao">("internal");
+  const [sellerName, setSellerName] = useState("");
+  const [sellerContact, setSellerContact] = useState("");
   const [counterCostPerThousand, setCounterCostPerThousand] = useState("");
 
   // Step 1 - Client & Flight
@@ -87,7 +105,8 @@ export default function NewSaleWizard() {
   const [boardingFeeMode, setBoardingFeeMode] = useState<"total" | "per_segment">("total");
   const [totalBoardingFee, setTotalBoardingFee] = useState("");
 
-  // Step 2 - Calculation
+  // Step 2 - Calculation (Internal channel only)
+  const [programId, setProgramId] = useState<string>();
   const [accountId, setAccountId] = useState<string>();
   const [pricingType, setPricingType] = useState<"per_passenger" | "total">("total");
   const [pricePerPassenger, setPricePerPassenger] = useState("");
