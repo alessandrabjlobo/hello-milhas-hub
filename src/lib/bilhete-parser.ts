@@ -1,10 +1,5 @@
 import * as pdfjsLib from 'pdfjs-dist';
-
-// Configure PDF.js worker - use local version from node_modules
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url
-).toString();
+// Worker is configured globally in main.tsx via pdfWorker.ts
 
 interface ExtractedData {
   pnr?: string;

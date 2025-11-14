@@ -746,9 +746,57 @@ export type Database = {
           },
         ]
       }
+      sale_segments: {
+        Row: {
+          created_at: string | null
+          date: string | null
+          direction: string
+          flight_number: string | null
+          from_code: string
+          id: string
+          position: number
+          sale_id: string
+          to_code: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          date?: string | null
+          direction: string
+          flight_number?: string | null
+          from_code: string
+          id?: string
+          position?: number
+          sale_id: string
+          to_code: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          date?: string | null
+          direction?: string
+          flight_number?: string | null
+          from_code?: string
+          id?: string
+          position?: number
+          sale_id?: string
+          to_code?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_sale"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sales: {
         Row: {
           boarding_fee: number | null
+          channel: string
           client_contact: string | null
           client_cpf_encrypted: string
           client_name: string
@@ -760,6 +808,7 @@ export type Database = {
           counter_seller_name: string | null
           cpf_used_id: string | null
           created_at: string
+          created_by: string | null
           customer_cpf: string | null
           customer_name: string | null
           customer_phone: string | null
@@ -786,11 +835,15 @@ export type Database = {
           profit: number
           profit_estimate: number | null
           profit_margin: number
+          program_id: string | null
           route_text: string | null
           sale_price: number
           sale_source: string | null
+          seller_contact: string | null
+          seller_name: string | null
           status: Database["public"]["Enums"]["sale_status"]
           supplier_id: string | null
+          total_amount: number | null
           total_cost: number
           travel_dates: Json | null
           trip_type: string | null
@@ -799,6 +852,7 @@ export type Database = {
         }
         Insert: {
           boarding_fee?: number | null
+          channel: string
           client_contact?: string | null
           client_cpf_encrypted: string
           client_name: string
@@ -810,6 +864,7 @@ export type Database = {
           counter_seller_name?: string | null
           cpf_used_id?: string | null
           created_at?: string
+          created_by?: string | null
           customer_cpf?: string | null
           customer_name?: string | null
           customer_phone?: string | null
@@ -836,11 +891,15 @@ export type Database = {
           profit: number
           profit_estimate?: number | null
           profit_margin: number
+          program_id?: string | null
           route_text?: string | null
           sale_price: number
           sale_source?: string | null
+          seller_contact?: string | null
+          seller_name?: string | null
           status?: Database["public"]["Enums"]["sale_status"]
           supplier_id?: string | null
+          total_amount?: number | null
           total_cost: number
           travel_dates?: Json | null
           trip_type?: string | null
@@ -849,6 +908,7 @@ export type Database = {
         }
         Update: {
           boarding_fee?: number | null
+          channel?: string
           client_contact?: string | null
           client_cpf_encrypted?: string
           client_name?: string
@@ -860,6 +920,7 @@ export type Database = {
           counter_seller_name?: string | null
           cpf_used_id?: string | null
           created_at?: string
+          created_by?: string | null
           customer_cpf?: string | null
           customer_name?: string | null
           customer_phone?: string | null
@@ -886,11 +947,15 @@ export type Database = {
           profit?: number
           profit_estimate?: number | null
           profit_margin?: number
+          program_id?: string | null
           route_text?: string | null
           sale_price?: number
           sale_source?: string | null
+          seller_contact?: string | null
+          seller_name?: string | null
           status?: Database["public"]["Enums"]["sale_status"]
           supplier_id?: string | null
+          total_amount?: number | null
           total_cost?: number
           travel_dates?: Json | null
           trip_type?: string | null
@@ -917,6 +982,13 @@ export type Database = {
             columns: ["mileage_account_id"]
             isOneToOne: false
             referencedRelation: "mileage_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "airline_companies"
             referencedColumns: ["id"]
           },
           {
