@@ -32,7 +32,7 @@ serve(async (req) => {
 
     // ⚠️ COLE SUA CHAVE AQUI PARA TESTE
     // Ideal: usar Deno.env.get("OPENAI_API_KEY") com secret configurado
-    const apiKey = "SUA_CHAVE_AQUI"; // ex: "sk-proj-..."
+    const apiKey = "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"; // ex: "sk-proj-..."
 
     if (!apiKey || !apiKey.startsWith("sk-")) {
       return new Response(
