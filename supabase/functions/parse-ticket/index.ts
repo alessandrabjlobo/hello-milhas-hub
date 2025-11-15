@@ -13,7 +13,6 @@ serve(async (req: Request): Promise<Response> => {
     return new Response("ok", { status: 200, headers: corsHeaders });
   }
 
-  // Só aceitamos POST
   if (req.method !== "POST") {
     return new Response(
       JSON.stringify({ error: "Method not allowed" }),
@@ -28,17 +27,17 @@ serve(async (req: Request): Promise<Response> => {
   }
 
   try {
-    // Tenta ler o JSON
     let bodyReq: any = {};
     try {
       bodyReq = await req.json();
-    } catch {
-      // se der erro de parse, continua vazio
+    } catch (_e) {
+      console.error("[parse-ticket] Erro ao fazer req.json()");
     }
 
     const text = bodyReq?.text;
 
     if (!text || typeof text !== "string") {
+      console.error("[parse-ticket] Campo 'text' ausente ou inválido:", text);
       return new Response(
         JSON.stringify({ error: "Campo 'text' é obrigatório." }),
         {
@@ -51,14 +50,17 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // 🔑 Pega a chave das variáveis de ambiente do SUPABASE
     const apiKey = Deno.env.get("OPENAI_API_KEY");
     console.log("[parse-ticket] OPENAI_API_KEY setada?", !!apiKey);
 
     if (!apiKey) {
-      // Se cair aqui, é 100% configuração de env no Supabase
+      console.error(
+        "[parse-ticket] ERRO: OPENAI_API_KEY não configurada no Supabase",
+      );
       return new Response(
-        JSON.stringify({ error: "OPENAI_API_KEY não configurada no Supabase." }),
+        JSON.stringify({
+          error: "OPENAI_API_KEY não configurada no Supabase.",
+        }),
         {
           status: 500,
           headers: {
@@ -69,7 +71,6 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Limita tamanho do texto
     const maxChars = 8000;
     const trimmedText = text.slice(0, maxChars);
 
