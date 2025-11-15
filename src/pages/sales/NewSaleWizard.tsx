@@ -72,7 +72,7 @@ export type PassengerCPF = {
   cpf: string;
 };
 
-const steps = ["Método de Entrada", "Dados da Venda", "Finalização"];
+const steps = ["Dados da Venda", "Finalização"];
 
 export default function NewSaleWizard() {
   const navigate = useNavigate();
@@ -85,6 +85,7 @@ export default function NewSaleWizard() {
   const { supplierId } = useUserRole();
   const { linkedAirlines } = useSupplierAirlines(supplierId);
   const { configs, calculateInstallmentValue } = usePaymentInterestConfig();
+  const { activeMethods } = usePaymentMethods();
 
   // Step 0: Entry method
   const [entryMethod, setEntryMethod] = useState<"pdf" | "manual" | null>(null);
@@ -1561,21 +1562,47 @@ export default function NewSaleWizard() {
                         <SelectValue placeholder="Selecione" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="pix">PIX</SelectItem>
-                        <SelectItem value="credit_card">
-                          Cartão de Crédito
-                        </SelectItem>
-                        <SelectItem value="debit_card">
-                          Cartão de Débito
-                        </SelectItem>
-                        <SelectItem value="bank_transfer">
-                          Transferência Bancária
-                        </SelectItem>
-                        <SelectItem value="cash">
-                          Dinheiro
-                        </SelectItem>
+                        {activeMethods.map((method) => (
+                          <SelectItem key={method.id} value={method.id}>
+                            {method.method_name}
+                            {method.method_type === 'pix' && method.additional_info?.pix_holder && (
+                              <span className="text-xs text-muted-foreground ml-2">
+                                ({method.additional_info.pix_holder})
+                              </span>
+                            )}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
+
+                    {/* Info PIX quando selecionado */}
+                    {paymentMethod && (() => {
+                      const selectedMethod = activeMethods.find(m => m.id === paymentMethod);
+                      if (selectedMethod?.method_type === 'pix' && selectedMethod.additional_info) {
+                        return (
+                          <Card className="p-3 bg-blue-50 dark:bg-blue-950/20 border-blue-200">
+                            <div className="space-y-1 text-sm">
+                              {selectedMethod.additional_info.pix_key && (
+                                <div>
+                                  <span className="font-semibold">Chave PIX:</span>{" "}
+                                  <span className="text-muted-foreground">
+                                    {selectedMethod.additional_info.pix_key}
+                                  </span>
+                                </div>
+                              )}
+                              {selectedMethod.additional_info.pix_holder && (
+                                <div>
+                                  <span className="font-semibold">Titular:</span>{" "}
+                                  <span className="text-muted-foreground">
+                                    {selectedMethod.additional_info.pix_holder}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </Card>
+                        );
+                      }
+                    })()}
                   </div>
 
                   {/* Installments (only for credit card) */}

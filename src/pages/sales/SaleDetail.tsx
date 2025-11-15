@@ -20,6 +20,7 @@ import { PaymentTimeline } from "@/components/sales/PaymentTimeline";
 import { EditSaleDialog } from "@/components/sales/EditSaleDialog";
 import { DeleteSaleDialog } from "@/components/sales/DeleteSaleDialog";
 import type { Database } from "@/integrations/supabase/types";
+import { formatMiles } from "@/lib/utils";
 
 type Sale = Database["public"]["Tables"]["sales"]["Row"] & {
   mileage_accounts?: {
