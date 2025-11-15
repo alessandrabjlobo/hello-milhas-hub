@@ -157,19 +157,35 @@ export default function NewSaleWizard() {
 
   // --- HOOKS (useEffect) DEVEM VIR ANTES DE QUALQUER RETURN CONDICIONAL ---
 
-  // Auto-preencher passageiro quando há apenas 1
+  // Auto-preencher passageiros quando customerName e customerCpf mudam
   useEffect(() => {
-    if (passengers === 1 && customerName && customerCpf) {
-      if (passengerCpfs.length === 1) {
-        const current = passengerCpfs[0];
-        if (current.name !== customerName || current.cpf !== customerCpf) {
-          setPassengerCpfs([{ name: customerName, cpf: customerCpf }]);
-        }
-      } else if (passengerCpfs.length === 0) {
-        setPassengerCpfs([{ name: customerName, cpf: customerCpf }]);
+    if (customerName && customerCpf) {
+      // Sempre garantir que o primeiro passageiro seja o cliente
+      const firstPassenger: PassengerCPF = {
+        name: customerName,
+        cpf: customerCpf.replace(/\D/g, '') // Remove máscara
+      };
+      
+      if (passengers === 1) {
+        // 1 passageiro: substituir array inteiro
+        setPassengerCpfs([firstPassenger]);
+      } else if (passengers > 1) {
+        // 2+ passageiros: garantir que o primeiro seja o cliente
+        setPassengerCpfs(prev => {
+          const updated = [...prev];
+          updated[0] = firstPassenger;
+          
+          // Preencher posições vazias com objetos vazios
+          while (updated.length < passengers) {
+            updated.push({ name: "", cpf: "" });
+          }
+          
+          // Remover excesso se diminuiu o número de passageiros
+          return updated.slice(0, passengers);
+        });
       }
     }
-  }, [passengers, customerName, customerCpf, passengerCpfs]);
+  }, [customerName, customerCpf, passengers]);
 
   // Buscar orçamento se houver quoteId
   useEffect(() => {
@@ -266,15 +282,28 @@ export default function NewSaleWizard() {
 
   // Filtrar contas ativas vinculadas aos programas do fornecedor
   const filteredAccounts = (accounts || []).filter((acc) => {
+    console.log("[NewSaleWizard] 🔍 Verificando conta:", {
+      account: acc.account_number,
+      airline: acc.airline_company_id,
+      status: acc.status,
+      saleSource,
+      supplierId
+    });
+    
     if (saleSource === "internal_account") {
-      return (
-        (linkedAirlines || []).some(
-          (la: any) => la.airline_company_id === acc.airline_company_id
-        ) && acc.status === "active"
+      const isLinked = (linkedAirlines || []).some(
+        (la: any) => la.airline_company_id === acc.airline_company_id
       );
+      const isActive = acc.status === "active";
+      
+      console.log(`  ✓ Conta ${acc.account_number}: isLinked=${isLinked}, isActive=${isActive}`);
+      
+      return isLinked && isActive;
     }
     return false;
   });
+  
+  console.log(`[NewSaleWizard] ✅ Total de contas filtradas: ${filteredAccounts.length}`);
 
   const selectedAccount = filteredAccounts.find((a) => a.id === accountId);
 

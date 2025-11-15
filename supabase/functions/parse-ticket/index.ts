@@ -7,285 +7,180 @@ const corsHeaders: Record<string, string> = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+// Função de extração por regex (sem custo)
+function extractDataWithRegex(text: string) {
+  const patterns = {
+    pnr: /(?:LOC(?:ALIZADOR)?|PNR|RECORD\s*LOC(?:ATOR)?|Código\s*da\s*reserva)[:\s]*([A-Z0-9]{6})/i,
+    ticketNumber: /(?:TICKET|BILHETE|E-TICKET|Número\s*da\s*passagem)[:\s#]*(\d{3}[-\s]?\d{10}|\d{13})/i,
+    cpf: /(?:CPF|TAX|Documento\s*de\s*Identificação)[:\s]*(\d{3}\.?\d{3}\.?\d{3}[-\s]?\d{2}|\d{11})/i,
+    route: /(?:ROUTE|ROTA|FROM|DE|Origem.*Destino)[:\s]*([A-Z]{3})\s*[-\/→]\s*([A-Z]{3})/i,
+    flightNumber: /(?:FLIGHT|VOO|VÔO|N°\s*de\s*voo)[:\s#]*([A-Z]{2}\s?\d{3,4})/i,
+    passengerName: /(?:PASSENGER|PASSAGEIRO|NAME|NOME|Nome\s*do\s*Passageiro)[:\s]*([A-ZÀ-Ú\s]{5,50})/i,
+    airline: /(?:AIRLINE|CIA\s*AEREA|COMPANHIA|TAM|GOL|AZUL|LATAM)/i,
+    date: /(?:Data|Saída)[:\s]*(\d{2}[-\/]\d{2}[-\/]\d{2,4})/i,
+  };
+
+  const data: any = {};
+
+  const pnrMatch = text.match(patterns.pnr);
+  if (pnrMatch) data.pnr = pnrMatch[1].toUpperCase();
+
+  const ticketMatch = text.match(patterns.ticketNumber);
+  if (ticketMatch) data.ticketNumber = ticketMatch[1].replace(/[-\s]/g, "");
+
+  const cpfMatch = text.match(patterns.cpf);
+  if (cpfMatch) data.cpf = cpfMatch[1].replace(/[.\-\s]/g, "");
+
+  const routeMatch = text.match(patterns.route);
+  if (routeMatch) data.route = `${routeMatch[1]}-${routeMatch[2]}`.toUpperCase();
+
+  const flightMatch = text.match(patterns.flightNumber);
+  if (flightMatch) data.flightNumber = flightMatch[1].replace(/\s/g, "").toUpperCase();
+
+  const nameMatch = text.match(patterns.passengerName);
+  if (nameMatch) data.passengerName = nameMatch[1].trim();
+
+  const airlineMatch = text.match(patterns.airline);
+  if (airlineMatch) {
+    data.airline = airlineMatch[0].includes("TAM") || airlineMatch[0].includes("LATAM") 
+      ? "LATAM" 
+      : airlineMatch[0].includes("GOL") 
+      ? "GOL" 
+      : airlineMatch[0].includes("AZUL") 
+      ? "AZUL" 
+      : airlineMatch[1]?.trim();
+  }
+
+  const dateMatch = text.match(patterns.date);
+  if (dateMatch) {
+    const parts = dateMatch[1].split(/[-\/]/);
+    if (parts.length === 3) {
+      const [day, month, year] = parts;
+      const fullYear = year.length === 2 ? `20${year}` : year;
+      data.departureDate = `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+  }
+
+  return data;
+}
+
 serve(async (req: Request): Promise<Response> => {
-  // Preflight CORS
   if (req.method === "OPTIONS") {
-    return new Response("ok", {
-      status: 200,
-      headers: corsHeaders,
-    });
+    return new Response("ok", { status: 200, headers: corsHeaders });
   }
 
   console.log("[parse-ticket] Método:", req.method);
 
   try {
     const rawBody = await req.text();
-    console.log("[parse-ticket] Body recebido (raw):", rawBody);
-
     let body: any = {};
     try {
       body = rawBody ? JSON.parse(rawBody) : {};
     } catch (err) {
-      console.error("[parse-ticket] Erro ao fazer JSON.parse do body:", err);
+      console.error("[parse-ticket] Erro ao parsear JSON:", err);
     }
 
     const text = body?.text;
-    console.log("[parse-ticket] Campo text:", text ? "OK" : "VAZIO/INDEFINIDO");
-
     if (!text || typeof text !== "string" || !text.trim()) {
       return new Response(
-        JSON.stringify({
-          error: "Campo 'text' é obrigatório.",
-          pnr: null,
-          ticketNumber: null,
-          passengerName: null,
-          cpf: null,
-          route: null,
-          departureDate: null,
-          airline: null,
-          flightNumber: null,
-        }),
-        {
-          status: 200,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
-        },
+        JSON.stringify({ error: "Campo 'text' é obrigatório." }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    const trimmedText = text.slice(0, 8000);
+    const regexData = extractDataWithRegex(trimmedText);
+    const regexFieldsCount = Object.values(regexData).filter(v => v).length;
+
+    console.log(`[parse-ticket] 📋 Regex extraiu ${regexFieldsCount} campos:`, regexData);
+
+    const missingFields = [];
+    if (!regexData.pnr) missingFields.push('pnr');
+    if (!regexData.passengerName) missingFields.push('passengerName');
+    if (!regexData.cpf) missingFields.push('cpf');
+    if (!regexData.airline) missingFields.push('airline');
+
+    if (missingFields.length === 0) {
+      console.log("[parse-ticket] ✅ Campos principais extraídos, pulando IA");
+      return new Response(JSON.stringify(regexData), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    console.log(`[parse-ticket] 🤖 Faltam: ${missingFields.join(', ')}`);
 
     const apiKey = Deno.env.get("OPENAI_API_KEY");
-    console.log(
-      "[parse-ticket] OPENAI_API_KEY configurada?",
-      apiKey ? "SIM" : "NÃO",
-    );
-
     if (!apiKey) {
+      console.warn("[parse-ticket] ⚠️ OpenAI não configurada");
       return new Response(
-        JSON.stringify({
-          error: "OPENAI_API_KEY não configurada na função.",
-          pnr: null,
-          ticketNumber: null,
-          passengerName: null,
-          cpf: null,
-          route: null,
-          departureDate: null,
-          airline: null,
-          flightNumber: null,
-        }),
-        {
-          status: 200,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
-        },
+        JSON.stringify({ ...regexData, warning: "OpenAI não configurada" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const maxChars = 8000;
-    const trimmedText = (text as string).slice(0, maxChars);
-
-    const openaiPayload = {
-      model: "gpt-4o-mini",
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content:
-            "Você é um assistente especializado em ler bilhetes de passagem aérea (e-tickets) em português ou inglês e extrair campos estruturados. Sempre responda APENAS com um JSON válido, sem texto extra.",
-        },
-        {
-          role: "user",
-          content: `
-Extraia os seguintes campos, se existirem, do texto abaixo do bilhete de passagem:
-
-- pnr: código localizador (6 caracteres, letras e números)
-- ticketNumber: número do bilhete, geralmente no formato 0000000000000 ou 000-0000000000
-- passengerName: nome completo do passageiro, formato "SOBRENOME/NOME" ou similar
-- cpf: CPF do passageiro (apenas números, 11 dígitos)
-- route: rota principal no formato ORIGEM-DESTINO, ex: FOR-GRU ou GRU-MCO
-- departureDate: data da partida no formato YYYY-MM-DD
-- airline: nome da companhia aérea (ex: LATAM, GOL, AZUL, TAP)
-- flightNumber: número do voo (ex: LA1234, G31234)
-
-Regras importantes:
-- Se algum campo não existir com clareza, devolva null para ele.
-- Não invente dados. Só preencha se estiver claro no texto.
-- A data pode aparecer em formatos diferentes (DD/MM/YYYY, DD-MM-YYYY, etc.). Converta sempre para YYYY-MM-DD.
-- Se houver mais de um voo, considere o primeiro voo da viagem como referência.
-
-Responda APENAS com um JSON com esta estrutura:
-{
-  "pnr": string | null,
-  "ticketNumber": string | null,
-  "passengerName": string | null,
-  "cpf": string | null,
-  "route": string | null,
-  "departureDate": string | null,
-  "airline": string | null,
-  "flightNumber": string | null
-}
-
-Texto do bilhete:
-"""${trimmedText}"""
-        `.trim(),
-        },
-      ],
-    };
-
-    console.log("[parse-ticket] Enviando requisição para OpenAI...");
-
-    const openaiRes = await fetch(
-      "https://api.openai.com/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(openaiPayload),
+    const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
       },
-    );
-
-    console.log(
-      "[parse-ticket] Status da resposta da OpenAI:",
-      openaiRes.status,
-    );
-
-    if (!openaiRes.ok) {
-      const errText = await openaiRes.text();
-      console.error("[parse-ticket] Erro na chamada OpenAI:", errText);
-
-      return new Response(
-        JSON.stringify({
-          error: "Erro ao chamar OpenAI",
-          openaiStatus: openaiRes.status,
-          openaiBody: errText,
-          pnr: null,
-          ticketNumber: null,
-          passengerName: null,
-          cpf: null,
-          route: null,
-          departureDate: null,
-          airline: null,
-          flightNumber: null,
-        }),
-        {
-          status: 200,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "system",
+            content: "Extraia campos de bilhetes aéreos retornando JSON."
           },
-        },
+          {
+            role: "user",
+            content: `Extraia: pnr, ticketNumber, passengerName, cpf, route, departureDate, airline, flightNumber.\n\n${trimmedText}`
+          }
+        ],
+      }),
+    });
+
+    if (!openaiResponse.ok) {
+      const errorBody = await openaiResponse.text();
+      console.error("[parse-ticket] ❌ OpenAI erro:", openaiResponse.status, errorBody);
+      return new Response(
+        JSON.stringify({ ...regexData, error: "Erro OpenAI", openaiStatus: openaiResponse.status }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const json = await openaiRes.json();
-    const content = json?.choices?.[0]?.message?.content;
-
-    console.log("[parse-ticket] Conteúdo retornado pela OpenAI:", content);
-
-    if (!content || typeof content !== "string") {
-      return new Response(
-        JSON.stringify({
-          error: "Resposta vazia ou inválida da OpenAI",
-          raw: json,
-          pnr: null,
-          ticketNumber: null,
-          passengerName: null,
-          cpf: null,
-          route: null,
-          departureDate: null,
-          airline: null,
-          flightNumber: null,
-        }),
-        {
-          status: 200,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
-        },
-      );
-    }
-
+    const openaiData = await openaiResponse.json();
     let parsed: any = {};
     try {
-      parsed = JSON.parse(content);
-    } catch (e) {
-      console.error(
-        "[parse-ticket] Falha ao fazer JSON.parse no retorno da OpenAI. Conteúdo bruto:",
-        content,
-      );
-
-      return new Response(
-        JSON.stringify({
-          error: "OpenAI não retornou JSON válido",
-          rawContent: content,
-          pnr: null,
-          ticketNumber: null,
-          passengerName: null,
-          cpf: null,
-          route: null,
-          departureDate: null,
-          airline: null,
-          flightNumber: null,
-        }),
-        {
-          status: 200,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
-        },
-      );
+      parsed = JSON.parse(openaiData?.choices?.[0]?.message?.content || "{}");
+    } catch {
+      parsed = {};
     }
 
     const result = {
-      pnr: parsed.pnr ?? null,
-      ticketNumber: parsed.ticketNumber ?? null,
-      passengerName: parsed.passengerName ?? null,
-      cpf: parsed.cpf ?? null,
-      route: parsed.route ?? null,
-      departureDate: parsed.departureDate ?? null,
-      airline: parsed.airline ?? null,
-      flightNumber: parsed.flightNumber ?? null,
+      pnr: parsed.pnr ?? regexData.pnr ?? null,
+      ticketNumber: parsed.ticketNumber ?? regexData.ticketNumber ?? null,
+      passengerName: parsed.passengerName ?? regexData.passengerName ?? null,
+      cpf: parsed.cpf ?? regexData.cpf ?? null,
+      route: parsed.route ?? regexData.route ?? null,
+      departureDate: parsed.departureDate ?? regexData.departureDate ?? null,
+      airline: parsed.airline ?? regexData.airline ?? null,
+      flightNumber: parsed.flightNumber ?? regexData.flightNumber ?? null,
     };
 
-    console.log("[parse-ticket] Resultado final:", result);
+    const aiFieldsCount = Object.values(parsed).filter(v => v).length;
+    console.log(`[parse-ticket] 📊 Regex: ${regexFieldsCount} | IA: ${aiFieldsCount}`);
 
     return new Response(JSON.stringify(result), {
       status: 200,
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "application/json",
-      },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (err) {
-    console.error("[parse-ticket] Erro inesperado:", err);
-
+  } catch (error: any) {
+    console.error("[parse-ticket] ❌ Erro:", error);
     return new Response(
-      JSON.stringify({
-        error: "Erro interno na função parse-ticket",
-        details: String(err),
-        pnr: null,
-        ticketNumber: null,
-        passengerName: null,
-        cpf: null,
-        route: null,
-        departureDate: null,
-        airline: null,
-        flightNumber: null,
-      }),
-      {
-        status: 200,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
-      },
+      JSON.stringify({ error: error?.message || String(error) }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
