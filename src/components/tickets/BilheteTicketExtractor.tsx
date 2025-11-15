@@ -72,6 +72,27 @@ export function BilheteTicketExtractor({ onDataExtracted }: BilheteTicketExtract
     }
   };
 
+  const formatRoute = (route: any): string => {
+    if (!route) return "";
+    if (typeof route === "string") return route;
+    if (Array.isArray(route)) {
+      return route
+        .map((leg) => {
+          const o = leg?.origin || leg?.from || "";
+          const d = leg?.destination || leg?.to || "";
+          return [o, d].filter(Boolean).join(" → ");
+        })
+        .filter(Boolean)
+        .join(" / ");
+    }
+    if (typeof route === "object") {
+      const o = route.origin || route.from || "";
+      const d = route.destination || route.to || "";
+      return [o, d].filter(Boolean).join(" → ");
+    }
+    return String(route);
+  };
+
   const handleApply = () => {
     if (extractedData) {
       onDataExtracted(extractedData);
@@ -156,7 +177,7 @@ export function BilheteTicketExtractor({ onDataExtracted }: BilheteTicketExtract
               {extractedData.route && (
                 <div>
                   <span className="text-muted-foreground">Rota:</span>{" "}
-                  <span className="font-medium">{extractedData.route}</span>
+                  <span className="font-medium">{formatRoute(extractedData.route)}</span>
                 </div>
               )}
               {extractedData.airline && (
