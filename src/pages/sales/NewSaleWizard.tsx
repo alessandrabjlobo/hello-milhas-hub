@@ -107,6 +107,30 @@ export default function NewSaleWizard() {
     "internal_account" | "mileage_counter"
   >("internal_account");
   const [counterSellerName, setCounterSellerName] = useState("");
+
+  // Auto-preencher passageiro quando há apenas 1
+  useEffect(() => {
+    if (passengers === 1 && customerName && customerCpf) {
+      if (passengerCpfs.length === 1) {
+        const current = passengerCpfs[0];
+        if (current.name !== customerName || current.cpf !== customerCpf) {
+          setPassengerCpfs([{
+            name: customerName,
+            cpf: customerCpf
+          }]);
+          toast({
+            title: "✅ Passageiro atualizado",
+            description: "Dados copiados automaticamente do cliente",
+          });
+        }
+      } else if (passengerCpfs.length === 0) {
+        setPassengerCpfs([{
+          name: customerName,
+          cpf: customerCpf
+        }]);
+      }
+    }
+  }, [passengers, customerName, customerCpf]);
   const [counterSellerContact, setCounterSellerContact] = useState("");
   const [counterAirlineProgram, setCounterAirlineProgram] = useState("");
   const [counterCostPerThousand, setCounterCostPerThousand] = useState("");
@@ -597,10 +621,38 @@ export default function NewSaleWizard() {
         counterAirlineProgram &&
         counterCostPerThousand));
 
+  const selectedPaymentMethod = activeMethods.find(m => m.id === paymentMethod);
   const canProceedStep2 =
     (saleSource === "mileage_counter" || accountId) &&
     (pricePerPassenger || priceTotal) &&
-    paymentMethod;
+    selectedPaymentMethod;
+
+  // Debug logs para validação Step Final
+  useEffect(() => {
+    if (currentStep === steps.length - 1) {
+      console.log("🔍 Validação Step Final:", {
+        saleSource,
+        accountId,
+        pricePerPassenger,
+        priceTotal,
+        paymentMethod,
+        selectedPaymentMethod: selectedPaymentMethod?.method_name,
+        canProceed: canProceedStep2
+      });
+      
+      if (!canProceedStep2) {
+        if (saleSource === "internal_account" && !accountId) {
+          console.warn("⚠️ Falta selecionar conta");
+        }
+        if (!pricePerPassenger && !priceTotal) {
+          console.warn("⚠️ Falta informar preço");
+        }
+        if (!selectedPaymentMethod) {
+          console.warn("⚠️ Falta selecionar método de pagamento válido");
+        }
+      }
+    }
+  }, [currentStep, saleSource, accountId, pricePerPassenger, priceTotal, paymentMethod, selectedPaymentMethod, canProceedStep2]);
 
   // Progress calculation
   const extractedFieldsStatus = {
@@ -1084,98 +1136,100 @@ export default function NewSaleWizard() {
                       </RadioGroup>
                     </div>
 
-                    <div>
-                      <Label htmlFor="passengers">
-                        Número de Passageiros *
-                      </Label>
-                      <Input
-                        id="passengers"
-                        type="number"
-                        min="1"
-                        value={passengers}
-                        onChange={(e) =>
-                          setPassengers(parseInt(e.target.value) || 1)
-                        }
-                      />
+                    {/* Grid compacto: Passageiros + Taxa de Embarque */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* Número de Passageiros */}
+                      <div>
+                        <Label htmlFor="passengers">
+                          Nº Passageiros *
+                        </Label>
+                        <Input
+                          id="passengers"
+                          type="number"
+                          min="1"
+                          value={passengers}
+                          onChange={(e) =>
+                            setPassengers(parseInt(e.target.value) || 1)
+                          }
+                        />
+                      </div>
+
+                      {/* Modo Taxa de Embarque */}
+                      <div className="md:col-span-2">
+                        <Label>Taxa de Embarque *</Label>
+                        <RadioGroup
+                          value={boardingFeeMode}
+                          onValueChange={(value: "total" | "per_segment") =>
+                            setBoardingFeeMode(value)
+                          }
+                          className="flex gap-4 mt-2"
+                        >
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="total" id="total" />
+                            <Label htmlFor="total" className="cursor-pointer">Total</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="per_segment" id="per_segment" />
+                            <Label htmlFor="per_segment" className="cursor-pointer">Por Trecho</Label>
+                          </div>
+                        </RadioGroup>
+                        
+                        {boardingFeeMode === "total" && (
+                          <Input
+                            type="number"
+                            placeholder="R$ 0,00 (por passageiro)"
+                            value={totalBoardingFee}
+                            onChange={(e) => setTotalBoardingFee(e.target.value)}
+                            className="mt-2"
+                            step="0.01"
+                          />
+                        )}
+                      </div>
                     </div>
 
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setShowPassengerDialog(true)}
-                      className="w-full"
-                    >
-                      <Users className="h-4 w-4 mr-2" />
-                      {passengerCpfs.length === 0
-                        ? "Adicionar CPFs dos Passageiros"
-                        : `${passengerCpfs.length} de ${passengers} passageiro(s) adicionado(s)`}
-                    </Button>
+                    {/* Botão CPFs + Alert/Success */}
+                    {passengers > 1 ? (
+                      <>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setShowPassengerDialog(true)}
+                          className="w-full"
+                        >
+                          <Users className="h-4 w-4 mr-2" />
+                          {passengerCpfs.length === 0
+                            ? "Adicionar CPFs dos Passageiros"
+                            : `${passengerCpfs.length} de ${passengers} passageiro(s) adicionado(s)`}
+                        </Button>
 
-                    {passengerCpfs.length !== passengers && (
-                      <Alert>
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>
-                          É necessário adicionar o CPF de todos os{" "}
-                          {passengers} passageiro(s) para continuar.
-                        </AlertDescription>
-                      </Alert>
+                        {passengerCpfs.length !== passengers && (
+                          <Alert>
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertDescription>
+                              É necessário adicionar o CPF de todos os{" "}
+                              {passengers} passageiro(s) para continuar.
+                            </AlertDescription>
+                          </Alert>
+                        )}
+                      </>
+                    ) : (
+                      passengerCpfs.length === 1 && (
+                        <Alert className="bg-green-50 border-green-200">
+                          <Check className="h-4 w-4 text-green-600" />
+                          <AlertDescription className="text-green-800">
+                            ✅ Passageiro preenchido automaticamente: <strong>{passengerCpfs[0].name}</strong>
+                          </AlertDescription>
+                        </Alert>
+                      )
                     )}
                   </div>
 
-                  {/* Boarding Fee Mode */}
-                  <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
-                    <Label className="font-semibold">
-                      Taxas de Embarque
-                    </Label>
-                    <RadioGroup
-                      value={boardingFeeMode}
-                      onValueChange={(value: "total" | "per_segment") =>
-                        setBoardingFeeMode(value)
-                      }
-                      className="grid grid-cols-2 gap-4"
-                    >
-                      <div className="flex items-center space-x-2 border rounded p-3 cursor-pointer hover:bg-accent">
-                        <RadioGroupItem value="total" id="fee-total" />
-                        <Label
-                          htmlFor="fee-total"
-                          className="cursor-pointer flex-1"
-                        >
-                          <div>
-                            <p className="font-semibold">
-                              Taxa Total
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              Valor único para toda viagem (mais comum)
-                            </p>
-                          </div>
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2 border rounded p-3 cursor-pointer hover:bg-accent">
-                        <RadioGroupItem
-                          value="per_segment"
-                          id="fee-segment"
-                        />
-                        <Label
-                          htmlFor="fee-segment"
-                          className="cursor-pointer flex-1"
-                        >
-                          <div>
-                            <p className="font-semibold">
-                              Taxa por Trecho
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              Valores individuais por segmento
-                            </p>
-                          </div>
-                        </Label>
-                      </div>
-                    </RadioGroup>
-
-                    {boardingFeeMode === "total" && (
-                      <div className="space-y-2 mt-3">
-                        <Label htmlFor="total-boarding-fee">
-                          Taxa de Embarque Total (por passageiro) *
-                        </Label>
+                  {/* Boarding Fee Mode - caso seja per_segment, mostrar abaixo */}
+                  {boardingFeeMode === "per_segment" && (
+                    <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
+                      <Label className="font-semibold">
+                        Taxas por Trecho
+                      </Label>
                         <Input
                           id="total-boarding-fee"
                           type="number"
