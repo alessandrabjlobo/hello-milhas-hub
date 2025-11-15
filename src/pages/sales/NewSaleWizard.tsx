@@ -1230,11 +1230,14 @@ export default function NewSaleWizard() {
         expectedCount={passengers}
       />
 
-      <SaleSuccessDialog
-        open={showSuccessDialog}
-        onClose={() => setShowSuccessDialog(false)}
-        saleData={lastSaleData}
-      />
+      {lastSaleData && (
+  <SaleSuccessDialog
+    open={showSuccessDialog}
+    onClose={() => setShowSuccessDialog(false)}
+    saleData={lastSaleData}
+  />
+)}
+
     </div>
   );
 }
