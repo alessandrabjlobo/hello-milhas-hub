@@ -9,6 +9,9 @@ interface SaleSummaryCardProps {
   passengers: number;
   milesNeeded: string;
   priceTotal: string;
+  boardingFee?: string;
+  paymentMethod?: string;
+  saleSource?: string;
 }
 
 export function SalesSummaryCard({
@@ -19,6 +22,9 @@ export function SalesSummaryCard({
   passengers,
   milesNeeded,
   priceTotal,
+  boardingFee,
+  paymentMethod,
+  saleSource,
 }: SaleSummaryCardProps) {
   return (
     <Card className="p-6 sticky top-6">
@@ -76,6 +82,17 @@ export function SalesSummaryCard({
             <Separator />
           </>
         )}
+        {boardingFee && (
+          <>
+            <div>
+              <p className="text-muted-foreground">Taxa de Embarque</p>
+              <p className="font-medium">
+                R$ {parseFloat(boardingFee).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+            <Separator />
+          </>
+        )}
         {priceTotal && (
           <>
             <div>
@@ -83,6 +100,24 @@ export function SalesSummaryCard({
               <p className="text-xl font-bold text-primary">
                 R$ {(parseFloat(priceTotal) || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
               </p>
+            </div>
+            <Separator />
+          </>
+        )}
+        {paymentMethod && (
+          <>
+            <div>
+              <p className="text-muted-foreground">Forma de Pagamento</p>
+              <p className="font-medium">{paymentMethod}</p>
+            </div>
+            <Separator />
+          </>
+        )}
+        {saleSource && (
+          <>
+            <div>
+              <p className="text-muted-foreground">Origem</p>
+              <p className="font-medium">{saleSource}</p>
             </div>
           </>
         )}
