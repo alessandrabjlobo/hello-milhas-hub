@@ -6,6 +6,7 @@ import { PaymentStatusBadge } from "@/components/sales/PaymentStatusBadge";
 import { Eye } from "lucide-react";
 import { useAccountSales } from "@/hooks/useAccountSales";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatMiles } from "@/lib/utils";
 
 interface AccountSalesTableProps {
   accountId: string;
@@ -45,7 +46,7 @@ export const AccountSalesTable = ({ accountId }: AccountSalesTableProps) => {
         </div>
         <div className="rounded-lg border p-4">
           <p className="text-sm text-muted-foreground">Milhas Utilizadas</p>
-          <p className="text-2xl font-bold">{totalMilesUsed.toLocaleString("pt-BR")}</p>
+          <p className="text-2xl font-bold">{formatMiles(totalMilesUsed)}</p>
         </div>
         <div className="rounded-lg border p-4">
           <p className="text-sm text-muted-foreground">Receita Total</p>
@@ -76,7 +77,7 @@ export const AccountSalesTable = ({ accountId }: AccountSalesTableProps) => {
                 <TableCell>{sale.client_name}</TableCell>
                 <TableCell className="max-w-xs truncate">{sale.route_text || "N/A"}</TableCell>
                 <TableCell className="text-right">
-                  {Number(sale.miles_used || 0).toLocaleString("pt-BR")}
+                  {formatMiles(Number(sale.miles_used || 0))}
                 </TableCell>
                 <TableCell className="text-right font-medium">
                   R$ {Number(sale.sale_price || 0).toFixed(2)}

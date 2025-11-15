@@ -111,7 +111,7 @@ export async function parseDocument(file: File): Promise<ExtractedData> {
       console.log("[parseDocument] ✅ IA extraiu", fieldsExtractedByAI, "campos");
 
       if (fieldsExtractedByAI > 0) {
-        toast.success(`IA extraiu ${fieldsExtractedByAI} campos adicionais!`);
+        toast.success(`IA extraiu ${fieldsExtractedByAI} campos com sucesso!`);
       }
 
       // Mesclar: IA tem prioridade
@@ -132,9 +132,12 @@ export async function parseDocument(file: File): Promise<ExtractedData> {
       console.error("[parseDocument] ⚠️ Falha na camada de IA:", aiError);
 
       // Mostrar toast de erro ao usuário
-      if (aiError.message?.includes("API Key")) {
-        toast.error("IA não configurada. Configure VITE_OPENAI_API_KEY nos secrets.");
-      } else if (aiError.message?.includes("401")) {
+      if (aiError.message?.includes("não configurada")) {
+        toast.error("IA não está configurada no servidor.");
+      } else if (
+        aiError.message?.includes("401") ||
+        aiError.message?.includes("inválida")
+      ) {
         toast.error("Chave da OpenAI inválida ou sem créditos.");
       } else {
         toast.warning("IA falhou. Usando extração básica por regex.");
