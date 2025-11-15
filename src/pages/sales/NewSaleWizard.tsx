@@ -38,6 +38,7 @@ import { AccountCombobox } from "@/components/sales/AccountCombobox";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -271,6 +272,42 @@ export default function NewSaleWizard() {
       newAutoFilled.add("pnr");
     }
 
+    // Normalizar rota em flight segments
+    const route = data.route;
+    let segments: FlightSegment[] = [];
+    const norm = (s: string) => s.replace(/\s|→/g, "").toUpperCase();
+    
+    if (typeof route === "string" && route.trim()) {
+      const cleaned = route.replace(/[–—]/g, "-").replace(/\s*→\s*/g, "-").replace(/\//g, "-");
+      const parts = cleaned.split("-").map((p) => p.trim()).filter(Boolean);
+      for (let i = 0; i + 1 < parts.length; i += 1) {
+        const from = norm(parts[i]);
+        const to = norm(parts[i + 1]);
+        if (from && to) segments.push({ from, to, date: "", miles: 0 });
+      }
+    } else if (Array.isArray(route)) {
+      segments = route
+        .map((leg: any) => {
+          const from = norm(leg?.origin || leg?.from || "");
+          const to = norm(leg?.destination || leg?.to || "");
+          if (from && to) return { from, to, date: "", miles: 0 };
+          return null;
+        })
+        .filter(Boolean) as FlightSegment[];
+    } else if (route && typeof route === "object") {
+      const from = norm(route.origin || route.from || "");
+      const to = norm(route.destination || route.to || "");
+      if (from && to) segments = [{ from, to, date: "", miles: 0 }];
+    }
+    
+    if (segments.length > 0) {
+      setFlightSegments(segments);
+      segments.forEach((_, idx) => {
+        newAutoFilled.add(`segment_${idx}_from`);
+        newAutoFilled.add(`segment_${idx}_to`);
+      });
+    }
+
     setExtractedData(data);
     setAutoFilledFields(newAutoFilled);
 
@@ -281,18 +318,23 @@ export default function NewSaleWizard() {
   };
 
   // Filtrar contas ativas vinculadas aos programas do fornecedor
+  console.log("[NewSaleWizard] 📊 Estado inicial:", {
+    supplierId,
+    accountsTotal: (accounts || []).length,
+    linkedAirlinesIds: (linkedAirlines || []).map((a: any) => a?.id),
+    saleSource
+  });
+
   const filteredAccounts = (accounts || []).filter((acc) => {
     console.log("[NewSaleWizard] 🔍 Verificando conta:", {
       account: acc.account_number,
       airline: acc.airline_company_id,
       status: acc.status,
-      saleSource,
-      supplierId
     });
     
     if (saleSource === "internal_account") {
       const isLinked = (linkedAirlines || []).some(
-        (la: any) => la.airline_company_id === acc.airline_company_id
+        (la: any) => la?.id === acc?.airline_company_id
       );
       const isActive = acc.status === "active";
       
@@ -594,8 +636,8 @@ export default function NewSaleWizard() {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr,380px] gap-6">
+          <div className="space-y-6">
             <Card className="p-6">
               {currentStep === 0 && (
                 <div className="space-y-6">
@@ -625,6 +667,9 @@ export default function NewSaleWizard() {
                             <DialogTitle>
                               Extrair Dados do Bilhete
                             </DialogTitle>
+                            <DialogDescription>
+                              Selecione um PDF de bilhete para extrair dados automaticamente.
+                            </DialogDescription>
                           </DialogHeader>
                           <BilheteTicketExtractor
                             onDataExtracted={handlePDFDataExtracted}
@@ -1235,7 +1280,7 @@ export default function NewSaleWizard() {
             </Card>
           </div>
 
-          <div className="lg:col-span-1">
+          <div className="space-y-4 lg:sticky lg:top-6 h-fit">
             <SalesSummaryCard
               customerName={customerName}
               routeText={(flightSegments || [])
