@@ -1,16 +1,23 @@
+// supabase/functions/parse-ticket/index.ts
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
-serve(async (req) => {
+serve(async (req: Request): Promise<Response> => {
+  // Preflight CORS
   if (req.method === "OPTIONS") {
-    return new Response("ok", { status: 200, headers: corsHeaders });
+    return new Response("ok", {
+      status: 200,
+      headers: corsHeaders,
+    });
   }
 
+  // Só aceitamos POST
   if (req.method !== "POST") {
     return new Response(
       JSON.stringify({ error: "Method not allowed" }),
@@ -25,9 +32,18 @@ serve(async (req) => {
   }
 
   try {
-    const { text } = await req.json();
+    // Lê o corpo com segurança
+    let bodyReq: any = null;
+    try {
+      bodyReq = await req.json();
+    } catch (_err) {
+      bodyReq = null;
+    }
 
-    if (!text || typeof text !== "string") {
+    const text =
+      bodyReq && typeof bodyReq.text === "string" ? bodyReq.text.trim() : "";
+
+    if (!text) {
       return new Response(
         JSON.stringify({ error: "Campo 'text' é obrigatório." }),
         {
@@ -40,11 +56,12 @@ serve(async (req) => {
       );
     }
 
+    // Pega a chave da OpenAI do ambiente do Supabase
     const apiKey = Deno.env.get("OPENAI_API_KEY");
     if (!apiKey) {
-      console.error("API configuration error");
+      console.error("OPENAI_API_KEY não definida nas variáveis do Supabase");
       return new Response(
-        JSON.stringify({ error: "Service configuration error" }),
+        JSON.stringify({ error: "OPENAI_API_KEY not configured" }),
         {
           status: 500,
           headers: {
@@ -59,9 +76,9 @@ serve(async (req) => {
     const maxChars = 8000;
     const trimmedText = text.slice(0, maxChars);
 
-    const body = {
-      model: "gpt-4o-mini",
-      response_format: { type: "json_object" as const },
+    const openaiBody = {
+      model: "gpt-4.1-mini", // pode trocar pra gpt-4o-mini se quiser
+      response_format: { type: "json_object" },
       messages: [
         {
           role: "system",
@@ -115,7 +132,7 @@ Texto do bilhete:
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify(openaiBody),
       },
     );
 
@@ -123,7 +140,10 @@ Texto do bilhete:
       const errText = await openaiRes.text();
       console.error("Erro na chamada OpenAI:", errText);
       return new Response(
-        JSON.stringify({ error: "Erro ao chamar OpenAI" }),
+        JSON.stringify({
+          error: "Erro ao chamar OpenAI",
+          details: errText,
+        }),
         {
           status: 500,
           headers: {
@@ -138,6 +158,7 @@ Texto do bilhete:
     const content = json?.choices?.[0]?.message?.content;
 
     if (!content) {
+      console.error("Resposta vazia da OpenAI:", json);
       return new Response(
         JSON.stringify({ error: "Resposta vazia da OpenAI" }),
         {
@@ -157,6 +178,8 @@ Texto do bilhete:
       console.error(
         "Falha ao fazer JSON.parse no retorno da OpenAI. Conteúdo bruto:",
         content,
+        "Erro:",
+        e,
       );
       return new Response(
         JSON.stringify({ error: "OpenAI não retornou JSON válido" }),
