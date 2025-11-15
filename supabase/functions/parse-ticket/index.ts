@@ -13,44 +13,24 @@ serve(async (req) => {
     return new Response("ok", { status: 200, headers: corsHeaders });
   }
 
-  if (req.method !== "POST") {
-    return new Response(
-      JSON.stringify({ error: "Method not allowed" }),
-      {
-        status: 405,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
-      },
-    );
-  }
+  console.log("[parse-ticket] Método:", req.method);
 
   try {
-    const body = await req.json().catch(() => null) as { text?: string } | null;
-
-    if (!body || typeof body.text !== "string" || !body.text.trim()) {
-      return new Response(
-        JSON.stringify({ error: "Campo 'text' é obrigatório." }),
-        {
-          status: 400,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
-        },
-      );
+    // Tentamos ler o body sempre, mas se der erro, tratamos
+    let body: any = null;
+    try {
+      body = await req.json();
+    } catch (_err) {
+      console.error("[parse-ticket] Erro ao fazer req.json()");
     }
 
-    const text = body.text;
-    const apiKey = Deno.env.get("OPENAI_API_KEY");
+    const text = body?.text;
 
-    // 🔴 SE NÃO TIVER CHAVE, NÃO QUEBRA MAIS: SÓ DEVOLVE VAZIO
-    if (!apiKey) {
-      console.error("[parse-ticket] OPENAI_API_KEY não configurada");
+    if (!text || typeof text !== "string" || !text.trim()) {
+      console.warn("[parse-ticket] Campo 'text' ausente ou inválido");
       return new Response(
         JSON.stringify({
-          error: "OPENAI_API_KEY não configurada",
+          error: "Campo 'text' é obrigatório.",
           pnr: null,
           ticketNumber: null,
           passengerName: null,
@@ -61,7 +41,7 @@ serve(async (req) => {
           flightNumber: null,
         }),
         {
-          status: 200, // 👈 sempre 200 pra não virar FunctionsHttpError
+          status: 200, // 👈 SEMPRE 200
           headers: {
             ...corsHeaders,
             "Content-Type": "application/json",
@@ -70,6 +50,33 @@ serve(async (req) => {
       );
     }
 
+    const apiKey = Deno.env.get("OPENAI_API_KEY");
+
+    if (!apiKey) {
+      console.error("[parse-ticket] OPENAI_API_KEY não configurada");
+      return new Response(
+        JSON.stringify({
+          error: "OPENAI_API_KEY não configurada na função.",
+          pnr: null,
+          ticketNumber: null,
+          passengerName: null,
+          cpf: null,
+          route: null,
+          departureDate: null,
+          airline: null,
+          flightNumber: null,
+        }),
+        {
+          status: 200, // 👈 SEMPRE 200
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        },
+      );
+    }
+
+    // Limita o tamanho do texto
     const maxChars = 8000;
     const trimmedText = text.slice(0, maxChars);
 
@@ -136,7 +143,7 @@ Texto do bilhete:
     if (!openaiRes.ok) {
       const errText = await openaiRes.text();
       console.error("[parse-ticket] Erro na chamada OpenAI:", errText);
-      // 🔴 NÃO devolve mais 500, devolve 200 com erro no JSON
+
       return new Response(
         JSON.stringify({
           error: "Erro ao chamar OpenAI",
@@ -151,7 +158,7 @@ Texto do bilhete:
           flightNumber: null,
         }),
         {
-          status: 200,
+          status: 200, // 👈 SEMPRE 200
           headers: {
             ...corsHeaders,
             "Content-Type": "application/json",
@@ -165,6 +172,7 @@ Texto do bilhete:
 
     if (!content) {
       console.error("[parse-ticket] Resposta vazia da OpenAI:", json);
+
       return new Response(
         JSON.stringify({
           error: "Resposta vazia da OpenAI",
@@ -195,6 +203,7 @@ Texto do bilhete:
         "[parse-ticket] Falha ao fazer JSON.parse no retorno da OpenAI. Conteúdo bruto:",
         content,
       );
+
       return new Response(
         JSON.stringify({
           error: "OpenAI não retornou JSON válido",
@@ -229,8 +238,10 @@ Texto do bilhete:
       flightNumber: parsed.flightNumber ?? null,
     };
 
+    console.log("[parse-ticket] Resultado final:", result);
+
     return new Response(JSON.stringify(result), {
-      status: 200,
+      status: 200, // 👈 SEMPRE 200
       headers: {
         ...corsHeaders,
         "Content-Type": "application/json",
@@ -238,10 +249,11 @@ Texto do bilhete:
     });
   } catch (err) {
     console.error("[parse-ticket] Erro inesperado:", err);
-    // 🔴 Mesmo no catch final, não devolve 500
+
     return new Response(
       JSON.stringify({
         error: "Erro interno na função parse-ticket",
+        rawError: String(err),
         pnr: null,
         ticketNumber: null,
         passengerName: null,
@@ -252,7 +264,7 @@ Texto do bilhete:
         flightNumber: null,
       }),
       {
-        status: 200,
+        status: 200, // 👈 SEMPRE 200
         headers: {
           ...corsHeaders,
           "Content-Type": "application/json",
