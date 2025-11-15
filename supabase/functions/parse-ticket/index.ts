@@ -1,7 +1,6 @@
-// supabase/functions/parse-ticket/index.ts
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
-const corsHeaders = {
+const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers":
@@ -9,12 +8,9 @@ const corsHeaders = {
 };
 
 serve(async (req: Request): Promise<Response> => {
-  // Preflight CORS
+  // Pré-flight CORS
   if (req.method === "OPTIONS") {
-    return new Response("ok", {
-      status: 200,
-      headers: corsHeaders,
-    });
+    return new Response("ok", { status: 200, headers: corsHeaders });
   }
 
   // Só aceitamos POST
@@ -32,18 +28,17 @@ serve(async (req: Request): Promise<Response> => {
   }
 
   try {
-    // Lê o corpo com segurança
-    let bodyReq: any = null;
+    // Tenta ler o JSON
+    let bodyReq: any = {};
     try {
       bodyReq = await req.json();
-    } catch (_err) {
-      bodyReq = null;
+    } catch {
+      // se der erro de parse, continua vazio
     }
 
-    const text =
-      bodyReq && typeof bodyReq.text === "string" ? bodyReq.text.trim() : "";
+    const text = bodyReq?.text;
 
-    if (!text) {
+    if (!text || typeof text !== "string") {
       return new Response(
         JSON.stringify({ error: "Campo 'text' é obrigatório." }),
         {
@@ -56,12 +51,14 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Pega a chave da OpenAI do ambiente do Supabase
+    // 🔑 Pega a chave das variáveis de ambiente do SUPABASE
     const apiKey = Deno.env.get("OPENAI_API_KEY");
+    console.log("[parse-ticket] OPENAI_API_KEY setada?", !!apiKey);
+
     if (!apiKey) {
-      console.error("OPENAI_API_KEY não definida nas variáveis do Supabase");
+      // Se cair aqui, é 100% configuração de env no Supabase
       return new Response(
-        JSON.stringify({ error: "OPENAI_API_KEY not configured" }),
+        JSON.stringify({ error: "OPENAI_API_KEY não configurada no Supabase." }),
         {
           status: 500,
           headers: {
@@ -72,13 +69,13 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Limita o tamanho do texto
+    // Limita tamanho do texto
     const maxChars = 8000;
     const trimmedText = text.slice(0, maxChars);
 
     const openaiBody = {
-      model: "gpt-4.1-mini", // pode trocar pra gpt-4o-mini se quiser
-      response_format: { type: "json_object" },
+      model: "gpt-4o-mini",
+      response_format: { type: "json_object" as const },
       messages: [
         {
           role: "system",
@@ -119,7 +116,7 @@ Responda APENAS com um JSON com esta estrutura:
 
 Texto do bilhete:
 """${trimmedText}"""
-          `.trim(),
+        `.trim(),
         },
       ],
     };
@@ -136,13 +133,20 @@ Texto do bilhete:
       },
     );
 
+    const rawText = await openaiRes.text();
+    console.log(
+      "[parse-ticket] OpenAI status:",
+      openaiRes.status,
+      openaiRes.statusText,
+    );
+
     if (!openaiRes.ok) {
-      const errText = await openaiRes.text();
-      console.error("Erro na chamada OpenAI:", errText);
+      console.error("[parse-ticket] Erro na chamada OpenAI:", rawText);
       return new Response(
         JSON.stringify({
           error: "Erro ao chamar OpenAI",
-          details: errText,
+          status: openaiRes.status,
+          details: rawText,
         }),
         {
           status: 500,
@@ -154,11 +158,29 @@ Texto do bilhete:
       );
     }
 
-    const json = await openaiRes.json();
-    const content = json?.choices?.[0]?.message?.content;
+    let json: any;
+    try {
+      json = JSON.parse(rawText);
+    } catch (e) {
+      console.error(
+        "[parse-ticket] Falha ao fazer JSON.parse no retorno da OpenAI:",
+        rawText,
+      );
+      return new Response(
+        JSON.stringify({ error: "OpenAI não retornou JSON válido" }),
+        {
+          status: 500,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        },
+      );
+    }
 
+    const content = json?.choices?.[0]?.message?.content;
     if (!content) {
-      console.error("Resposta vazia da OpenAI:", json);
+      console.error("[parse-ticket] Resposta da OpenAI sem content:", json);
       return new Response(
         JSON.stringify({ error: "Resposta vazia da OpenAI" }),
         {
@@ -176,13 +198,11 @@ Texto do bilhete:
       parsed = JSON.parse(content);
     } catch (e) {
       console.error(
-        "Falha ao fazer JSON.parse no retorno da OpenAI. Conteúdo bruto:",
+        "[parse-ticket] JSON.parse no content falhou. content bruto:",
         content,
-        "Erro:",
-        e,
       );
       return new Response(
-        JSON.stringify({ error: "OpenAI não retornou JSON válido" }),
+        JSON.stringify({ error: "OpenAI não retornou JSON de bilhete" }),
         {
           status: 500,
           headers: {
@@ -212,9 +232,12 @@ Texto do bilhete:
       },
     });
   } catch (err) {
-    console.error("Erro inesperado em parse-ticket:", err);
+    console.error("[parse-ticket] Erro inesperado:", err);
     return new Response(
-      JSON.stringify({ error: "Erro interno na função parse-ticket" }),
+      JSON.stringify({
+        error: "Erro interno na função parse-ticket",
+        details: String(err),
+      }),
       {
         status: 500,
         headers: {
