@@ -81,7 +81,7 @@ export function SalesSummaryCard({
             <div>
               <p className="text-muted-foreground">Valor Total</p>
               <p className="text-xl font-bold text-primary">
-                R$ {parseFloat(priceTotal).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                R$ {(parseFloat(priceTotal) || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
               </p>
             </div>
           </>

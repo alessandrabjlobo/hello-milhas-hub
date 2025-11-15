@@ -11,7 +11,19 @@ export function useSubscriptionGuard() {
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
-    checkAccess();
+    let isMounted = true;
+    
+    const runCheck = async () => {
+      await checkAccess();
+    };
+    
+    if (isMounted) {
+      runCheck();
+    }
+    
+    return () => {
+      isMounted = false;
+    };
   }, [user, authLoading]);
   
   const checkAccess = async (retryCount = 0) => {
