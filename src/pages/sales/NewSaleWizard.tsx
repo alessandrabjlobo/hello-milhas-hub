@@ -332,17 +332,24 @@ export default function NewSaleWizard() {
       status: acc.status,
     });
     
-    if (saleSource === "internal_account") {
-      const isLinked = (linkedAirlines || []).some(
-        (la: any) => la?.id === acc?.airline_company_id
-      );
-      const isActive = acc.status === "active";
-      
-      console.log(`  ✓ Conta ${acc.account_number}: isLinked=${isLinked}, isActive=${isActive}`);
-      
-      return isLinked && isActive;
-    }
-    return false;
+    if (saleSource !== "internal_account") return false;
+
+    const isActive = acc.status === "active";
+
+    // Restringir por supplier quando disponível
+    const belongsToSupplier = (acc as any).supplier_id ? (acc as any).supplier_id === supplierId : true;
+
+    // Se houver companhias vinculadas, filtra por vínculo; senão, mostra todas ativas do fornecedor
+    const hasLinks = (linkedAirlines || []).length > 0;
+    const isLinked = hasLinks
+      ? (linkedAirlines || []).some((la: any) => la?.id === acc?.airline_company_id)
+      : true;
+
+    const include = isActive && belongsToSupplier && isLinked;
+
+    console.log(`  ✓ Conta ${acc.account_number}: isLinked=${isLinked}, isActive=${isActive}, belongsToSupplier=${belongsToSupplier}`);
+
+    return include;
   });
   
   console.log(`[NewSaleWizard] ✅ Total de contas filtradas: ${filteredAccounts.length}`);
