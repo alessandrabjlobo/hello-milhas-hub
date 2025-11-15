@@ -12,19 +12,34 @@ export function useSubscriptionGuard() {
   
   useEffect(() => {
     let isMounted = true;
+    let timeoutId: NodeJS.Timeout | null = null;
     
     const runCheck = async () => {
-      await checkAccess();
+      // Debounce de 100ms para evitar múltiplas chamadas simultâneas
+      if (timeoutId) clearTimeout(timeoutId);
+      
+      timeoutId = setTimeout(async () => {
+        if (isMounted) {
+          await checkAccess();
+        }
+      }, 100);
     };
     
-    if (isMounted) {
+    if (!authLoading && user) {
       runCheck();
+    } else if (!authLoading && !user) {
+      if (isMounted) {
+        console.log('[useSubscriptionGuard] No user, redirecting to login');
+        navigate('/login');
+        setLoading(false);
+      }
     }
     
     return () => {
       isMounted = false;
+      if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [user, authLoading]);
+  }, [user, authLoading, navigate]);
   
   const checkAccess = async (retryCount = 0) => {
     if (authLoading) return;
