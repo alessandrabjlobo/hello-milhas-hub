@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, MapPin, DollarSign, FileText, ExternalLink, CheckCircle2, LayoutGrid, List } from "lucide-react";
+import { Calendar, MapPin, DollarSign, FileText, ExternalLink, CheckCircle2, LayoutGrid, List, Edit2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect } from "react";
@@ -68,6 +68,10 @@ const QuoteHistory = () => {
   useEffect(() => {
     fetchQuotes();
   }, [filter]);
+
+  const handleEdit = (quoteId: string) => {
+    navigate(`/quotes/${quoteId}`);
+  };
 
   const handleConvert = (quoteId: string) => {
     // Navigate to new sale wizard with quote data pre-filled
@@ -212,22 +216,32 @@ const QuoteHistory = () => {
                     ) : "-"}
                   </TableCell>
                   <TableCell>
-                    {!quote.converted_to_sale_id ? (
+                    <div className="flex gap-2">
                       <Button
                         size="sm"
-                        onClick={() => handleConvert(quote.id)}
-                      >
-                        Converter
-                      </Button>
-                    ) : (
-                      <Button
                         variant="outline"
-                        size="sm"
-                        onClick={() => navigate(`/sales/${quote.converted_to_sale_id}`)}
+                        onClick={() => handleEdit(quote.id)}
                       >
-                        Ver Venda
+                        <Edit2 className="h-3 w-3 mr-1" />
+                        Editar
                       </Button>
-                    )}
+                      {!quote.converted_to_sale_id ? (
+                        <Button
+                          size="sm"
+                          onClick={() => handleConvert(quote.id)}
+                        >
+                          Converter
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate(`/sales/${quote.converted_to_sale_id}`)}
+                        >
+                          Ver Venda
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -279,23 +293,35 @@ const QuoteHistory = () => {
                   <p className="text-xs text-muted-foreground">
                     Criado em {new Date(quote.created_at).toLocaleDateString("pt-BR")}
                   </p>
-                  {!quote.converted_to_sale_id && (
+                  <div className="flex gap-2">
                     <Button
-                      className="w-full"
-                      onClick={() => handleConvert(quote.id)}
-                    >
-                      Converter em Venda
-                    </Button>
-                  )}
-                  {quote.converted_to_sale_id && (
-                    <Button
+                      size="sm"
                       variant="outline"
-                      className="w-full"
-                      onClick={() => navigate(`/sales/${quote.converted_to_sale_id}`)}
+                      onClick={() => handleEdit(quote.id)}
+                      className="flex-1"
                     >
-                      Ver Venda
+                      <Edit2 className="h-3 w-3 mr-1" />
+                      Editar
                     </Button>
-                  )}
+                    {!quote.converted_to_sale_id ? (
+                      <Button
+                        className="flex-1"
+                        size="sm"
+                        onClick={() => handleConvert(quote.id)}
+                      >
+                        Converter
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        className="flex-1"
+                        size="sm"
+                        onClick={() => navigate(`/sales/${quote.converted_to_sale_id}`)}
+                      >
+                        Ver Venda
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>

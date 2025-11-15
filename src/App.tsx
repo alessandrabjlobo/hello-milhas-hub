@@ -77,6 +77,7 @@ const App = () => (
                         <Route path="/reports" element={<Reports />} />
                         <Route path="/calculator" element={<Calculator />} />
                         <Route path="/quotes/new" element={<QuoteGenerator />} />
+                        <Route path="/quotes/:quoteId" element={<QuoteGenerator />} />
                         <Route path="/quotes" element={<QuoteHistory />} />
                         <Route path="/customers" element={<Customers />} />
                         <Route path="/settings/my-airlines" element={<MyAirlines />} />
