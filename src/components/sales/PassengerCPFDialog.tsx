@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Trash2, Plus, UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { maskCPF } from "@/lib/input-masks";
+import { cn } from "@/lib/utils";
 
 export interface PassengerCPF {
   name: string;
@@ -29,11 +31,18 @@ export function PassengerCPFDialog({
   const [localPassengers, setLocalPassengers] = useState<PassengerCPF[]>(passengers);
   const { toast } = useToast();
 
+  // Sincronizar com a prop quando o dialog abre
+  useEffect(() => {
+    setLocalPassengers(passengers);
+  }, [open, passengers]);
+
   const handleAddPassenger = () => {
     setLocalPassengers([...localPassengers, { name: "", cpf: "" }]);
   };
 
   const handleRemovePassenger = (index: number) => {
+    // Não permitir remover o primeiro passageiro (cliente principal)
+    if (index === 0) return;
     setLocalPassengers(localPassengers.filter((_, i) => i !== index));
   };
 
@@ -101,17 +110,29 @@ export function PassengerCPFDialog({
 
         <div className="space-y-4">
           {localPassengers.map((passenger, index) => (
-            <div key={index} className="p-4 border rounded-lg space-y-3 bg-muted/30">
+            <div key={index} className={cn(
+              "p-4 border rounded-lg space-y-3",
+              index === 0 ? "bg-primary/5 border-primary/20" : "bg-muted/30"
+            )}>
               <div className="flex items-center justify-between">
-                <Label className="font-semibold">Passageiro {index + 1}</Label>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleRemovePassenger(index)}
-                  className="h-8 w-8 p-0"
-                >
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
+                <Label className="font-semibold">
+                  Passageiro {index + 1}
+                  {index === 0 && (
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      (Cliente Principal)
+                    </span>
+                  )}
+                </Label>
+                {index > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleRemovePassenger(index)}
+                    className="h-8 w-8 p-0"
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                )}
               </div>
 
               <div className="grid md:grid-cols-2 gap-3">
@@ -122,6 +143,7 @@ export function PassengerCPFDialog({
                     placeholder="João Silva"
                     value={passenger.name}
                     onChange={(e) => handleUpdatePassenger(index, "name", e.target.value)}
+                    disabled={index === 0}
                   />
                 </div>
 
@@ -131,8 +153,12 @@ export function PassengerCPFDialog({
                     id={`cpf-${index}`}
                     placeholder="000.000.000-00"
                     value={passenger.cpf}
-                    onChange={(e) => handleUpdatePassenger(index, "cpf", e.target.value)}
+                    onChange={(e) => {
+                      const masked = maskCPF(e.target.value);
+                      handleUpdatePassenger(index, "cpf", masked);
+                    }}
                     maxLength={14}
+                    disabled={index === 0}
                   />
                 </div>
               </div>

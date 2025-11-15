@@ -35,6 +35,12 @@ export async function parseWithAI(text: string): Promise<ExtractedData> {
     
     if (error) {
       console.error("[parseWithAI] ❌ Erro na edge function:", error);
+      
+      // Se o erro contém informações da OpenAI
+      if (data?.openaiStatus === 401) {
+        throw new Error('Chave da OpenAI inválida. Configure a chave correta.');
+      }
+      
       throw new Error(error.message || 'Erro ao chamar função de análise');
     }
     
