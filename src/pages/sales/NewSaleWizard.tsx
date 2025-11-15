@@ -84,7 +84,6 @@ export default function NewSaleWizard() {
   const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(new Set());
   const [isConvertingQuote, setIsConvertingQuote] = useState(false);
   const [sourceQuote, setSourceQuote] = useState<any>(null);
-  const [autoCreateTickets, setAutoCreateTickets] = useState(false);
 
   // Origem da venda
   const [saleSource, setSaleSource] = useState<"internal_account" | "mileage_counter">(
@@ -520,9 +519,8 @@ export default function NewSaleWizard() {
       }
 
       if (saleId && typeof saleId === "string") {
-        if (autoCreateTickets) {
-          await createTicketsForPassengers(saleId);
-        }
+        // Always create tickets automatically
+        await createTicketsForPassengers(saleId);
 
         setLastSaleData({
           customerName,
@@ -538,7 +536,7 @@ export default function NewSaleWizard() {
           passengers,
           paymentMethod,
           pnr: pnr || undefined,
-          ticketsCreated: autoCreateTickets,
+          ticketsCreated: true,
           saleId: saleId,
           saleSource,
           accountInfo:
@@ -1227,22 +1225,6 @@ export default function NewSaleWizard() {
                         }
                         return null;
                       })()}
-                  </div>
-
-                  <div className="flex items-center space-x-2 p-4 border rounded-lg">
-                    <Checkbox
-                      id="autoCreateTickets"
-                      checked={autoCreateTickets}
-                      onCheckedChange={(checked) =>
-                        setAutoCreateTickets(checked as boolean)
-                      }
-                    />
-                    <Label
-                      htmlFor="autoCreateTickets"
-                      className="cursor-pointer"
-                    >
-                      Criar automaticamente as passagens após salvar
-                    </Label>
                   </div>
                 </div>
               )}

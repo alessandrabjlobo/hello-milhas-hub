@@ -85,7 +85,7 @@ export function FlightSegmentForm({
           <Input
             id={`miles-${index}`}
             type="number"
-            placeholder="15000"
+            placeholder="Ex: 15000"
             value={segment.miles || ""}
             onChange={(e) => onUpdate(index, "miles", parseInt(e.target.value) || 0)}
           />

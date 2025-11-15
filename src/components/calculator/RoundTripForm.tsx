@@ -74,7 +74,7 @@ export function RoundTripForm({ data, onChange }: RoundTripFormProps) {
         <Input
           id="miles"
           type="number"
-          placeholder="30000"
+          placeholder="Ex: 30000"
           value={data.miles || ""}
           onChange={(e) => updateField("miles", parseInt(e.target.value) || 0)}
         />

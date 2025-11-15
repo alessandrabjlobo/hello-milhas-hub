@@ -13,6 +13,7 @@ import { format } from "date-fns";
 import { FlightSegmentForm, type FlightSegment } from "@/components/sales/FlightSegmentForm";
 import { RoundTripForm, type RoundTripData } from "@/components/calculator/RoundTripForm";
 import { usePaymentInterestConfig } from "@/hooks/usePaymentInterestConfig";
+import { formatMiles } from "@/lib/utils";
 
 export function QuoteGenerator() {
   const { toast } = useToast();
@@ -36,8 +37,8 @@ export function QuoteGenerator() {
     returnDate: "",
     miles: 0
   });
-  const [costPerMile, setCostPerMile] = useState("29");
-  const [desiredMarkup, setDesiredMarkup] = useState("20");
+  const [costPerMile, setCostPerMile] = useState("");
+  const [desiredMarkup, setDesiredMarkup] = useState("");
   const [showCalculator, setShowCalculator] = useState(false);
   
   const [showPreview, setShowPreview] = useState(false);
@@ -173,8 +174,11 @@ export function QuoteGenerator() {
     if (tripType === 'round_trip') {
       text += `Origem: ${roundTripData.origin}\n`;
       text += `Destino: ${roundTripData.destination}\n`;
-      text += `Data de Ida: ${format(new Date(roundTripData.departureDate), 'dd/MM/yyyy')}\n`;
-      text += `Data de Volta: ${format(new Date(roundTripData.returnDate), 'dd/MM/yyyy')}\n`;
+      // Parse dates correctly to avoid timezone issues
+      const [depYear, depMonth, depDay] = roundTripData.departureDate.split('-');
+      const [retYear, retMonth, retDay] = roundTripData.returnDate.split('-');
+      text += `Data de Ida: ${depDay}/${depMonth}/${depYear}\n`;
+      text += `Data de Volta: ${retDay}/${retMonth}/${retYear}\n`;
     } else {
       flightSegments.filter(seg => seg.from && seg.to).forEach((segment, index) => {
         text += `\nTrecho ${index + 1}: ${segment.from} → ${segment.to}\n`;
