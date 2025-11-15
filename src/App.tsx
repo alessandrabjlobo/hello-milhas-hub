@@ -15,7 +15,7 @@ import AdminUsers from "./pages/AdminUsers";
 import Onboarding from "./pages/Onboarding";
 import Auth from "./pages/Auth";
 import { ProtectedRoute } from "./components/ProtectedRoute";
-import NewSaleWizard from "./pages/sales/NewSaleWizard";
+import NewSaleWizard from "./pages/sales/NewSaleWizardSinglePage";
 import SalesList from "./pages/sales/SalesList";
 import SaleDetail from "./pages/sales/SaleDetail";
 import AccountDetail from "./pages/AccountDetail";
