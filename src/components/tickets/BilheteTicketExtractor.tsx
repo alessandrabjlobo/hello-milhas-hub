@@ -23,6 +23,7 @@ interface BilheteTicketExtractorProps {
 export function BilheteTicketExtractor({ onDataExtracted }: BilheteTicketExtractorProps) {
   const [file, setFile] = useState<File | null>(null);
   const [extracting, setExtracting] = useState(false);
+  const [processingAI, setProcessingAI] = useState(false);
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -39,24 +40,35 @@ export function BilheteTicketExtractor({ onDataExtracted }: BilheteTicketExtract
     if (!file) return;
 
     setExtracting(true);
+    setProcessingAI(false);
+
     try {
+      console.log("[BilheteExtractor] 📄 Iniciando extração do PDF:", file.name);
+
+      // Mostrar que está extraindo texto
+      toast.info("Lendo texto do PDF...");
+
+      setProcessingAI(true);
       const data = await parseDocument(file);
+
+      console.log("[BilheteExtractor] ✅ Dados extraídos:", data);
       setExtractedData(data);
-      
+
       const extractedCount = Object.values(data).filter(v => v).length;
-      
+
       if (extractedCount === 0) {
-        toast.error("Nenhum dado encontrado no PDF. Tente preencher manualmente ou use outro arquivo.");
+        toast.error("Nenhum dado encontrado no PDF. Tente preencher manualmente.");
       } else if (extractedCount < 4) {
-        toast.success(`${extractedCount} campos extraídos. Complete os dados faltantes manualmente.`);
+        toast.success(`${extractedCount} campos extraídos. Complete os faltantes manualmente.`);
       } else {
-        toast.success(`${extractedCount} campos extraídos do bilhete!`);
+        toast.success(`${extractedCount} campos extraídos com sucesso!`);
       }
     } catch (error) {
-      console.error("Erro ao extrair dados:", error);
+      console.error("[BilheteExtractor] ❌ Erro ao extrair dados:", error);
       toast.error("Não foi possível extrair dados do PDF");
     } finally {
       setExtracting(false);
+      setProcessingAI(false);
     }
   };
 
@@ -101,7 +113,7 @@ export function BilheteTicketExtractor({ onDataExtracted }: BilheteTicketExtract
               {extracting ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Extraindo...
+                  {processingAI ? "Processando com IA..." : "Extraindo texto..."}
                 </>
               ) : (
                 "Extrair Informações"
