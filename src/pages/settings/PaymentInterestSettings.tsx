@@ -69,34 +69,21 @@ export default function PaymentInterestSettings() {
     const installmentsNum = parseInt(installments);
     const interestRateNum = parseFloat(interestRate);
 
-    console.log('[PaymentInterestSettings] Tentando salvar:', {
-      installments: installmentsNum,
-      interest_rate: interestRateNum,
-      payment_type: paymentType,
-      config_type: configType,
-      per_installment_rates: perInstallmentRates,
-      editingConfig: editingConfig ? 'Sim' : 'Não'
-    });
-
     // Validação: débito deve ter 1 parcela
     if (paymentType === 'debit' && installmentsNum !== 1) {
-      console.warn('[PaymentInterestSettings] Débito deve ter 1 parcela');
       return;
     }
 
     if (!installmentsNum || installmentsNum < 1 || installmentsNum > 24) {
-      console.warn('[PaymentInterestSettings] Número de parcelas inválido:', installmentsNum);
       return;
     }
 
     if (configType === 'total' && (isNaN(interestRateNum) || interestRateNum < 0)) {
-      console.warn('[PaymentInterestSettings] Taxa de juros inválida:', interestRateNum);
       return;
     }
 
     let success = false;
     if (editingConfig) {
-      console.log('[PaymentInterestSettings] Atualizando config:', editingConfig.id);
       success = await updateConfig(editingConfig.id, {
         installments: installmentsNum,
         interest_rate: configType === 'total' ? interestRateNum : 0,
@@ -104,7 +91,6 @@ export default function PaymentInterestSettings() {
         per_installment_rates: configType === 'per_installment' ? perInstallmentRates : {},
       });
     } else {
-      console.log('[PaymentInterestSettings] Criando nova config');
       success = await createConfig({
         installments: installmentsNum,
         interest_rate: configType === 'total' ? interestRateNum : 0,
@@ -113,8 +99,6 @@ export default function PaymentInterestSettings() {
         per_installment_rates: configType === 'per_installment' ? perInstallmentRates : {},
       });
     }
-
-    console.log('[PaymentInterestSettings] Resultado:', success ? 'Sucesso' : 'Falha');
 
     if (success) {
       setDialogOpen(false);

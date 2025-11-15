@@ -62,11 +62,9 @@ export const usePaymentInterestConfig = () => {
     per_installment_rates?: Record<number, number>;
   }) => {
     try {
-      console.log('[usePaymentInterestConfig] Criando configuração:', data);
       const { supplierId } = await getSupplierId();
-      console.log('[usePaymentInterestConfig] Supplier ID:', supplierId);
 
-      const payload = {
+      const { error } = await supabase.from("credit_interest_config" as any).insert({
         supplier_id: supplierId,
         installments: data.installments,
         interest_rate: data.interest_rate,
@@ -74,20 +72,9 @@ export const usePaymentInterestConfig = () => {
         config_type: data.config_type || 'total',
         per_installment_rates: data.per_installment_rates || {},
         is_active: true,
-      };
-      console.log('[usePaymentInterestConfig] Payload:', payload);
+      } as any);
 
-      const { data: result, error } = await supabase
-        .from("credit_interest_config" as any)
-        .insert(payload as any)
-        .select();
-
-      if (error) {
-        console.error('[usePaymentInterestConfig] Erro no insert:', error);
-        throw error;
-      }
-
-      console.log('[usePaymentInterestConfig] Configuração criada com sucesso:', result);
+      if (error) throw error;
 
       toast({
         title: "Configuração criada!",
@@ -97,7 +84,6 @@ export const usePaymentInterestConfig = () => {
       await fetchConfigs();
       return true;
     } catch (error: any) {
-      console.error('[usePaymentInterestConfig] Erro ao criar:', error);
       toast({
         title: "Erro ao criar configuração",
         description: error.message,

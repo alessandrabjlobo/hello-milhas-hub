@@ -39,27 +39,11 @@ const formatCurrency = (value: number): string => {
   });
 };
 
-interface ProfitCalculatorProps {
-  embedded?: boolean;
-  initialMiles?: number;
-  initialBoardingFee?: number;
-  initialPassengers?: number;
-  initialCostPerMile?: number;
-  onPriceCalculated?: (price: number) => void;
-}
-
-export function ProfitCalculator({
-  embedded = false,
-  initialMiles,
-  initialBoardingFee,
-  initialPassengers,
-  initialCostPerMile,
-  onPriceCalculated,
-}: ProfitCalculatorProps = {}) {
-  const [milesUsed, setMilesUsed] = useState(initialMiles?.toString() || "50000");
-  const [costPerMile, setCostPerMile] = useState(initialCostPerMile?.toString() || "29.00");
-  const [boardingFee, setBoardingFee] = useState(initialBoardingFee?.toString() || "35.00");
-  const [passengers, setPassengers] = useState(initialPassengers?.toString() || "2");
+export function ProfitCalculator() {
+  const [milesUsed, setMilesUsed] = useState("50000");
+  const [costPerMile, setCostPerMile] = useState("29.00");
+  const [boardingFee, setBoardingFee] = useState("35.00");
+  const [passengers, setPassengers] = useState("2");
   const [targetMargin, setTargetMargin] = useState("20");
   const [manualPrice, setManualPrice] = useState("");
   const [accounts, setAccounts] = useState<MileageAccount[]>([]);
@@ -67,55 +51,9 @@ export function ProfitCalculator({
   const [activeTab, setActiveTab] = useState("manual");
   const [showScenarios, setShowScenarios] = useState(false);
 
-  // Cálculos
-  const milesNum = parseFormattedNumber(milesUsed);
-  const costPerMileNum = parseFloat(costPerMile) || 0;
-  const boardingFeeNum = parseFloat(boardingFee) || 0;
-  const passengersNum = parseInt(passengers) || 1;
-  const targetMarginNum = parseFloat(targetMargin) || 0;
-  const manualPriceNum = parseFloat(manualPrice) || 0;
-
-  const costPerPassenger = (milesNum / 1000) * costPerMileNum + boardingFeeNum;
-  const totalCost = costPerPassenger * passengersNum;
-  const suggestedPrice = targetMarginNum > 0 && targetMarginNum < 100 
-    ? totalCost / (1 - targetMarginNum / 100) 
-    : totalCost;
-  
-  const price = manualPriceNum > 0 ? manualPriceNum : suggestedPrice;
-  const profit = price - totalCost;
-  const profitMargin = price > 0 ? (profit / price) * 100 : 0;
-  const effectiveCostPerMile = milesNum > 0 ? totalCost / milesNum : 0;
-  const pricePerThousand = milesNum > 0 ? (price / milesNum) * 1000 : 0;
-
   useEffect(() => {
-    if (!embedded) {
-      loadAccounts();
-    }
-  }, [embedded]);
-
-  // Atualizar quando props mudarem
-  useEffect(() => {
-    if (initialMiles !== undefined) setMilesUsed(initialMiles.toString());
-  }, [initialMiles]);
-
-  useEffect(() => {
-    if (initialBoardingFee !== undefined) setBoardingFee(initialBoardingFee.toString());
-  }, [initialBoardingFee]);
-
-  useEffect(() => {
-    if (initialPassengers !== undefined) setPassengers(initialPassengers.toString());
-  }, [initialPassengers]);
-
-  useEffect(() => {
-    if (initialCostPerMile !== undefined) setCostPerMile(initialCostPerMile.toString());
-  }, [initialCostPerMile]);
-
-  // Notificar mudança de preço sugerido
-  useEffect(() => {
-    if (onPriceCalculated && suggestedPrice > 0) {
-      onPriceCalculated(suggestedPrice);
-    }
-  }, [suggestedPrice, onPriceCalculated]);
+    loadAccounts();
+  }, []);
 
   const loadAccounts = async () => {
     const { data } = await supabase
@@ -139,6 +77,26 @@ export function ProfitCalculator({
       }
     }
   }, [selectedAccount, accounts]);
+
+  // Cálculos
+  const milesNum = parseFormattedNumber(milesUsed);
+  const costPerMileNum = parseFloat(costPerMile) || 0;
+  const boardingFeeNum = parseFloat(boardingFee) || 0;
+  const passengersNum = parseInt(passengers) || 1;
+  const targetMarginNum = parseFloat(targetMargin) || 0;
+  const manualPriceNum = parseFloat(manualPrice) || 0;
+
+  const costPerPassenger = (milesNum / 1000) * costPerMileNum + boardingFeeNum;
+  const totalCost = costPerPassenger * passengersNum;
+  const suggestedPrice = targetMarginNum > 0 && targetMarginNum < 100 
+    ? totalCost / (1 - targetMarginNum / 100) 
+    : totalCost;
+  
+  const price = manualPriceNum > 0 ? manualPriceNum : suggestedPrice;
+  const profit = price - totalCost;
+  const profitMargin = price > 0 ? (profit / price) * 100 : 0;
+  const effectiveCostPerMile = milesNum > 0 ? totalCost / milesNum : 0;
+  const pricePerThousand = milesNum > 0 ? (price / milesNum) * 1000 : 0;
 
   // Cenários de margem
   const scenarios = [
@@ -656,8 +614,8 @@ export function ProfitCalculator({
                 </Collapsible>
               </div>
             )}
-            </TabsContent>
-          </Tabs>
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   );

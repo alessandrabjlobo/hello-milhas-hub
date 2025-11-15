@@ -89,15 +89,10 @@ export function QuoteGeneratorNew() {
                 destination: seg0?.to || "",
                 departureDate: seg0?.date || "",
                 returnDate: seg1?.date || "",
-                miles: data.miles_needed / parseInt((data.passengers || 1).toString()) || 0
+                miles: data.miles_needed || 0
               });
             } else {
-              setFlightSegments(segments.map((seg: any) => ({
-                from: seg.from || "",
-                to: seg.to || "",
-                date: seg.date || "",
-                miles: seg.miles || 0
-              })));
+              setFlightSegments(segments as any);
             }
             setTripType((data.trip_type as any) || "round_trip");
           }
@@ -485,30 +480,24 @@ export function QuoteGeneratorNew() {
       </Card>
 
       <Collapsible open={showCalculator} onOpenChange={setShowCalculator}>
-        <Card className="border-2">
+        <Card>
           <CardHeader>
             <CollapsibleTrigger className="flex items-center justify-between w-full hover:opacity-80">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Calculator className="h-5 w-5" />
-                  Calculadora Inteligente de Milhas
-                </CardTitle>
-                <CardDescription className="mt-1">
-                  Calcule automaticamente o preço ideal com análise de margem em tempo real
-                </CardDescription>
-              </div>
+              <CardTitle className="flex items-center gap-2">
+                <Calculator className="h-5 w-5" />
+                Calculadora de Preço (Automática)
+              </CardTitle>
               <ChevronDown className={`h-5 w-5 transition-transform ${showCalculator ? 'rotate-180' : ''}`} />
             </CollapsibleTrigger>
+            <CardDescription>
+              Configure o custo e margem. O preço será calculado automaticamente.
+            </CardDescription>
           </CardHeader>
           <CollapsibleContent>
-            <CardContent className="space-y-6">
-              {/* Inputs principais */}
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="costPerMile" className="flex items-center gap-2">
-                    Custo por Milheiro (R$)
-                    <Info className="h-3 w-3 text-muted-foreground" />
-                  </Label>
+            <CardContent className="space-y-4">
+              <div className="grid md:grid-cols-2 gap-4 p-4 border rounded-lg bg-muted/30">
+                <div>
+                  <Label htmlFor="costPerMile">Custo por Milheiro (R$)</Label>
                   <Input
                     id="costPerMile"
                     type="number"
@@ -516,14 +505,10 @@ export function QuoteGeneratorNew() {
                     placeholder="Ex: 29.00"
                     value={costPerMile}
                     onChange={(e) => setCostPerMile(e.target.value)}
-                    className="text-lg"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="desiredMarkup" className="flex items-center gap-2">
-                    Margem Desejada (%)
-                    <Info className="h-3 w-3 text-muted-foreground" />
-                  </Label>
+                <div>
+                  <Label htmlFor="desiredMarkup">Margem Desejada (%)</Label>
                   <Input
                     id="desiredMarkup"
                     type="number"
@@ -531,52 +516,29 @@ export function QuoteGeneratorNew() {
                     placeholder="Ex: 20"
                     value={desiredMarkup}
                     onChange={(e) => setDesiredMarkup(e.target.value)}
-                    className="text-lg"
                   />
                 </div>
               </div>
 
-              {/* Resultados */}
               {costPerMile && desiredMarkup && milesNum > 0 && (
-                <div className="space-y-4">
-                  <Separator />
-                  
-                  {/* Cards de resultados */}
-                  <div className="grid md:grid-cols-3 gap-4">
-                    <Card className="p-4 bg-muted/30">
-                      <p className="text-xs text-muted-foreground mb-1">Total de Milhas</p>
-                      <p className="text-2xl font-bold">{formatMiles(milesNum * passengersNum)}</p>
-                    </Card>
-                    <Card className="p-4 bg-muted/30">
-                      <p className="text-xs text-muted-foreground mb-1">Custo Total</p>
-                      <p className="text-2xl font-bold text-destructive">R$ {totalCost.toFixed(2)}</p>
-                    </Card>
-                    <Card className="p-4 bg-primary/10 border-primary">
-                      <p className="text-xs text-muted-foreground mb-1">Preço Sugerido</p>
-                      <p className="text-2xl font-bold text-primary">R$ {suggestedPrice.toFixed(2)}</p>
-                    </Card>
-                  </div>
-
-                  {/* Análise de lucro */}
-                  {currentPrice > 0 && (
-                    <Card className={`p-4 ${profit >= 0 ? 'bg-green-500/10 border-green-500' : 'bg-red-500/10 border-red-500'}`}>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-muted-foreground mb-1">Lucro Atual</p>
-                          <p className={`text-3xl font-bold ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            R$ {profit.toFixed(2)}
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    <div className="space-y-1 text-sm">
+                      <p><strong>Total de Milhas:</strong> {formatMiles(milesNum * passengersNum)}</p>
+                      <p><strong>Custo Total:</strong> R$ {totalCost.toFixed(2)}</p>
+                      <p><strong>Preço Sugerido:</strong> R$ {suggestedPrice.toFixed(2)}</p>
+                      {currentPrice > 0 && (
+                        <>
+                          <Separator className="my-2" />
+                          <p className={profit >= 0 ? "text-green-600" : "text-red-600"}>
+                            <strong>Lucro:</strong> R$ {profit.toFixed(2)} ({profitMargin.toFixed(1)}% de margem)
                           </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm text-muted-foreground mb-1">Margem</p>
-                          <p className={`text-3xl font-bold ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {profitMargin.toFixed(1)}%
-                          </p>
-                        </div>
-                      </div>
-                    </Card>
-                  )}
-                </div>
+                        </>
+                      )}
+                    </div>
+                  </AlertDescription>
+                </Alert>
               )}
             </CardContent>
           </CollapsibleContent>
