@@ -1,11 +1,13 @@
-const corsHeaders = {
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+
+const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
 
-Deno.serve(async (req) => {
+serve(async (req: Request): Promise<Response> => {
   // Preflight CORS
   if (req.method === "OPTIONS") {
     return new Response("ok", {
@@ -16,19 +18,27 @@ Deno.serve(async (req) => {
 
   console.log("[parse-ticket] Método:", req.method);
 
+  // ✅ IMPORTANTE:
+  // Para evitar o erro "non-2xx status code" no front,
+  // SEMPRE vamos responder 200, mesmo se houver erro interno.
+  // O erro será indicado dentro do JSON.
+
   try {
-    // Tenta ler o body como JSON
-    let body: any = null;
+    // Lê o body bruto (como texto) para evitar qualquer erro de parsing
+    const rawBody = await req.text();
+    console.log("[parse-ticket] Body recebido (raw):", rawBody);
+
+    let body: any = {};
     try {
-      body = await req.json();
-    } catch (_err) {
-      console.error("[parse-ticket] Erro ao fazer req.json()");
+      body = rawBody ? JSON.parse(rawBody) : {};
+    } catch (err) {
+      console.error("[parse-ticket] Erro ao fazer JSON.parse do body:", err);
     }
 
     const text = body?.text;
+    console.log("[parse-ticket] Campo text:", text ? "OK" : "VAZIO/INDEFINIDO");
 
     if (!text || typeof text !== "string" || !text.trim()) {
-      console.warn("[parse-ticket] Campo 'text' ausente ou inválido");
       return new Response(
         JSON.stringify({
           error: "Campo 'text' é obrigatório.",
@@ -52,9 +62,12 @@ Deno.serve(async (req) => {
     }
 
     const apiKey = Deno.env.get("OPENAI_API_KEY");
+    console.log(
+      "[parse-ticket] OPENAI_API_KEY configurada?",
+      apiKey ? "SIM" : "NÃO",
+    );
 
     if (!apiKey) {
-      console.error("[parse-ticket] OPENAI_API_KEY não configurada");
       return new Response(
         JSON.stringify({
           error: "OPENAI_API_KEY não configurada na função.",
@@ -79,7 +92,7 @@ Deno.serve(async (req) => {
 
     // Limita o tamanho do texto
     const maxChars = 8000;
-    const trimmedText = text.slice(0, maxChars);
+    const trimmedText = (text as string).slice(0, maxChars);
 
     const openaiPayload = {
       model: "gpt-4.1-mini",
@@ -129,6 +142,8 @@ Texto do bilhete:
       ],
     };
 
+    console.log("[parse-ticket] Enviando requisição para OpenAI...");
+
     const openaiRes = await fetch(
       "https://api.openai.com/v1/chat/completions",
       {
@@ -141,6 +156,11 @@ Texto do bilhete:
       },
     );
 
+    console.log(
+      "[parse-ticket] Status da resposta da OpenAI:",
+      openaiRes.status,
+    );
+
     if (!openaiRes.ok) {
       const errText = await openaiRes.text();
       console.error("[parse-ticket] Erro na chamada OpenAI:", errText);
@@ -148,7 +168,8 @@ Texto do bilhete:
       return new Response(
         JSON.stringify({
           error: "Erro ao chamar OpenAI",
-          rawError: errText,
+          openaiStatus: openaiRes.status,
+          openaiBody: errText,
           pnr: null,
           ticketNumber: null,
           passengerName: null,
@@ -171,12 +192,13 @@ Texto do bilhete:
     const json = await openaiRes.json();
     const content = json?.choices?.[0]?.message?.content;
 
-    if (!content) {
-      console.error("[parse-ticket] Resposta vazia da OpenAI:", json);
+    console.log("[parse-ticket] Conteúdo retornado pela OpenAI:", content);
 
+    if (!content || typeof content !== "string") {
       return new Response(
         JSON.stringify({
-          error: "Resposta vazia da OpenAI",
+          error: "Resposta vazia ou inválida da OpenAI",
+          raw: json,
           pnr: null,
           ticketNumber: null,
           passengerName: null,
@@ -196,12 +218,12 @@ Texto do bilhete:
       );
     }
 
-    let parsed: any;
+    let parsed: any = {};
     try {
       parsed = JSON.parse(content);
     } catch (e) {
       console.error(
-        "[parse-ticket] Falha ao fazer JSON.parse. Conteúdo bruto:",
+        "[parse-ticket] Falha ao fazer JSON.parse no retorno da OpenAI. Conteúdo bruto:",
         content,
       );
 
@@ -254,7 +276,7 @@ Texto do bilhete:
     return new Response(
       JSON.stringify({
         error: "Erro interno na função parse-ticket",
-        rawError: String(err),
+        details: String(err),
         pnr: null,
         ticketNumber: null,
         passengerName: null,
