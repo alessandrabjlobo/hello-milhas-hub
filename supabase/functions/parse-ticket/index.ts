@@ -18,13 +18,7 @@ serve(async (req: Request): Promise<Response> => {
 
   console.log("[parse-ticket] Método:", req.method);
 
-  // ✅ IMPORTANTE:
-  // Para evitar o erro "non-2xx status code" no front,
-  // SEMPRE vamos responder 200, mesmo se houver erro interno.
-  // O erro será indicado dentro do JSON.
-
   try {
-    // Lê o body bruto (como texto) para evitar qualquer erro de parsing
     const rawBody = await req.text();
     console.log("[parse-ticket] Body recebido (raw):", rawBody);
 
@@ -90,7 +84,6 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Limita o tamanho do texto
     const maxChars = 8000;
     const trimmedText = (text as string).slice(0, maxChars);
 
