@@ -1,5 +1,3 @@
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -7,16 +5,19 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   // Preflight CORS
   if (req.method === "OPTIONS") {
-    return new Response("ok", { status: 200, headers: corsHeaders });
+    return new Response("ok", {
+      status: 200,
+      headers: corsHeaders,
+    });
   }
 
   console.log("[parse-ticket] Método:", req.method);
 
   try {
-    // Tentamos ler o body sempre, mas se der erro, tratamos
+    // Tenta ler o body como JSON
     let body: any = null;
     try {
       body = await req.json();
@@ -41,7 +42,7 @@ serve(async (req) => {
           flightNumber: null,
         }),
         {
-          status: 200, // 👈 SEMPRE 200
+          status: 200,
           headers: {
             ...corsHeaders,
             "Content-Type": "application/json",
@@ -67,7 +68,7 @@ serve(async (req) => {
           flightNumber: null,
         }),
         {
-          status: 200, // 👈 SEMPRE 200
+          status: 200,
           headers: {
             ...corsHeaders,
             "Content-Type": "application/json",
@@ -158,7 +159,7 @@ Texto do bilhete:
           flightNumber: null,
         }),
         {
-          status: 200, // 👈 SEMPRE 200
+          status: 200,
           headers: {
             ...corsHeaders,
             "Content-Type": "application/json",
@@ -200,7 +201,7 @@ Texto do bilhete:
       parsed = JSON.parse(content);
     } catch (e) {
       console.error(
-        "[parse-ticket] Falha ao fazer JSON.parse no retorno da OpenAI. Conteúdo bruto:",
+        "[parse-ticket] Falha ao fazer JSON.parse. Conteúdo bruto:",
         content,
       );
 
@@ -241,7 +242,7 @@ Texto do bilhete:
     console.log("[parse-ticket] Resultado final:", result);
 
     return new Response(JSON.stringify(result), {
-      status: 200, // 👈 SEMPRE 200
+      status: 200,
       headers: {
         ...corsHeaders,
         "Content-Type": "application/json",
@@ -264,7 +265,7 @@ Texto do bilhete:
         flightNumber: null,
       }),
       {
-        status: 200, // 👈 SEMPRE 200
+        status: 200,
         headers: {
           ...corsHeaders,
           "Content-Type": "application/json",
