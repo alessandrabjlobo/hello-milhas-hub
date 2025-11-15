@@ -21,7 +21,6 @@ export async function parseWithAI(text: string): Promise<ExtractedData> {
   const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
 
   if (!apiKey) {
-    console.warn("VITE_OPENAI_API_KEY não está definida. Pulando IA.");
     return {};
   }
 
@@ -33,7 +32,7 @@ export async function parseWithAI(text: string): Promise<ExtractedData> {
   const trimmedText = text.slice(0, maxChars);
 
   const body = {
-    model: "gpt-4.1-mini",
+    model: "gpt-4o-mini",
     response_format: { type: "json_object" as const },
     messages: [
       {
