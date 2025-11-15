@@ -154,7 +154,7 @@ export const usePaymentInterestConfig = () => {
     totalPrice: number,
     installments: number
   ): { installmentValue: number; finalPrice: number; interestRate: number } => {
-    const config = configs.find((c) => c.installments === installments);
+    const config = (configs || []).find((c) => c.installments === installments);
     
     if (!config || config.interest_rate === 0) {
       return {

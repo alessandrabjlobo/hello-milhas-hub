@@ -76,11 +76,26 @@ export default function NewSaleWizard() {
   const { toast } = useToast();
 
   const [currentStep, setCurrentStep] = useState(0);
-  const { accounts } = useMileageAccounts();
+  const { accounts, loading: accountsLoading } = useMileageAccounts();
   const { supplierId } = useUserRole();
-  const { linkedAirlines } = useSupplierAirlines(supplierId);
-  const { configs, calculateInstallmentValue } = usePaymentInterestConfig();
-  const { activeMethods } = usePaymentMethods();
+  const { linkedAirlines, loading: airlinesLoading } = useSupplierAirlines(supplierId);
+  const { configs, loading: configsLoading, calculateInstallmentValue } = usePaymentInterestConfig();
+  const { activeMethods, loading: methodsLoading } = usePaymentMethods();
+
+  const isLoadingData = accountsLoading || airlinesLoading || configsLoading || methodsLoading;
+
+  if (isLoadingData) {
+    return (
+      <div className="container mx-auto p-6 max-w-7xl">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center space-y-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="text-muted-foreground">Carregando dados da venda...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const [extractedData, setExtractedData] = useState<any>(null);
   const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(new Set());
@@ -171,10 +186,10 @@ export default function NewSaleWizard() {
   };
 
   // Filtrar contas ativas vinculadas aos programas do fornecedor
-  const filteredAccounts = accounts.filter((acc) => {
+  const filteredAccounts = (accounts || []).filter((acc) => {
     if (saleSource === "internal_account") {
       return (
-        linkedAirlines.some((la: any) => la.airline_company_id === acc.airline_company_id) &&
+        (linkedAirlines || []).some((la: any) => la.airline_company_id === acc.airline_company_id) &&
         acc.status === "active"
       );
     }
@@ -195,10 +210,10 @@ export default function NewSaleWizard() {
     }
   };
 
-  const totalMiles = flightSegments.reduce((sum, s) => sum + (s.miles || 0), 0);
+  const totalMiles = (flightSegments || []).reduce((sum, s) => sum + (s.miles || 0), 0);
   const boardingFeePerPassenger = boardingFeeMode === "total"
     ? parseFloat(totalBoardingFee) || 0
-    : flightSegments.reduce((sum, s) => sum + (s.boardingFee || 0), 0);
+    : (flightSegments || []).reduce((sum, s) => sum + (s.boardingFee || 0), 0);
 
   useEffect(() => {
     if (quoteId) {
@@ -252,8 +267,8 @@ export default function NewSaleWizard() {
           passenger_name: passenger.name,
           passenger_cpf_encrypted: passenger.cpf,
           airline: airline,
-          route: flightSegments.map((s) => `${s.from} → ${s.to}`).join(" / "),
-          departure_date: flightSegments[0]?.date || new Date().toISOString(),
+          route: (flightSegments || []).map((s) => `${s.from} → ${s.to}`).join(" / "),
+          departure_date: (flightSegments || [])[0]?.date || new Date().toISOString(),
           ticket_code: `TKT-${Date.now()}-${i + 1}`,
           status: "pending",
         });
@@ -385,19 +400,19 @@ export default function NewSaleWizard() {
     customerName &&
     customerCpf &&
     passengers > 0 &&
-    passengerCpfs.length === passengers &&
-    flightSegments.length > 0 &&
-    flightSegments.every((s) => s.from && s.to && s.date && s.miles) &&
+    (passengerCpfs || []).length === passengers &&
+    (flightSegments || []).length > 0 &&
+    (flightSegments || []).every((s) => s.from && s.to && s.date && s.miles) &&
     (boardingFeeMode === "total"
       ? totalBoardingFee
-      : flightSegments.every((s) => s.boardingFee !== undefined)) &&
+      : (flightSegments || []).every((s) => s.boardingFee !== undefined)) &&
     (saleSource === "internal_account" ||
       (saleSource === "mileage_counter" &&
         counterSellerName &&
         counterAirlineProgram &&
         counterCostPerThousand));
 
-  const selectedPaymentMethod = activeMethods.find(m => m.id === paymentMethod);
+  const selectedPaymentMethod = activeMethods?.find(m => m.id === paymentMethod) || null;
   const canProceedStep2 =
     (saleSource === "mileage_counter" || accountId) &&
     (pricePerPassenger || priceTotal) &&
@@ -881,7 +896,7 @@ export default function NewSaleWizard() {
                         <SelectValue placeholder="Selecione" />
                       </SelectTrigger>
                       <SelectContent>
-                        {activeMethods.map((method) => (
+                        {(activeMethods || []).map((method) => (
                           <SelectItem key={method.id} value={method.id}>
                             {method.method_name}
                             {method.method_type === 'pix' && method.additional_info?.pix_holder && (
@@ -895,7 +910,7 @@ export default function NewSaleWizard() {
                     </Select>
 
                     {paymentMethod && (() => {
-                      const selectedMethod = activeMethods.find(m => m.id === paymentMethod);
+                      const selectedMethod = (activeMethods || []).find(m => m.id === paymentMethod);
                       if (selectedMethod?.method_type === 'pix' && selectedMethod.additional_info) {
                         return (
                           <Card className="p-3 bg-blue-50 dark:bg-blue-950/20 border-blue-200">
@@ -980,9 +995,9 @@ export default function NewSaleWizard() {
           <div className="lg:col-span-1">
             <SalesSummaryCard
               customerName={customerName}
-              routeText={flightSegments.map((s) => `${s.from} → ${s.to}`).join(" / ")}
-              departureDate={flightSegments[0]?.date || ""}
-              returnDate={flightSegments[1]?.date}
+              routeText={(flightSegments || []).map((s) => `${s.from} → ${s.to}`).join(" / ")}
+              departureDate={(flightSegments || [])[0]?.date || ""}
+              returnDate={(flightSegments || [])[1]?.date}
               passengers={passengers}
               milesNeeded={totalMiles.toString()}
               priceTotal={priceTotal}
