@@ -1,6 +1,7 @@
 // src/lib/bilhete-parser.ts
 import * as pdfjsLib from "pdfjs-dist";
 import { parseWithAI, type ExtractedData } from "./ai-bilhete-parser";
+import { toast } from "sonner";
 // Worker é configurado globalmente em main.tsx via pdfWorker.ts
 
 const patterns = {
@@ -95,14 +96,25 @@ export async function parseDocument(file: File): Promise<ExtractedData> {
       });
     }
 
-    // 1) Primeiro: regex "burro", mas rápido
+    // 1) Primeiro: regex
     const regexData = extractDataFromTextRegex(text);
+    console.log("[parseDocument] 📋 Dados extraídos por regex:", regexData);
 
-    // 2) Depois: tentar IA (se chave existir). Se der erro, usamos só regex.
+    // 2) Depois: tentar IA
     try {
+      console.log("[parseDocument] 🤖 Tentando extração via IA...");
       const aiData = await parseWithAI(text);
 
-      // Mesclar: IA tem prioridade; se IA não preencher, usa regex
+      const fieldsExtractedByAI = Object.keys(aiData).filter(
+        k => aiData[k as keyof ExtractedData]
+      ).length;
+      console.log("[parseDocument] ✅ IA extraiu", fieldsExtractedByAI, "campos");
+
+      if (fieldsExtractedByAI > 0) {
+        toast.success(`IA extraiu ${fieldsExtractedByAI} campos adicionais!`);
+      }
+
+      // Mesclar: IA tem prioridade
       const merged: ExtractedData = {
         pnr: aiData.pnr || regexData.pnr,
         ticketNumber: aiData.ticketNumber || regexData.ticketNumber,
@@ -114,9 +126,21 @@ export async function parseDocument(file: File): Promise<ExtractedData> {
         flightNumber: aiData.flightNumber || regexData.flightNumber,
       };
 
+      console.log("[parseDocument] 🔄 Dados mesclados (IA + regex):", merged);
       return merged;
-    } catch (aiError) {
-      console.warn("Falha na camada de IA. Usando apenas regex.", aiError);
+    } catch (aiError: any) {
+      console.error("[parseDocument] ⚠️ Falha na camada de IA:", aiError);
+
+      // Mostrar toast de erro ao usuário
+      if (aiError.message?.includes("API Key")) {
+        toast.error("IA não configurada. Configure VITE_OPENAI_API_KEY nos secrets.");
+      } else if (aiError.message?.includes("401")) {
+        toast.error("Chave da OpenAI inválida ou sem créditos.");
+      } else {
+        toast.warning("IA falhou. Usando extração básica por regex.");
+      }
+
+      console.log("[parseDocument] 🔙 Retornando apenas dados do regex");
       return regexData;
     }
   } catch (error) {

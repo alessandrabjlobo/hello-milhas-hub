@@ -6,10 +6,12 @@ describe('AI Bilhete Parser', () => {
     vi.clearAllMocks();
   });
 
-  it('deve retornar objeto vazio quando não há API key', async () => {
+  it('deve lançar erro quando não há API key', async () => {
     vi.stubEnv('VITE_OPENAI_API_KEY', '');
-    const result = await parseWithAI('teste');
-    expect(result).toEqual({});
+    
+    await expect(parseWithAI('teste')).rejects.toThrow(
+      'API Key da OpenAI não configurada'
+    );
   });
 
   it('deve retornar objeto vazio quando o texto está vazio', async () => {
@@ -84,7 +86,7 @@ describe('AI Bilhete Parser', () => {
     );
   });
 
-  it('deve lidar com erro 401 da API', async () => {
+  it('deve lançar erro quando OpenAI retorna 401', async () => {
     vi.stubEnv('VITE_OPENAI_API_KEY', 'invalid-key');
 
     global.fetch = vi.fn(() =>
@@ -96,22 +98,12 @@ describe('AI Bilhete Parser', () => {
       } as Response)
     );
 
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-    const result = await parseWithAI('teste de bilhete');
-
-    expect(result).toEqual({});
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      'Erro na chamada OpenAI:',
-      401,
-      'Unauthorized',
-      'Invalid API key'
+    await expect(parseWithAI('teste de bilhete')).rejects.toThrow(
+      'OpenAI API: Chave inválida ou sem créditos (401)'
     );
-
-    consoleErrorSpy.mockRestore();
   });
 
-  it('deve lidar com resposta JSON inválida', async () => {
+  it('deve lançar erro quando resposta JSON é inválida', async () => {
     vi.stubEnv('VITE_OPENAI_API_KEY', 'test-key');
 
     const mockResponse = {
@@ -131,16 +123,8 @@ describe('AI Bilhete Parser', () => {
       } as Response)
     );
 
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-    const result = await parseWithAI('teste de bilhete');
-
-    expect(result).toEqual({});
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      'Falha ao fazer JSON.parse no retorno da OpenAI. Conteúdo bruto:',
-      'não é um JSON válido'
+    await expect(parseWithAI('teste de bilhete')).rejects.toThrow(
+      'JSON inválido da OpenAI'
     );
-
-    consoleErrorSpy.mockRestore();
   });
 });

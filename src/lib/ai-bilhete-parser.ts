@@ -18,18 +18,26 @@ export interface ExtractedData {
  * - NÃO depende de Supabase / edge function
  */
 export async function parseWithAI(text: string): Promise<ExtractedData> {
+  console.log("[parseWithAI] 🚀 Iniciando extração via IA");
+  console.log("[parseWithAI] 📝 Tamanho do texto:", text.length, "caracteres");
+  
   const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
 
   if (!apiKey) {
-    return {};
+    console.error("[parseWithAI] ❌ VITE_OPENAI_API_KEY não configurada");
+    throw new Error("API Key da OpenAI não configurada");
   }
 
+  console.log("[parseWithAI] ✅ API Key encontrada:", apiKey.substring(0, 10) + "...");
+
   if (!text || !text.trim()) {
+    console.warn("[parseWithAI] ⚠️ Texto vazio, abortando");
     return {};
   }
 
   const maxChars = 8000;
   const trimmedText = text.slice(0, maxChars);
+  console.log("[parseWithAI] ✂️ Texto trimado para:", trimmedText.length, "caracteres");
 
   const body = {
     model: "gpt-4o-mini",
@@ -79,6 +87,8 @@ Texto do bilhete:
     ],
   };
 
+  console.log("[parseWithAI] 📡 Enviando requisição para OpenAI...");
+
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -89,42 +99,42 @@ Texto do bilhete:
       body: JSON.stringify(body),
     });
 
+    console.log("[parseWithAI] 📬 Resposta recebida - Status:", response.status);
+
     if (!response.ok) {
       const errText = await response.text();
-      console.error(
-        "Erro na chamada OpenAI:",
-        response.status,
-        response.statusText,
-        errText
-      );
+      console.error("[parseWithAI] ❌ Erro na chamada OpenAI:", {
+        status: response.status,
+        statusText: response.statusText,
+        body: errText
+      });
 
-      // 401 normalmente = chave inválida / sem créditos
       if (response.status === 401) {
-        console.error(
-          "Verifique se a VITE_OPENAI_API_KEY está correta e com créditos."
-        );
+        throw new Error("OpenAI API: Chave inválida ou sem créditos (401)");
       }
 
-      return {};
+      throw new Error(`OpenAI API falhou: ${response.status} - ${errText}`);
     }
 
     const json = await response.json();
+    console.log("[parseWithAI] 📦 JSON recebido:", json);
+
     const content = json?.choices?.[0]?.message?.content;
 
     if (!content) {
-      console.error("Resposta vazia da OpenAI:", json);
-      return {};
+      console.error("[parseWithAI] ❌ Resposta vazia da OpenAI:", json);
+      throw new Error("Resposta vazia da OpenAI");
     }
+
+    console.log("[parseWithAI] 🔍 Conteúdo bruto da IA:", content);
 
     let parsed: any;
     try {
       parsed = JSON.parse(content);
+      console.log("[parseWithAI] ✅ JSON parseado com sucesso:", parsed);
     } catch (e) {
-      console.error(
-        "Falha ao fazer JSON.parse no retorno da OpenAI. Conteúdo bruto:",
-        content
-      );
-      return {};
+      console.error("[parseWithAI] ❌ Falha ao parsear JSON:", content);
+      throw new Error(`JSON inválido da OpenAI: ${content}`);
     }
 
     const result: ExtractedData = {
@@ -138,9 +148,11 @@ Texto do bilhete:
       flightNumber: parsed.flightNumber ?? undefined,
     };
 
+    console.log("[parseWithAI] 🎉 Extração concluída:", result);
+
     return result;
   } catch (error) {
-    console.error("Erro em parseWithAI:", error);
-    return {};
+    console.error("[parseWithAI] ❌ Erro crítico:", error);
+    throw error; // Propagar erro ao invés de engolir
   }
 }
