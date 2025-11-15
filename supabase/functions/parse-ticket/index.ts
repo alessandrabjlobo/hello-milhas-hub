@@ -60,7 +60,7 @@ serve(async (req) => {
     const trimmedText = text.slice(0, maxChars);
 
     const body = {
-      model: "gpt-4.1-mini",
+      model: "gpt-4o-mini",
       response_format: { type: "json_object" as const },
       messages: [
         {
