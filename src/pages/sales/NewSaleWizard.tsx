@@ -491,48 +491,30 @@ export default function NewSaleWizard() {
       }
     }
 
-    const saleId = await createSaleWithSegments({
-      sale_source: saleSource,
-      counter_seller_name:
-        saleSource === "mileage_counter" ? counterSellerName : undefined,
-      counter_seller_contact:
-        saleSource === "mileage_counter" ? counterSellerContact : undefined,
-      counter_airline_program:
-        saleSource === "mileage_counter" ? counterAirlineProgram : undefined,
-      counter_cost_per_thousand:
-        saleSource === "mileage_counter"
-          ? parseFloat(counterCostPerThousand)
-          : undefined,
-      customer_name: customerName,
-      customer_phone: customerPhone,
-      customer_cpf: customerCpf,
-      trip_type: tripType,
-      flight_segments: flightSegments,
-      passenger_cpfs: passengerCpfs,
+    const formData = {
+      channel: saleSource === "internal_account" ? "internal" as const : "balcao" as const,
+      customerName,
+      customerCpf,
+      customerPhone,
       passengers,
+      tripType,
+      flightSegments,
+      paymentMethod,
       notes,
-      mileage_account_id:
-        saleSource === "internal_account" ? accountId : undefined,
-      cpf_used_id: cpfUsedId, // FASE 1: Vincular CPF usado
-      miles_needed: totalMiles,
-      boarding_fee: boardingFeePerPassenger,
-      price_per_passenger: parseFloat(pricePerPassenger) || 0,
-      price_total: parseFloat(priceTotal) || 0,
-      payment_method: paymentMethod,
-      installments: paymentMethod === "credit_card" ? installments : undefined,
-      interest_rate:
-        paymentMethod === "credit_card" && installments
-          ? interestRate
-          : undefined,
-      final_price_with_interest:
-        paymentMethod === "credit_card" && installments
-          ? finalPrice
-          : undefined,
-      status: "pending",
-      issue_date: issueDate || null,
-      pnr: pnr || null,
-      ticket_number: ticketNumber || null,
-    } as any);
+      programId: saleSource === "internal_account" ? programId : undefined,
+      accountId: saleSource === "internal_account" ? accountId : undefined,
+      sellerName: saleSource === "mileage_counter" ? counterSellerName : undefined,
+      sellerContact: saleSource === "mileage_counter" ? counterSellerContact : undefined,
+      counterCostPerThousand: saleSource === "mileage_counter" ? Number(counterCostPerThousand) : undefined,
+    };
+
+    const result = await createSaleWithSegments(formData, supplierId!);
+    
+    if (result.error) {
+      throw new Error(result.error);
+    }
+    
+    const saleId = result.saleId;
 
     setSaving(false);
 

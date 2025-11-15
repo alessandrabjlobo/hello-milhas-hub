@@ -43,7 +43,6 @@ const formSchema = z.object({
   pnr: z.string().optional(),
   ticket_number: z.string().optional(),
   issued_at: z.date().optional(),
-  verification_status: z.enum(["pending", "requested", "received", "completed"]).default("pending"),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -66,7 +65,6 @@ export function RegisterTicketDialog({ open, onOpenChange, saleId }: RegisterTic
     resolver: zodResolver(formSchema),
     defaultValues: {
       sale_id: saleId ?? "",
-      verification_status: "pending",
     },
   });
 
@@ -138,7 +136,6 @@ export function RegisterTicketDialog({ open, onOpenChange, saleId }: RegisterTic
       const sale = sales.find(s => s.id === data.sale_id);
       if (!sale) throw new Error("Venda não encontrada");
 
-      // Create ticket with attachments
       const travelDates = typeof sale.travel_dates === 'object' && sale.travel_dates !== null ? sale.travel_dates as any : {};
       const success = await createTicket({
         sale_id: data.sale_id,
@@ -146,7 +143,7 @@ export function RegisterTicketDialog({ open, onOpenChange, saleId }: RegisterTic
         pnr: data.pnr || null,
         ticket_number: data.ticket_number || null,
         issued_at: data.issued_at?.toISOString() || null,
-        verification_status: data.verification_status,
+        verification_status: "pending",
         route: sale.route_text || "",
         airline: sale.mileage_accounts?.airline_companies?.code || "N/A",
         passenger_name: sale.customer_name || "",
@@ -364,30 +361,6 @@ export function RegisterTicketDialog({ open, onOpenChange, saleId }: RegisterTic
                         />
                       </PopoverContent>
                     </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="verification_status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Status de Verificação</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="pending">Pendente</SelectItem>
-                        <SelectItem value="requested">Código Solicitado</SelectItem>
-                        <SelectItem value="received">Código Recebido</SelectItem>
-                        <SelectItem value="completed">Completo</SelectItem>
-                      </SelectContent>
-                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
