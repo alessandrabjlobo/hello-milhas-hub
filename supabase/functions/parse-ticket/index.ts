@@ -88,7 +88,7 @@ serve(async (req: Request): Promise<Response> => {
     const trimmedText = (text as string).slice(0, maxChars);
 
     const openaiPayload = {
-      model: "gpt-4.1-mini",
+      model: "gpt-4o-mini",
       response_format: { type: "json_object" },
       messages: [
         {

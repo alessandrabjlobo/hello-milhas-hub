@@ -52,6 +52,8 @@ import { useToast } from "@/hooks/use-toast";
 import { BilheteTicketExtractor } from "@/components/tickets/BilheteTicketExtractor";
 import { AutoFilledInput } from "@/components/ui/auto-filled-input";
 import { createSaleWithSegments } from "@/services/saleService";
+import { formatMiles } from "@/lib/utils";
+import { usePaymentMethods } from "@/hooks/usePaymentMethods";
 
 // Type definitions
 export type FlightSegment = {
@@ -1357,16 +1359,13 @@ export default function NewSaleWizard() {
                                   Total Milhas
                                 </p>
                                 <p className="font-bold text-lg">
-                                  {totalMiles.toLocaleString("pt-BR")}
+                                  {formatMiles(totalMiles)}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
-                                  {flightSegments
-                                    .reduce(
-                                      (s, seg) =>
-                                        s + (seg.miles || 0),
-                                      0
-                                    )
-                                    .toLocaleString("pt-BR")}{" "}
+                                  {formatMiles(flightSegments.reduce(
+                                    (s, seg) => s + (seg.miles || 0),
+                                    0
+                                  ))}{" "}
                                   × {passengers} pax
                                 </p>
                               </div>
