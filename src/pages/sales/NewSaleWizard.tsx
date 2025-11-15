@@ -75,13 +75,72 @@ export default function NewSaleWizard() {
   const quoteId = searchParams.get("quoteId");
   const { toast } = useToast();
 
+  // ✅ Todos os hooks devem ser declarados ANTES de qualquer early return
   const [currentStep, setCurrentStep] = useState(0);
+  
+  // State para dados extraídos e auto-preenchimento
+  const [extractedData, setExtractedData] = useState<any>(null);
+  const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(new Set());
+  const [isConvertingQuote, setIsConvertingQuote] = useState(false);
+  const [sourceQuote, setSourceQuote] = useState<any>(null);
+  const [autoCreateTickets, setAutoCreateTickets] = useState(false);
+
+  // State para origem da venda
+  const [saleSource, setSaleSource] = useState<"internal_account" | "mileage_counter">("internal_account");
+  const [counterSellerName, setCounterSellerName] = useState("");
+  const [counterSellerContact, setCounterSellerContact] = useState("");
+  const [counterAirlineProgram, setCounterAirlineProgram] = useState("");
+  const [counterCostPerThousand, setCounterCostPerThousand] = useState("");
+
+  // State para dados do cliente
+  const [customerName, setCustomerName] = useState("");
+  const [customerCpf, setCustomerCpf] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+
+  // State para viagem e passageiros
+  const [tripType, setTripType] = useState<"one_way" | "round_trip" | "multi_city">("one_way");
+  const [passengers, setPassengers] = useState(1);
+  const [passengerCpfs, setPassengerCpfs] = useState<PassengerCPF[]>([]);
+  const [showPassengerDialog, setShowPassengerDialog] = useState(false);
+
+  // State para segmentos de voo
+  const [flightSegments, setFlightSegments] = useState<FlightSegment[]>([
+    { from: "", to: "", date: "", miles: 0 },
+  ]);
+
+  // State para taxa de embarque
+  const [boardingFeeMode, setBoardingFeeMode] = useState<"total" | "per_segment">("total");
+  const [totalBoardingFee, setTotalBoardingFee] = useState("");
+
+  // State para conta e programa
+  const [accountId, setAccountId] = useState("");
+  const [programId, setProgramId] = useState("");
+
+  // State para preços e detalhes
+  const [pricePerPassenger, setPricePerPassenger] = useState("");
+  const [priceTotal, setPriceTotal] = useState("");
+  const [airline, setAirline] = useState("");
+  const [pnr, setPnr] = useState("");
+  const [notes, setNotes] = useState("");
+
+  // State para pagamento
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [installments, setInstallments] = useState(1);
+  const [interestRate, setInterestRate] = useState(0);
+
+  // State para salvamento e diálogo de sucesso
+  const [saving, setSaving] = useState(false);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [lastSaleData, setLastSaleData] = useState<any>(null);
+
+  // Custom hooks (devem estar depois dos useState)
   const { accounts, loading: accountsLoading } = useMileageAccounts();
   const { supplierId } = useUserRole();
   const { linkedAirlines, loading: airlinesLoading } = useSupplierAirlines(supplierId);
   const { configs, loading: configsLoading, calculateInstallmentValue } = usePaymentInterestConfig();
   const { activeMethods, loading: methodsLoading } = usePaymentMethods();
 
+  // ✅ Agora sim: verificação de loading DEPOIS de todos os hooks
   const isLoadingData = accountsLoading || airlinesLoading || configsLoading || methodsLoading;
 
   if (isLoadingData) {
@@ -96,51 +155,6 @@ export default function NewSaleWizard() {
       </div>
     );
   }
-
-  const [extractedData, setExtractedData] = useState<any>(null);
-  const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(new Set());
-  const [isConvertingQuote, setIsConvertingQuote] = useState(false);
-  const [sourceQuote, setSourceQuote] = useState<any>(null);
-  const [autoCreateTickets, setAutoCreateTickets] = useState(false);
-
-  const [saleSource, setSaleSource] = useState<"internal_account" | "mileage_counter">("internal_account");
-  const [counterSellerName, setCounterSellerName] = useState("");
-  const [counterSellerContact, setCounterSellerContact] = useState("");
-  const [counterAirlineProgram, setCounterAirlineProgram] = useState("");
-  const [counterCostPerThousand, setCounterCostPerThousand] = useState("");
-
-  const [customerName, setCustomerName] = useState("");
-  const [customerCpf, setCustomerCpf] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
-
-  const [tripType, setTripType] = useState<"one_way" | "round_trip" | "multi_city">("one_way");
-  const [passengers, setPassengers] = useState(1);
-  const [passengerCpfs, setPassengerCpfs] = useState<PassengerCPF[]>([]);
-  const [showPassengerDialog, setShowPassengerDialog] = useState(false);
-
-  const [flightSegments, setFlightSegments] = useState<FlightSegment[]>([
-    { from: "", to: "", date: "", miles: 0 },
-  ]);
-
-  const [boardingFeeMode, setBoardingFeeMode] = useState<"total" | "per_segment">("total");
-  const [totalBoardingFee, setTotalBoardingFee] = useState("");
-
-  const [accountId, setAccountId] = useState("");
-  const [programId, setProgramId] = useState("");
-
-  const [pricePerPassenger, setPricePerPassenger] = useState("");
-  const [priceTotal, setPriceTotal] = useState("");
-  const [airline, setAirline] = useState("");
-  const [pnr, setPnr] = useState("");
-  const [notes, setNotes] = useState("");
-
-  const [paymentMethod, setPaymentMethod] = useState("");
-  const [installments, setInstallments] = useState(1);
-  const [interestRate, setInterestRate] = useState(0);
-
-  const [saving, setSaving] = useState(false);
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
-  const [lastSaleData, setLastSaleData] = useState<any>(null);
 
   // Auto-preencher passageiro quando há apenas 1
   useEffect(() => {
