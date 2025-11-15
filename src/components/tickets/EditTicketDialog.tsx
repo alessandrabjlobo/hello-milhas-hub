@@ -39,7 +39,6 @@ export function EditTicketDialog({
     pnr: "",
     ticket_number: "",
     issued_at: "",
-    verification_status: "pending" as "pending" | "requested" | "received" | "completed",
     status: "pending" as "pending" | "confirmed" | "cancelled",
   });
 
@@ -49,7 +48,6 @@ export function EditTicketDialog({
         pnr: ticket.pnr || "",
         ticket_number: ticket.ticket_number || "",
         issued_at: ticket.issued_at ? new Date(ticket.issued_at).toISOString().slice(0, 16) : "",
-        verification_status: (ticket.verification_status as any) || "pending",
         status: ticket.status || "pending",
       });
     }
@@ -66,7 +64,6 @@ export function EditTicketDialog({
           pnr: formData.pnr || null,
           ticket_number: formData.ticket_number || null,
           issued_at: formData.issued_at ? new Date(formData.issued_at).toISOString() : null,
-          verification_status: formData.verification_status,
           status: formData.status,
           updated_at: new Date().toISOString(),
         })
@@ -127,26 +124,6 @@ export function EditTicketDialog({
               value={formData.issued_at}
               onChange={(e) => setFormData((f) => ({ ...f, issued_at: e.target.value }))}
             />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="verification_status">Status de Verificação</Label>
-            <Select
-              value={formData.verification_status}
-              onValueChange={(value: any) =>
-                setFormData((f) => ({ ...f, verification_status: value }))
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="pending">Pendente</SelectItem>
-                <SelectItem value="requested">Solicitado</SelectItem>
-                <SelectItem value="received">Recebido</SelectItem>
-                <SelectItem value="completed">Completo</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
 
           <div className="space-y-2">

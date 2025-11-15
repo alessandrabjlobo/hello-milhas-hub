@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -22,9 +23,14 @@ import { useMileageAccounts } from "@/hooks/useMileageAccounts";
 import { AddAccountDialog } from "@/components/accounts/AddAccountDialog";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { AddMovementDialog } from "@/components/movements/AddMovementDialog";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { formatMiles } from "@/lib/utils";
 
 export default function Accounts() {
   const { accounts, loading, fetchAccounts } = useMileageAccounts();
+  const { toast } = useToast();
+  const [updatingStatus, setUpdatingStatus] = useState<Set<string>>(new Set());
 
   // Estados dos filtros
   const [searchTerm, setSearchTerm] = useState(() => 
@@ -190,6 +196,40 @@ export default function Accounts() {
         {used}/{limit}
       </Badge>
     );
+  };
+
+  const toggleAccountStatus = async (accountId: string, currentStatus: string) => {
+    const newStatus = currentStatus === "active" ? "inactive" : "active";
+    
+    setUpdatingStatus(prev => new Set(prev).add(accountId));
+    
+    try {
+      const { error } = await supabase
+        .from("mileage_accounts")
+        .update({ status: newStatus })
+        .eq("id", accountId);
+
+      if (error) throw error;
+
+      await fetchAccounts();
+      
+      toast({
+        title: "Status atualizado",
+        description: `Conta ${newStatus === "active" ? "ativada" : "desativada"} com sucesso.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao atualizar status",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setUpdatingStatus(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(accountId);
+        return newSet;
+      });
+    }
   };
 
   if (loading) {
@@ -408,7 +448,7 @@ export default function Accounts() {
                       <div className="flex items-center gap-2">
                         <TrendingUp className="h-4 w-4 text-green-600" />
                         <span className="font-semibold">
-                          {(account.balance || 0).toLocaleString("pt-BR")}
+                          {formatMiles(account.balance || 0)}
                         </span>
                       </div>
                     </TableCell>
@@ -424,9 +464,16 @@ export default function Accounts() {
                       R$ {(account.cost_per_mile * 1000).toFixed(2)}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={account.status === "active" ? "default" : "secondary"}>
-                        {account.status === "active" ? "Ativa" : "Inativa"}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={account.status === "active"}
+                          onCheckedChange={() => toggleAccountStatus(account.id, account.status)}
+                          disabled={updatingStatus.has(account.id)}
+                        />
+                        <span className="text-sm">
+                          {account.status === "active" ? "Ativa" : "Inativa"}
+                        </span>
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">

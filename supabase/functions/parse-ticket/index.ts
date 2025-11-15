@@ -1,18 +1,14 @@
-// supabase/functions/parse-ticket/index.ts
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
 const corsHeaders = {
-  // ✅ libera o seu front (pode deixar * por enquanto)
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 serve(async (req) => {
-  // 🔹 1) Responder o preflight (OPTIONS) com 200 + CORS
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { status: 200, headers: corsHeaders });
   }
 
   if (req.method !== "POST") {
@@ -46,9 +42,9 @@ serve(async (req) => {
 
     const apiKey = Deno.env.get("OPENAI_API_KEY");
     if (!apiKey) {
-      console.error("OPENAI_API_KEY não configurada no Supabase");
+      console.error("API configuration error");
       return new Response(
-        JSON.stringify({ error: "OPENAI_API_KEY não configurada" }),
+        JSON.stringify({ error: "Service configuration error" }),
         {
           status: 500,
           headers: {

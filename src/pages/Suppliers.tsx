@@ -18,7 +18,7 @@ export default function Suppliers() {
 
   const [editingSupplier, setEditingSupplier] = useState<any>(null);
   const [deletingSupplier, setDeletingSupplier] = useState<any>(null);
-  const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
+  const [viewMode, setViewMode] = useState<"cards" | "list">("list");
 
   const getLinkedAccountsCount = (supplierId: string) => {
     return accounts.filter((acc) => (acc as any).supplier_id === supplierId).length;

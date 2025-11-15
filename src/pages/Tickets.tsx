@@ -40,7 +40,6 @@ export default function Tickets() {
   const [detailTicket, setDetailTicket] = useState<typeof tickets[0] | null>(null);
   const { toast } = useToast();
 
-  // Estados dos filtros
   const [searchTerm, setSearchTerm] = useState(() => 
     localStorage.getItem("tickets_filter_search") || ""
   );
