@@ -329,24 +329,23 @@ export default function NewSaleWizard() {
       account: acc.account_number,
       airline: acc.airline_company_id,
       status: acc.status,
+      supplier: (acc as any).supplier_id
     });
     
     if (saleSource !== "internal_account") return false;
 
     const isActive = acc.status === "active";
 
-    // Restringir por supplier quando disponível
-    const belongsToSupplier = (acc as any).supplier_id ? (acc as any).supplier_id === supplierId : true;
-
-    // Se houver companhias vinculadas, filtra por vínculo; senão, mostra todas ativas do fornecedor
+    // Mostrar TODAS as contas ativas, independente do fornecedor
+    // Se houver companhias vinculadas, filtra por vínculo; senão, mostra todas ativas
     const hasLinks = (linkedAirlines || []).length > 0;
     const isLinked = hasLinks
       ? (linkedAirlines || []).some((la: any) => la?.id === acc?.airline_company_id)
       : true;
 
-    const include = isActive && belongsToSupplier && isLinked;
+    const include = isActive && isLinked;
 
-    console.log(`  ✓ Conta ${acc.account_number}: isLinked=${isLinked}, isActive=${isActive}, belongsToSupplier=${belongsToSupplier}`);
+    console.log(`  ✓ Conta ${acc.account_number}: isLinked=${isLinked}, isActive=${isActive}`);
 
     return include;
   });
