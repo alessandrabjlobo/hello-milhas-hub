@@ -145,6 +145,8 @@ export default function NewSaleWizard() {
   const selectedPaymentMethod =
     activeMethods?.find((m) => m.id === paymentMethod) || null;
 
+  const selectedAccount = accounts.find((acc) => acc.id === accountId);
+
   // --- HOOKS (useEffect) DEVEM VIR ANTES DE QUALQUER RETURN CONDICIONAL ---
 
   // Auto-preencher passageiros quando customerName e customerCpf mudam
@@ -250,8 +252,6 @@ export default function NewSaleWizard() {
     });
   };
 
-  const selectedAccount = accounts.find((acc) => acc.id === accountId);
-
   // Filter all accounts (show from all suppliers)
   const filteredAccounts = accounts.filter((acc) => {
     return acc.status === "active";
@@ -285,6 +285,35 @@ export default function NewSaleWizard() {
     boardingFeeMode === "total"
       ? parseFloat(totalBoardingFee || "0")
       : flightSegments.reduce((sum, seg) => sum + (seg.boardingFee || 0), 0);
+
+  // --- CÁLCULO DE CUSTO E LUCRO ---
+
+  const costPerMileInternal =
+    saleSource === "internal_account" && selectedAccount
+      ? selectedAccount.cost_per_mile || 0
+      : 0;
+
+  const costPerMileCounter =
+    saleSource === "mileage_counter"
+      ? (parseFloat(counterCostPerThousand || "0") || 0) / 1000
+      : 0;
+
+  const activeCostPerMile =
+    saleSource === "internal_account" ? costPerMileInternal : costPerMileCounter;
+
+  const totalMilesCost = totalMiles * activeCostPerMile;
+
+  const totalBoardingFeeCost =
+    boardingFeeMode === "total"
+      ? (parseFloat(totalBoardingFee || "0") || 0) * passengers
+      : flightSegments.reduce(
+          (sum, seg) => sum + (seg.boardingFee || 0),
+          0
+        ) * passengers;
+
+  const revenue = parseFloat(priceTotal || "0");
+  const totalCost = totalMilesCost + totalBoardingFeeCost;
+  const profit = revenue - totalCost;
 
   const fetchAndPrefillQuote = async (qId: string) => {
     try {
@@ -437,31 +466,35 @@ export default function NewSaleWizard() {
     setSaving(true);
 
     try {
-      const saleData = {
-        sale_source: saleSource,
-        mileage_account_id: saleSource === "internal_account" ? accountId : null,
-        counter_seller_name: saleSource === "mileage_counter" ? counterSellerName : null,
-        counter_seller_contact: saleSource === "mileage_counter" ? counterSellerContact : null,
-        counter_airline_program: saleSource === "mileage_counter" ? counterAirlineProgram : null,
-        counter_cost_per_thousand:
-          saleSource === "mileage_counter" ? parseFloat(counterCostPerThousand) : null,
-        customer_name: customerName,
-        customer_cpf: customerCpf,
-        customer_phone: customerPhone || null,
-        trip_type: tripType,
+      // 🔹 Monta o objeto no formato esperado por createSaleWithSegments (SaleFormData)
+      const saleFormData: any = {
+        channel: saleSource === "internal_account" ? "internal" : "counter",
+
+        customerName,
+        customerCpf,
+        customerPhone,
         passengers,
-        passenger_cpfs: passengerCpfs,
-        flight_segments: flightSegments,
-        boarding_fee: boardingFeePerPassenger,
-        price_per_passenger: pricePerPassenger ? parseFloat(pricePerPassenger) : null,
-        price_total: parseFloat(priceTotal),
-        payment_method: paymentMethod,
-        installments,
-        interest_rate: interestRate,
-        notes: notes || null,
+        tripType,
+        paymentMethod,
+        notes,
+        flightSegments,
+
+        // Conta interna
+        accountId: saleSource === "internal_account" ? accountId : undefined,
+        programId: saleSource === "internal_account" ? programId : undefined,
+
+        // Balcão
+        sellerName:
+          saleSource === "mileage_counter" ? counterSellerName : undefined,
+        sellerContact:
+          saleSource === "mileage_counter" ? counterSellerContact : undefined,
+        counterCostPerThousand:
+          saleSource === "mileage_counter"
+            ? parseFloat(counterCostPerThousand || "0")
+            : undefined,
       };
 
-      const result = await createSaleWithSegments(saleData, supplierId);
+      const result = await createSaleWithSegments(saleFormData, supplierId);
 
       if (!result.saleId || result.error) {
         throw new Error(result.error || "Falha ao criar venda");
@@ -485,7 +518,7 @@ export default function NewSaleWizard() {
       }
 
       if (saleId && typeof saleId === "string") {
-        // Always create tickets automatically
+        // Sempre cria as passagens automaticamente
         await createTicketsForPassengers(saleId);
 
         setLastSaleData({
@@ -603,7 +636,7 @@ export default function NewSaleWizard() {
                         className={`p-4 cursor-pointer transition ${
                           saleSource === "internal_account"
                             ? "border-primary bg-primary/5"
-                            : "hover:border-primary/50"
+                            : "hover;border-primary/50"
                         }`}
                         onClick={() => setSaleSource("internal_account")}
                       >
@@ -961,6 +994,43 @@ export default function NewSaleWizard() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Resumo Financeiro (Lucro) */}
+                  <Card className="p-4 border border-dashed">
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Resumo financeiro estimado
+                    </p>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span>Custo das milhas</span>
+                        <span className="font-semibold">
+                          R$ {totalMilesCost.toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Taxas de embarque</span>
+                        <span className="font-semibold">
+                          R$ {totalBoardingFeeCost.toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Receita (preço total)</span>
+                        <span className="font-semibold">
+                          R$ {isNaN(revenue) ? "0,00" : revenue.toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between pt-2 border-t mt-2">
+                        <span>Lucro estimado</span>
+                        <span
+                          className={`font-semibold ${
+                            profit >= 0 ? "text-green-600" : "text-red-600"
+                          }`}
+                        >
+                          R$ {isNaN(profit) ? "0,00" : profit.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  </Card>
 
                   {/* Forma de Pagamento */}
                   <div>
