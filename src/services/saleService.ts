@@ -23,7 +23,42 @@ export async function createSaleWithSegments(
     // 🔍 Log para debug
     console.log("[createSaleWithSegments] formData recebido:", formData);
 
-    // ✅ Garante que sempre temos um array de segmentos
+    // -------------------------------------------------
+    // 1) Normalizar e validar canal (internal vs counter)
+    // -------------------------------------------------
+    const channel = (formData as any).channel as "internal" | "counter" | undefined;
+
+    if (!channel) {
+      throw new Error("Canal da venda (channel) não informado.");
+    }
+
+    // Valida dados mínimos conforme o canal
+    if (channel === "internal") {
+      const programId = (formData as any).programId;
+      const accountId = (formData as any).accountId;
+
+      if (!programId || !accountId) {
+        throw new Error(
+          "Selecione a conta e o programa de milhagem para vendas com conta interna."
+        );
+      }
+    }
+
+    if (channel === "counter") {
+      const sellerName = (formData as any).sellerName;
+      const sellerContact = (formData as any).sellerContact;
+      const counterCostPerThousand = (formData as any).counterCostPerThousand;
+
+      if (!sellerName || !sellerContact || !counterCostPerThousand) {
+        throw new Error(
+          "Informações do vendedor e custo por mil milhas são obrigatórias para vendas de balcão."
+        );
+      }
+    }
+
+    // -------------------------------------------------
+    // 2) Normalizar segmentos de voo
+    // -------------------------------------------------
     const rawSegments: any =
       (formData as any).flightSegments ??
       (formData as any).flight_segments ??
@@ -43,13 +78,15 @@ export async function createSaleWithSegments(
         "[createSaleWithSegments] Nenhum trecho recebido em flightSegments. " +
           "A venda será criada sem registros em sale_segments."
       );
-      // 👉 importante: não jogamos erro aqui; só não cria os segments
+      // 👉 Não damos erro aqui de propósito; só não cria os segments
     }
 
-    // --------- STEP 1: Inserir na tabela sales ---------
+    // -------------------------------------------------
+    // 3) Montar payload da venda (tabela sales)
+    // -------------------------------------------------
     const salePayload: any = {
       supplier_id: supplierId,
-      channel: formData.channel,
+      channel, // "internal" ou "counter"
       client_name: formData.customerName,
       client_cpf_encrypted: formData.customerCpf,
       client_contact: formData.customerPhone || null,
@@ -57,26 +94,27 @@ export async function createSaleWithSegments(
       trip_type: formData.tripType,
       payment_method: formData.paymentMethod || null,
       notes: formData.notes || null,
-      // ❌ removido: status: "draft"  (estava quebrando por causa do ENUM)
+      // ❌ status removido (ENUM não aceita "draft")
       created_by: user.id,
       user_id: user.id,
     };
 
-    // Campos específicos por canal
-    if (formData.channel === "internal") {
-      salePayload.program_id = formData.programId;
-      salePayload.mileage_account_id = formData.accountId;
+    if (channel === "internal") {
+      // Campos de conta própria
+      salePayload.program_id = (formData as any).programId;
+      salePayload.mileage_account_id = (formData as any).accountId;
       // compat com estrutura antiga
       salePayload.sale_source = "internal_account";
-    } else {
-      salePayload.seller_name = formData.sellerName;
-      salePayload.seller_contact = formData.sellerContact;
+    } else if (channel === "counter") {
+      // Campos de balcão de milhas
+      salePayload.seller_name = (formData as any).sellerName;
+      salePayload.seller_contact = (formData as any).sellerContact;
       salePayload.counter_cost_per_thousand =
-        formData.counterCostPerThousand ?? null;
+        (formData as any).counterCostPerThousand ?? null;
       // compat com estrutura antiga
       salePayload.sale_source = "mileage_counter";
-      salePayload.counter_seller_name = formData.sellerName;
-      salePayload.counter_seller_contact = formData.sellerContact;
+      salePayload.counter_seller_name = (formData as any).sellerName;
+      salePayload.counter_seller_contact = (formData as any).sellerContact;
     }
 
     // Guarda JSONB dos segmentos (compatibilidade)
@@ -90,6 +128,9 @@ export async function createSaleWithSegments(
             .join(", ")
         : null;
 
+    // -------------------------------------------------
+    // 4) Inserir na tabela sales
+    // -------------------------------------------------
     const { data: saleData, error: saleError } = await supabase
       .from("sales")
       .insert(salePayload)
@@ -105,7 +146,9 @@ export async function createSaleWithSegments(
       throw new Error("ID da venda não retornado");
     }
 
-    // --------- STEP 2: Inserir na tabela sale_segments (se houver trechos) ---------
+    // -------------------------------------------------
+    // 5) Inserir na tabela sale_segments (se houver trechos)
+    // -------------------------------------------------
     if (flightSegments.length > 0) {
       const direction =
         formData.tripType === "one_way"
@@ -114,15 +157,17 @@ export async function createSaleWithSegments(
           ? "roundtrip"
           : "multicity";
 
-      const segmentPayloads = flightSegments.map((segment: any, index: number) => ({
-        sale_id: saleData.id,
-        direction,
-        from_code: segment.from,
-        to_code: segment.to,
-        date: segment.date ? new Date(segment.date).toISOString() : null,
-        flight_number: segment.airline || null,
-        position: index,
-      }));
+      const segmentPayloads = flightSegments.map(
+        (segment: any, index: number) => ({
+          sale_id: saleData.id,
+          direction,
+          from_code: segment.from,
+          to_code: segment.to,
+          date: segment.date ? new Date(segment.date).toISOString() : null,
+          flight_number: segment.airline || null,
+          position: index,
+        })
+      );
 
       const { error: segmentsError } = await supabase
         .from("sale_segments")
