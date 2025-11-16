@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -153,23 +153,23 @@ export default function NewSaleWizard() {
       // Sempre garantir que o primeiro passageiro seja o cliente
       const firstPassenger: PassengerCPF = {
         name: customerName,
-        cpf: customerCpf.replace(/\D/g, '') // Remove máscara
+        cpf: customerCpf.replace(/\D/g, ""), // Remove máscara
       };
-      
+
       if (passengers === 1) {
         // 1 passageiro: substituir array inteiro
         setPassengerCpfs([firstPassenger]);
       } else if (passengers > 1) {
         // 2+ passageiros: garantir que o primeiro seja o cliente
-        setPassengerCpfs(prev => {
+        setPassengerCpfs((prev) => {
           const updated = [...prev];
           updated[0] = firstPassenger;
-          
+
           // Preencher posições vazias com objetos vazios
           while (updated.length < passengers) {
             updated.push({ name: "", cpf: "" });
           }
-          
+
           // Remover excesso se diminuiu o número de passageiros
           return updated.slice(0, passengers);
         });
@@ -231,7 +231,7 @@ export default function NewSaleWizard() {
     if (data.segments && data.segments.length > 0) {
       setFlightSegments(data.segments);
       newAutoFilledFields.add("flightSegments");
-      
+
       // Detect trip type based on segments
       if (data.segments.length === 1) {
         setTripType("one_way");
@@ -250,9 +250,7 @@ export default function NewSaleWizard() {
     });
   };
 
-  const selectedAccount = accounts.find(
-    (acc) => acc.id === accountId
-  );
+  const selectedAccount = accounts.find((acc) => acc.id === accountId);
 
   // Filter all accounts (show from all suppliers)
   const filteredAccounts = accounts.filter((acc) => {
@@ -286,10 +284,7 @@ export default function NewSaleWizard() {
   const boardingFeePerPassenger =
     boardingFeeMode === "total"
       ? parseFloat(totalBoardingFee || "0")
-      : flightSegments.reduce(
-          (sum, seg) => sum + (seg.boardingFee || 0),
-          0
-        );
+      : flightSegments.reduce((sum, seg) => sum + (seg.boardingFee || 0), 0);
 
   const fetchAndPrefillQuote = async (qId: string) => {
     try {
@@ -393,6 +388,42 @@ export default function NewSaleWizard() {
     }
   };
 
+  // --- Validação única PARA SALVAR (sem useMemo) ---
+  const hasOrigin =
+    saleSource === "internal_account"
+      ? !!accountId
+      : !!(
+          counterSellerName &&
+          counterSellerContact &&
+          counterAirlineProgram &&
+          counterCostPerThousand
+        );
+
+  const hasCustomer = !!(customerName && customerCpf);
+
+  const hasPassengers =
+    passengers > 0 && passengerCpfs.length === passengers;
+
+  const hasValidSegments =
+    flightSegments.length > 0 &&
+    flightSegments.every((s) => s.from && s.to && s.date && s.miles);
+
+  const hasBoardingFee =
+    boardingFeeMode === "total"
+      ? !!totalBoardingFee
+      : flightSegments.every((s) => s.boardingFee !== undefined);
+
+  const hasPriceAndPayment =
+    !!priceTotal && parseFloat(priceTotal) > 0 && !!paymentMethod;
+
+  const canSave =
+    hasOrigin &&
+    hasCustomer &&
+    hasPassengers &&
+    hasValidSegments &&
+    hasBoardingFee &&
+    hasPriceAndPayment;
+
   const handleSave = async () => {
     if (!canSave) {
       toast({
@@ -412,7 +443,8 @@ export default function NewSaleWizard() {
         counter_seller_name: saleSource === "mileage_counter" ? counterSellerName : null,
         counter_seller_contact: saleSource === "mileage_counter" ? counterSellerContact : null,
         counter_airline_program: saleSource === "mileage_counter" ? counterAirlineProgram : null,
-        counter_cost_per_thousand: saleSource === "mileage_counter" ? parseFloat(counterCostPerThousand) : null,
+        counter_cost_per_thousand:
+          saleSource === "mileage_counter" ? parseFloat(counterCostPerThousand) : null,
         customer_name: customerName,
         customer_cpf: customerCpf,
         customer_phone: customerPhone || null,
@@ -498,39 +530,6 @@ export default function NewSaleWizard() {
       });
     }
   };
-
-  // Validação única para salvar
-  const canSave = useMemo(() => {
-    // Validação de origem
-    const hasOrigin = saleSource === "internal_account" 
-      ? !!accountId 
-      : !!(counterSellerName && counterSellerContact && counterAirlineProgram && counterCostPerThousand);
-    
-    // Validação de cliente
-    const hasCustomer = !!(customerName && customerCpf);
-    
-    // Validação de passageiros
-    const hasPassengers = passengers > 0 && passengerCpfs.length === passengers;
-    
-    // Validação de trechos
-    const hasValidSegments = flightSegments.length > 0 && 
-      flightSegments.every(s => s.from && s.to && s.date && s.miles);
-    
-    // Validação de taxa de embarque
-    const hasBoardingFee = boardingFeeMode === "total"
-      ? !!totalBoardingFee
-      : flightSegments.every(s => s.boardingFee !== undefined);
-    
-    // Validação de preço e pagamento
-    const hasPriceAndPayment = !!(priceTotal && parseFloat(priceTotal) > 0 && paymentMethod);
-    
-    return hasOrigin && hasCustomer && hasPassengers && hasValidSegments && hasBoardingFee && hasPriceAndPayment;
-  }, [
-    saleSource, accountId, counterSellerName, counterSellerContact, 
-    counterAirlineProgram, counterCostPerThousand, customerName, customerCpf,
-    passengers, passengerCpfs, flightSegments, boardingFeeMode, totalBoardingFee,
-    priceTotal, paymentMethod
-  ]);
 
   // --- JSX ---
   return (
@@ -666,7 +665,7 @@ export default function NewSaleWizard() {
                         value={accountId}
                         onChange={(id) => {
                           setAccountId(id);
-                          const account = accounts.find(a => a.id === id);
+                          const account = accounts.find((a) => a.id === id);
                           if (account) {
                             setProgramId(account.airline_company_id);
                           }
@@ -1140,9 +1139,9 @@ export default function NewSaleWizard() {
         />
 
         {lastSaleData && (
-        <SaleSuccessDialog
-          open={showSuccessDialog}
-          onClose={() => setShowSuccessDialog(false)}
+          <SaleSuccessDialog
+            open={showSuccessDialog}
+            onClose={() => setShowSuccessDialog(false)}
             saleData={lastSaleData}
           />
         )}
