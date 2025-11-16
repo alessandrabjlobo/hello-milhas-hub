@@ -429,9 +429,9 @@ export default function NewSaleWizard() {
         notes: notes || null,
       };
 
-      const result = await createSaleWithSegments(saleData);
+      const result = await createSaleWithSegments(saleData, supplierId);
 
-      if (!result.success || !result.saleId) {
+      if (!result.saleId || result.error) {
         throw new Error(result.error || "Falha ao criar venda");
       }
 
@@ -664,9 +664,12 @@ export default function NewSaleWizard() {
                       <AccountCombobox
                         accounts={filteredAccounts}
                         value={accountId}
-                        onSelect={(id, pId) => {
+                        onChange={(id) => {
                           setAccountId(id);
-                          setProgramId(pId);
+                          const account = accounts.find(a => a.id === id);
+                          if (account) {
+                            setProgramId(account.airline_company_id);
+                          }
                         }}
                         placeholder="Buscar conta..."
                       />
@@ -840,12 +843,11 @@ export default function NewSaleWizard() {
                         key={index}
                         index={index}
                         segment={segment}
-                        tripType={tripType}
-                        boardingFeeMode={boardingFeeMode}
-                        onChange={(field, value) => {
+                        showBoardingFee={boardingFeeMode === "per_segment"}
+                        onUpdate={(idx, field, value) => {
                           const newSegments = [...flightSegments];
-                          newSegments[index] = {
-                            ...newSegments[index],
+                          newSegments[idx] = {
+                            ...newSegments[idx],
                             [field]: value,
                           };
                           setFlightSegments(newSegments);
@@ -1132,15 +1134,15 @@ export default function NewSaleWizard() {
         <PassengerCPFDialog
           open={showPassengerDialog}
           onOpenChange={setShowPassengerDialog}
-          passengers={passengers}
-          existingCpfs={passengerCpfs}
+          passengers={passengerCpfs}
+          expectedCount={passengers || 1}
           onSave={(cpfs) => setPassengerCpfs(cpfs)}
         />
 
         {lastSaleData && (
-          <SaleSuccessDialog
-            open={showSuccessDialog}
-            onOpenChange={setShowSuccessDialog}
+        <SaleSuccessDialog
+          open={showSuccessDialog}
+          onClose={() => setShowSuccessDialog(false)}
             saleData={lastSaleData}
           />
         )}
