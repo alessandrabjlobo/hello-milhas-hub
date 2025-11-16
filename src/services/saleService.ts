@@ -23,7 +23,7 @@ export async function createSaleWithSegments(
     // 🔍 Log para debug
     console.log("[createSaleWithSegments] formData recebido:", formData);
 
-    // ✅ Tenta pegar os segmentos em diferentes formatos (defensivo)
+    // ✅ Garante que sempre temos um array de segmentos
     const rawSegments: any =
       (formData as any).flightSegments ??
       (formData as any).flight_segments ??
@@ -43,8 +43,7 @@ export async function createSaleWithSegments(
         "[createSaleWithSegments] Nenhum trecho recebido em flightSegments. " +
           "A venda será criada sem registros em sale_segments."
       );
-      // 🚨 Importante: NÃO vamos mais dar throw aqui.
-      // Se tiver algo errado no front, a venda ainda é criada, só sem segmentos.
+      // 👉 importante: não jogamos erro aqui; só não cria os segments
     }
 
     // --------- STEP 1: Inserir na tabela sales ---------
@@ -58,7 +57,7 @@ export async function createSaleWithSegments(
       trip_type: formData.tripType,
       payment_method: formData.paymentMethod || null,
       notes: formData.notes || null,
-      status: "draft",
+      // ❌ removido: status: "draft"  (estava quebrando por causa do ENUM)
       created_by: user.id,
       user_id: user.id,
     };
