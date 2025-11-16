@@ -118,9 +118,22 @@ export async function createSaleWithSegments(
       created_by: user.id,
       user_id: user.id,
 
-      // 🔹 Campos exigidos pelo banco (NOT NULL)
+    // 🔹 Campos exigidos pelo banco (NOT NULL)
       miles_used: totalMilesUsed,
       total_cost: totalCost,
+      
+      // ✅ Campos de receita e lucro (NOT NULL)
+      sale_price: Number((formData as any).priceTotal ?? 0) || 0,
+      profit: Number((formData as any).profit ?? 0) || 0,
+      profit_margin: Number((formData as any).profitMargin ?? 0) || 0,
+      
+      // Campos opcionais relacionados a preço
+      price_per_passenger: (formData as any).pricePerPassenger 
+        ? Number((formData as any).pricePerPassenger) 
+        : null,
+      boarding_fee: (formData as any).boardingFee 
+        ? Number((formData as any).boardingFee) 
+        : null,
     };
 
     // Campos específicos por canal
