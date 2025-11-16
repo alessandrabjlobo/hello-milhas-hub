@@ -100,13 +100,7 @@ export async function createSaleWithSegments(
 
     const totalCost = Number(totalCostRaw) || 0;
 
-    // RECEITA TOTAL (opcional, caso exista coluna total_price no banco)
-    const totalPriceRaw =
-      (formData as any).priceTotal ??
-      (formData as any).totalPrice ??
-      0;
-
-    const totalPrice = Number(totalPriceRaw) || 0;
+    // (RECEITA total_price NÃO será enviada, pois a coluna não existe no banco)
 
     // -------------------------------------------------
     // 4) Montar payload da venda (tabela sales)
@@ -128,11 +122,6 @@ export async function createSaleWithSegments(
       miles_used: totalMilesUsed,
       total_cost: totalCost,
     };
-
-    // Se sua tabela tiver uma coluna total_price, isso já alimenta a receita:
-    if (!Number.isNaN(totalPrice) && totalPrice > 0) {
-      salePayload.total_price = totalPrice;
-    }
 
     // Campos específicos por canal
     if (channel === "internal") {
