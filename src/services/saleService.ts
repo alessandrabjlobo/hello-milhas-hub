@@ -72,7 +72,7 @@ export async function createSaleWithSegments(
       );
     }
 
-    // ✅ Calcula total de milhas usadas
+    // ✅ Total de milhas usadas
     const totalMilesUsed =
       flightSegments.length > 0
         ? flightSegments.reduce(
@@ -86,11 +86,30 @@ export async function createSaleWithSegments(
         "[createSaleWithSegments] Nenhum trecho recebido em flightSegments. " +
           "A venda será criada sem registros em sale_segments."
       );
-      // Não damos erro, só ficamos com miles_used = 0
+      // não damos erro, só deixamos miles_used = 0
     }
 
     // -------------------------------------------------
-    // 3) Montar payload da venda (tabela sales)
+    // 3) Normalizar valores financeiros vindos da tela
+    // -------------------------------------------------
+    // CUSTO TOTAL (obrigatório p/ coluna total_cost NOT NULL)
+    const totalCostRaw =
+      (formData as any).totalCost ??
+      (formData as any).total_cost ??
+      0;
+
+    const totalCost = Number(totalCostRaw) || 0;
+
+    // RECEITA TOTAL (opcional, caso exista coluna total_price no banco)
+    const totalPriceRaw =
+      (formData as any).priceTotal ??
+      (formData as any).totalPrice ??
+      0;
+
+    const totalPrice = Number(totalPriceRaw) || 0;
+
+    // -------------------------------------------------
+    // 4) Montar payload da venda (tabela sales)
     // -------------------------------------------------
     const salePayload: any = {
       supplier_id: supplierId,
@@ -105,10 +124,17 @@ export async function createSaleWithSegments(
       created_by: user.id,
       user_id: user.id,
 
-      // 🔹 Campo que o banco está exigindo (NOT NULL)
+      // 🔹 Campos exigidos pelo banco (NOT NULL)
       miles_used: totalMilesUsed,
+      total_cost: totalCost,
     };
 
+    // Se sua tabela tiver uma coluna total_price, isso já alimenta a receita:
+    if (!Number.isNaN(totalPrice) && totalPrice > 0) {
+      salePayload.total_price = totalPrice;
+    }
+
+    // Campos específicos por canal
     if (channel === "internal") {
       salePayload.program_id = (formData as any).programId;
       salePayload.mileage_account_id = (formData as any).accountId;
@@ -135,7 +161,7 @@ export async function createSaleWithSegments(
         : null;
 
     // -------------------------------------------------
-    // 4) Inserir na tabela sales
+    // 5) Inserir na tabela sales
     // -------------------------------------------------
     const { data: saleData, error: saleError } = await supabase
       .from("sales")
@@ -153,7 +179,7 @@ export async function createSaleWithSegments(
     }
 
     // -------------------------------------------------
-    // 5) Inserir na tabela sale_segments (se houver trechos)
+    // 6) Inserir na tabela sale_segments (se houver trechos)
     // -------------------------------------------------
     if (flightSegments.length > 0) {
       const direction =
