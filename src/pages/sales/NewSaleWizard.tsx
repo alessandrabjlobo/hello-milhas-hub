@@ -486,6 +486,12 @@ export default function NewSaleWizard() {
         totalBoardingFee: boardingFeeTotal,
         milesUsed: totalMiles,
         totalCost: estimatedTotalCost,
+        
+        // ✅ Campos de lucro (obrigatórios no banco)
+        profit: estimatedProfit || 0,
+        profitMargin: profitMarginPct || 0,
+        pricePerPassenger: pricePerPassenger || null,
+        boardingFee: boardingFeeTotal || 0,
       };
 
       if (channel === "internal") {

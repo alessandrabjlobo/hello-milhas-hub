@@ -51,7 +51,25 @@ export function QuoteGeneratorNew() {
   // Load existing quote if editing
   useEffect(() => {
     if (quoteId) {
+      console.log("🔍 [QuoteGeneratorNew] Carregando orçamento ID:", quoteId);
       loadQuote(quoteId);
+    } else {
+      // Reset do formulário quando não tem quoteId
+      console.log("🔄 [QuoteGeneratorNew] Reset - nenhum quoteId");
+      setExistingQuoteId(null);
+      setClientName("");
+      setClientPhone("");
+      setPassengers("1");
+      setTotalPrice("");
+      setBoardingFee("");
+      setFlightSegments([]);
+      setRoundTripData({
+        origin: "",
+        destination: "",
+        departureDate: "",
+        returnDate: "",
+        miles: 0
+      });
     }
   }, [quoteId]);
 
@@ -64,7 +82,12 @@ export function QuoteGeneratorNew() {
         .eq("id", id)
         .single();
 
-      if (error) throw error;
+      console.log("📦 [QuoteGeneratorNew] Dados carregados:", data);
+
+      if (error) {
+        console.error("❌ [QuoteGeneratorNew] Erro ao carregar:", error);
+        throw error;
+      }
 
       if (data) {
         setExistingQuoteId(data.id);
