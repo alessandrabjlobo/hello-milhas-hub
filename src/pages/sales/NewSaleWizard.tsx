@@ -35,14 +35,6 @@ import { PassengerCPFDialog } from "@/components/sales/PassengerCPFDialog";
 import { FlightSegmentForm } from "@/components/sales/FlightSegmentForm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AccountCombobox } from "@/components/sales/AccountCombobox";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { BilheteTicketExtractor } from "@/components/tickets/BilheteTicketExtractor";
@@ -74,16 +66,17 @@ export default function NewSaleWizard() {
   const { toast } = useToast();
 
   // --- STATES PRINCIPAIS ---
-  // Dados extraídos e auto-preenchimento
   const [extractedData, setExtractedData] = useState<any>(null);
-  const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(new Set());
+  const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(
+    new Set()
+  );
   const [isConvertingQuote, setIsConvertingQuote] = useState(false);
   const [sourceQuote, setSourceQuote] = useState<any>(null);
 
   // Origem da venda
-  const [saleSource, setSaleSource] = useState<"internal_account" | "mileage_counter">(
-    "internal_account"
-  );
+  const [saleSource, setSaleSource] = useState<
+    "internal_account" | "mileage_counter"
+  >("internal_account");
   const [counterSellerName, setCounterSellerName] = useState("");
   const [counterSellerContact, setCounterSellerContact] = useState("");
   const [counterAirlineProgram, setCounterAirlineProgram] = useState("");
@@ -95,7 +88,9 @@ export default function NewSaleWizard() {
   const [customerPhone, setCustomerPhone] = useState("");
 
   // Viagem e passageiros
-  const [tripType, setTripType] = useState<"one_way" | "round_trip" | "multi_city">("one_way");
+  const [tripType, setTripType] = useState<
+    "one_way" | "round_trip" | "multi_city"
+  >("one_way");
   const [passengers, setPassengers] = useState(1);
   const [passengerCpfs, setPassengerCpfs] = useState<PassengerCPF[]>([]);
   const [showPassengerDialog, setShowPassengerDialog] = useState(false);
@@ -106,7 +101,9 @@ export default function NewSaleWizard() {
   ]);
 
   // Taxa de embarque
-  const [boardingFeeMode, setBoardingFeeMode] = useState<"total" | "per_segment">("total");
+  const [boardingFeeMode, setBoardingFeeMode] = useState<
+    "total" | "per_segment"
+  >("total");
   const [totalBoardingFee, setTotalBoardingFee] = useState("");
 
   // Conta e programa
@@ -133,7 +130,8 @@ export default function NewSaleWizard() {
   // --- CUSTOM HOOKS ---
   const { accounts, loading: accountsLoading } = useMileageAccounts();
   const { supplierId } = useUserRole();
-  const { linkedAirlines, loading: airlinesLoading } = useSupplierAirlines(supplierId);
+  const { linkedAirlines, loading: airlinesLoading } =
+    useSupplierAirlines(supplierId);
   const {
     configs,
     loading: configsLoading,
@@ -141,45 +139,35 @@ export default function NewSaleWizard() {
   } = usePaymentInterestConfig();
   const { activeMethods, loading: methodsLoading } = usePaymentMethods();
 
-  // --- DERIVADOS (usados em hooks) ---
   const selectedPaymentMethod =
     activeMethods?.find((m) => m.id === paymentMethod) || null;
 
-  const selectedAccount = accounts.find((acc) => acc.id === accountId);
+  // --- HOOKS ---
 
-  // --- HOOKS (useEffect) DEVEM VIR ANTES DE QUALQUER RETURN CONDICIONAL ---
-
-  // Auto-preencher passageiros quando customerName e customerCpf mudam
   useEffect(() => {
     if (customerName && customerCpf) {
-      // Sempre garantir que o primeiro passageiro seja o cliente
       const firstPassenger: PassengerCPF = {
         name: customerName,
-        cpf: customerCpf.replace(/\D/g, ""), // Remove máscara
+        cpf: customerCpf.replace(/\D/g, ""),
       };
 
       if (passengers === 1) {
-        // 1 passageiro: substituir array inteiro
         setPassengerCpfs([firstPassenger]);
       } else if (passengers > 1) {
-        // 2+ passageiros: garantir que o primeiro seja o cliente
         setPassengerCpfs((prev) => {
           const updated = [...prev];
           updated[0] = firstPassenger;
 
-          // Preencher posições vazias com objetos vazios
           while (updated.length < passengers) {
             updated.push({ name: "", cpf: "" });
           }
 
-          // Remover excesso se diminuiu o número de passageiros
           return updated.slice(0, passengers);
         });
       }
     }
   }, [customerName, customerCpf, passengers]);
 
-  // Buscar orçamento se houver quoteId
   useEffect(() => {
     if (quoteId) {
       fetchAndPrefillQuote(quoteId);
@@ -187,7 +175,7 @@ export default function NewSaleWizard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quoteId]);
 
-  // --- LOADING STATE (quando dados necessários estão carregando) ---
+  // --- LOADING STATE ---
   if (accountsLoading || airlinesLoading || configsLoading || methodsLoading) {
     return (
       <div className="container mx-auto py-8 px-4">
@@ -197,14 +185,16 @@ export default function NewSaleWizard() {
               <div className="h-8 bg-muted rounded w-1/3 mx-auto" />
               <div className="h-4 bg-muted rounded w-2/3 mx-auto" />
             </div>
-            <p className="mt-4 text-muted-foreground">Carregando dados da venda...</p>
+            <p className="mt-4 text-muted-foreground">
+              Carregando dados da venda...
+            </p>
           </Card>
         </div>
       </div>
     );
   }
 
-  // --- HANDLERS E LÓGICA ---
+  // --- LÓGICA ---
 
   const handlePDFDataExtracted = (data: any) => {
     setExtractedData(data);
@@ -234,7 +224,6 @@ export default function NewSaleWizard() {
       setFlightSegments(data.segments);
       newAutoFilledFields.add("flightSegments");
 
-      // Detect trip type based on segments
       if (data.segments.length === 1) {
         setTripType("one_way");
       } else if (data.segments.length === 2) {
@@ -252,10 +241,9 @@ export default function NewSaleWizard() {
     });
   };
 
-  // Filter all accounts (show from all suppliers)
-  const filteredAccounts = accounts.filter((acc) => {
-    return acc.status === "active";
-  });
+  const selectedAccount = accounts.find((acc) => acc.id === accountId);
+
+  const filteredAccounts = accounts.filter((acc) => acc.status === "active");
 
   const updateTripType = (type: typeof tripType) => {
     setTripType(type);
@@ -284,36 +272,40 @@ export default function NewSaleWizard() {
   const boardingFeePerPassenger =
     boardingFeeMode === "total"
       ? parseFloat(totalBoardingFee || "0")
-      : flightSegments.reduce((sum, seg) => sum + (seg.boardingFee || 0), 0);
-
-  // --- CÁLCULO DE CUSTO E LUCRO ---
-
-  const costPerMileInternal =
-    saleSource === "internal_account" && selectedAccount
-      ? selectedAccount.cost_per_mile || 0
-      : 0;
-
-  const costPerMileCounter =
-    saleSource === "mileage_counter"
-      ? (parseFloat(counterCostPerThousand || "0") || 0) / 1000
-      : 0;
-
-  const activeCostPerMile =
-    saleSource === "internal_account" ? costPerMileInternal : costPerMileCounter;
-
-  const totalMilesCost = totalMiles * activeCostPerMile;
-
-  const totalBoardingFeeCost =
-    boardingFeeMode === "total"
-      ? (parseFloat(totalBoardingFee || "0") || 0) * passengers
       : flightSegments.reduce(
           (sum, seg) => sum + (seg.boardingFee || 0),
           0
-        ) * passengers;
+        );
 
-  const revenue = parseFloat(priceTotal || "0");
-  const totalCost = totalMilesCost + totalBoardingFeeCost;
-  const profit = revenue - totalCost;
+  const boardingFeeTotal =
+    boardingFeePerPassenger * (passengers || 1);
+
+  // 🔹 Cálculo de custo / lucro
+  let costPerThousand: number | null = null;
+
+  if (saleSource === "internal_account" && selectedAccount) {
+    if (selectedAccount.cost_per_mile) {
+      costPerThousand = (selectedAccount.cost_per_mile || 0) * 1000;
+    }
+  } else if (saleSource === "mileage_counter" && counterCostPerThousand) {
+    costPerThousand = parseFloat(counterCostPerThousand) || 0;
+  }
+
+  const costPerMile =
+    costPerThousand && costPerThousand > 0
+      ? costPerThousand / 1000
+      : 0;
+
+  const milesCostTotal = totalMiles * costPerMile;
+
+  const revenueTotal = parseFloat(priceTotal || "0") || 0;
+
+  const estimatedTotalCost = milesCostTotal + boardingFeeTotal;
+
+  const estimatedProfit = revenueTotal - estimatedTotalCost;
+
+  const profitMarginPct =
+    revenueTotal > 0 ? (estimatedProfit / revenueTotal) * 100 : 0;
 
   const fetchAndPrefillQuote = async (qId: string) => {
     try {
@@ -366,7 +358,8 @@ export default function NewSaleWizard() {
 
       toast({
         title: "Orçamento carregado",
-        description: "Dados do orçamento foram importados. Revise antes de salvar.",
+        description:
+          "Dados do orçamento foram importados. Revise antes de salvar.",
       });
     } catch (error: any) {
       toast({
@@ -395,9 +388,12 @@ export default function NewSaleWizard() {
         passenger_cpf_encrypted: pax.cpf,
         airline: airline || "Não informado",
         route: routeText,
-        departure_date: departureDate || new Date().toISOString().split("T")[0],
+        departure_date:
+          departureDate || new Date().toISOString().split("T")[0],
         return_date: returnDate,
-        ticket_code: `TKT-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        ticket_code: `TKT-${Date.now()}-${Math.random()
+          .toString(36)
+          .substr(2, 9)}`,
         pnr: pnr || null,
         status: "pending" as const,
       }));
@@ -406,18 +402,21 @@ export default function NewSaleWizard() {
 
       if (error) throw error;
 
-      console.log(`✅ ${ticketsToCreate.length} passagens criadas automaticamente`);
+      console.log(
+        `✅ ${ticketsToCreate.length} passagens criadas automaticamente`
+      );
     } catch (error: any) {
       console.error("Erro ao criar passagens:", error);
       toast({
         title: "Aviso",
-        description: "Venda salva, mas houve erro ao criar as passagens automaticamente.",
+        description:
+          "Venda salva, mas houve erro ao criar as passagens automaticamente.",
         variant: "destructive",
       });
     }
   };
 
-  // --- Validação única PARA SALVAR (sem useMemo) ---
+  // --- Validação ---
   const hasOrigin =
     saleSource === "internal_account"
       ? !!accountId
@@ -466,33 +465,39 @@ export default function NewSaleWizard() {
     setSaving(true);
 
     try {
-      // 🔹 Monta o objeto no formato esperado por createSaleWithSegments (SaleFormData)
-      const saleFormData: any = {
-        channel: saleSource === "internal_account" ? "internal" : "counter",
+      const channel =
+        saleSource === "internal_account" ? "internal" : "counter";
 
+      // 🔹 Dados enviados para o backend (incluindo custo / milhas)
+      const saleFormData: any = {
+        channel,
         customerName,
-        customerCpf,
-        customerPhone,
+        customerCpf: customerCpf.replace(/\D/g, ""),
+        customerPhone: customerPhone || null,
         passengers,
         tripType,
         paymentMethod,
-        notes,
+        notes: notes || null,
         flightSegments,
 
-        // Conta interna
-        accountId: saleSource === "internal_account" ? accountId : undefined,
-        programId: saleSource === "internal_account" ? programId : undefined,
-
-        // Balcão
-        sellerName:
-          saleSource === "mileage_counter" ? counterSellerName : undefined,
-        sellerContact:
-          saleSource === "mileage_counter" ? counterSellerContact : undefined,
-        counterCostPerThousand:
-          saleSource === "mileage_counter"
-            ? parseFloat(counterCostPerThousand || "0")
-            : undefined,
+        // financeiros
+        priceTotal: revenueTotal, // número já parseado
+        boardingFeePerPassenger,
+        totalBoardingFee: boardingFeeTotal,
+        milesUsed: totalMiles,
+        totalCost: estimatedTotalCost,
       };
+
+      if (channel === "internal") {
+        saleFormData.programId = programId;
+        saleFormData.accountId = accountId;
+      } else {
+        saleFormData.sellerName = counterSellerName;
+        saleFormData.sellerContact = counterSellerContact;
+        saleFormData.counterCostPerThousand = counterCostPerThousand
+          ? parseFloat(counterCostPerThousand)
+          : null;
+      }
 
       const result = await createSaleWithSegments(saleFormData, supplierId);
 
@@ -518,7 +523,6 @@ export default function NewSaleWizard() {
       }
 
       if (saleId && typeof saleId === "string") {
-        // Sempre cria as passagens automaticamente
         await createTicketsForPassengers(saleId);
 
         setLastSaleData({
@@ -538,6 +542,8 @@ export default function NewSaleWizard() {
           ticketsCreated: true,
           saleId: saleId,
           saleSource,
+          estimatedProfit,
+          profitMarginPct,
           accountInfo:
             saleSource === "internal_account" && selectedAccount
               ? {
@@ -550,8 +556,20 @@ export default function NewSaleWizard() {
                     (selectedAccount.cost_per_mile || 0.029) * 1000,
                   cpfsUsed: passengerCpfs.length,
                 }
+              : saleSource === "mileage_counter"
+              ? {
+                  airlineName: counterAirlineProgram || "",
+                  accountNumber: "",
+                  accountHolderName: counterSellerName || "",
+                  supplierName: "Balcão",
+                  costPerThousand: parseFloat(
+                    counterCostPerThousand || "0"
+                  ),
+                  cpfsUsed: passengerCpfs.length,
+                }
               : undefined,
         });
+
         setShowSuccessDialog(true);
       }
     } catch (error: any) {
@@ -588,8 +606,7 @@ export default function NewSaleWizard() {
           <Alert className="mb-4">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              Convertendo orçamento de{" "}
-              {sourceQuote.client_name} criado em{" "}
+              Convertendo orçamento de {sourceQuote.client_name} criado em{" "}
               {new Date(sourceQuote.created_at).toLocaleDateString()}
             </AlertDescription>
           </Alert>
@@ -599,7 +616,7 @@ export default function NewSaleWizard() {
           {/* Formulário */}
           <Card className="p-6">
             <div className="space-y-6">
-              {/* 1. Upload do Bilhete */}
+              {/* Upload do Bilhete */}
               <Card className="p-4 bg-primary/5 border-primary">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -621,7 +638,7 @@ export default function NewSaleWizard() {
                 </div>
               </Card>
 
-              {/* 2. Origem da Venda */}
+              {/* Origem da Venda */}
               <div>
                 <h2 className="text-xl font-semibold mb-4">Origem da Venda</h2>
                 <div className="space-y-4">
@@ -636,7 +653,7 @@ export default function NewSaleWizard() {
                         className={`p-4 cursor-pointer transition ${
                           saleSource === "internal_account"
                             ? "border-primary bg-primary/5"
-                            : "hover;border-primary/50"
+                            : "hover:border-primary/50"
                         }`}
                         onClick={() => setSaleSource("internal_account")}
                       >
@@ -771,7 +788,7 @@ export default function NewSaleWizard() {
 
               <Separator />
 
-              {/* 3. Dados do Cliente */}
+              {/* Dados do Cliente */}
               <div>
                 <h2 className="text-xl font-semibold mb-4">Dados do Cliente</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -790,7 +807,9 @@ export default function NewSaleWizard() {
                     <AutoFilledInput
                       id="customerCpf"
                       value={customerCpf}
-                      onChange={(e) => setCustomerCpf(maskCPF(e.target.value))}
+                      onChange={(e) =>
+                        setCustomerCpf(maskCPF(e.target.value))
+                      }
                       placeholder="000.000.000-00"
                       autoFilled={autoFilledFields.has("customerCpf")}
                     />
@@ -800,7 +819,9 @@ export default function NewSaleWizard() {
                     <Input
                       id="customerPhone"
                       value={customerPhone}
-                      onChange={(e) => setCustomerPhone(maskPhone(e.target.value))}
+                      onChange={(e) =>
+                        setCustomerPhone(maskPhone(e.target.value))
+                      }
                       placeholder="(00) 00000-0000"
                     />
                   </div>
@@ -809,13 +830,17 @@ export default function NewSaleWizard() {
 
               <Separator />
 
-              {/* 4. Detalhes da Viagem */}
+              {/* Detalhes da Viagem */}
               <div>
-                <h2 className="text-xl font-semibold mb-4">Detalhes da Viagem</h2>
+                <h2 className="text-xl font-semibold mb-4">
+                  Detalhes da Viagem
+                </h2>
                 <div className="space-y-4">
                   {/* Tipo de Viagem */}
                   <div>
-                    <Label className="text-base font-medium">Tipo de Viagem *</Label>
+                    <Label className="text-base font-medium">
+                      Tipo de Viagem *
+                    </Label>
                     <RadioGroup
                       value={tripType}
                       onValueChange={(v) =>
@@ -841,7 +866,7 @@ export default function NewSaleWizard() {
                     </RadioGroup>
                   </div>
 
-                  {/* Trechos da Viagem */}
+                  {/* Trechos */}
                   <div>
                     <div className="flex items-center justify-between mb-3">
                       <Label className="text-base font-medium">
@@ -884,11 +909,11 @@ export default function NewSaleWizard() {
                           };
                           setFlightSegments(newSegments);
                         }}
-                        onRemove={(index) => {
+                        onRemove={(indexToRemove) => {
                           if (flightSegments.length > 1) {
                             setFlightSegments(
                               flightSegments.filter(
-                                (_, i) => i !== index
+                                (_, i) => i !== indexToRemove
                               )
                             );
                           }
@@ -928,9 +953,9 @@ export default function NewSaleWizard() {
                       <Label>Taxa de Embarque *</Label>
                       <RadioGroup
                         value={boardingFeeMode}
-                        onValueChange={(value: "total" | "per_segment") =>
-                          setBoardingFeeMode(value)
-                        }
+                        onValueChange={(
+                          value: "total" | "per_segment"
+                        ) => setBoardingFeeMode(value)}
                         className="flex gap-4 mt-2"
                       >
                         <div className="flex items-center space-x-2">
@@ -940,8 +965,14 @@ export default function NewSaleWizard() {
                           </Label>
                         </div>
                         <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="per_segment" id="per_segment" />
-                          <Label htmlFor="per_segment" className="cursor-pointer">
+                          <RadioGroupItem
+                            value="per_segment"
+                            id="per_segment"
+                          />
+                          <Label
+                            htmlFor="per_segment"
+                            className="cursor-pointer"
+                          >
                             Por Trecho
                           </Label>
                         </div>
@@ -952,7 +983,9 @@ export default function NewSaleWizard() {
                           type="number"
                           placeholder="R$ 0,00 (por passageiro)"
                           value={totalBoardingFee}
-                          onChange={(e) => setTotalBoardingFee(e.target.value)}
+                          onChange={(e) =>
+                            setTotalBoardingFee(e.target.value)
+                          }
                           className="mt-2"
                           step="0.01"
                         />
@@ -960,9 +993,11 @@ export default function NewSaleWizard() {
                     </div>
                   </div>
 
-                  {/* Preços */}
+                  {/* Valores */}
                   <div className="p-4 border rounded-lg bg-primary/5">
-                    <Label className="font-semibold text-base mb-3 block">Valores</Label>
+                    <Label className="font-semibold text-base mb-3 block">
+                      Valores
+                    </Label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <Label htmlFor="pricePerPassenger">
@@ -974,8 +1009,11 @@ export default function NewSaleWizard() {
                           value={pricePerPassenger}
                           onChange={(e) => {
                             setPricePerPassenger(e.target.value);
-                            const perPassenger = parseFloat(e.target.value) || 0;
-                            setPriceTotal((perPassenger * passengers).toFixed(2));
+                            const perPassenger =
+                              parseFloat(e.target.value) || 0;
+                            setPriceTotal(
+                              (perPassenger * passengers).toFixed(2)
+                            );
                           }}
                           placeholder="R$ 0,00"
                           step="0.01"
@@ -995,38 +1033,48 @@ export default function NewSaleWizard() {
                     </div>
                   </div>
 
-                  {/* Resumo Financeiro (Lucro) */}
-                  <Card className="p-4 border border-dashed">
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Resumo financeiro estimado
-                    </p>
-                    <div className="space-y-1 text-sm">
+                  {/* Resumo Financeiro */}
+                  <Card className="mt-4 p-4 border-dashed border-primary/50 bg-muted/40">
+                    <h3 className="font-semibold mb-2">
+                      Resumo Financeiro (estimado)
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                       <div className="flex justify-between">
-                        <span>Custo das milhas</span>
+                        <span>Receita total:</span>
                         <span className="font-semibold">
-                          R$ {totalMilesCost.toFixed(2)}
+                          R$ {revenueTotal.toFixed(2)}
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span>Taxas de embarque</span>
-                        <span className="font-semibold">
-                          R$ {totalBoardingFeeCost.toFixed(2)}
-                        </span>
+                        <span>Custo estimado das milhas:</span>
+                        <span>R$ {milesCostTotal.toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span>Receita (preço total)</span>
-                        <span className="font-semibold">
-                          R$ {isNaN(revenue) ? "0,00" : revenue.toFixed(2)}
-                        </span>
+                        <span>Taxas de embarque (total):</span>
+                        <span>R$ {boardingFeeTotal.toFixed(2)}</span>
                       </div>
-                      <div className="flex justify-between pt-2 border-t mt-2">
-                        <span>Lucro estimado</span>
+                      <div className="flex justify-between">
+                        <span>Lucro estimado:</span>
                         <span
-                          className={`font-semibold ${
-                            profit >= 0 ? "text-green-600" : "text-red-600"
-                          }`}
+                          className={
+                            estimatedProfit >= 0
+                              ? "font-semibold text-emerald-600"
+                              : "font-semibold text-red-600"
+                          }
                         >
-                          R$ {isNaN(profit) ? "0,00" : profit.toFixed(2)}
+                          R$ {estimatedProfit.toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between md:col-span-2">
+                        <span>Margem de lucro estimada:</span>
+                        <span
+                          className={
+                            estimatedProfit >= 0
+                              ? "font-semibold text-emerald-600"
+                              : "font-semibold text-red-600"
+                          }
+                        >
+                          {profitMarginPct.toFixed(1)}%
                         </span>
                       </div>
                     </div>
@@ -1034,7 +1082,10 @@ export default function NewSaleWizard() {
 
                   {/* Forma de Pagamento */}
                   <div>
-                    <Label htmlFor="paymentMethod" className="text-base font-medium">
+                    <Label
+                      htmlFor="paymentMethod"
+                      className="text-base font-medium"
+                    >
                       Forma de Pagamento *
                     </Label>
                     <Select
@@ -1073,14 +1124,21 @@ export default function NewSaleWizard() {
                               <div className="space-y-1 text-sm">
                                 {selectedMethod.additional_info.pix_key && (
                                   <div>
-                                    <span className="font-semibold">Chave PIX:</span>{" "}
+                                    <span className="font-semibold">
+                                      Chave PIX:
+                                    </span>{" "}
                                     {selectedMethod.additional_info.pix_key}
                                   </div>
                                 )}
                                 {selectedMethod.additional_info.pix_holder && (
                                   <div>
-                                    <span className="font-semibold">Titular:</span>{" "}
-                                    {selectedMethod.additional_info.pix_holder}
+                                    <span className="font-semibold">
+                                      Titular:
+                                    </span>{" "}
+                                    {
+                                      selectedMethod.additional_info
+                                        .pix_holder
+                                    }
                                   </div>
                                 )}
                               </div>
@@ -1150,7 +1208,7 @@ export default function NewSaleWizard() {
                 />
               </div>
 
-              {/* Botão de Salvar */}
+              {/* Botão Salvar */}
               <div className="flex justify-end pt-4">
                 <Button
                   size="lg"
@@ -1171,12 +1229,14 @@ export default function NewSaleWizard() {
             </div>
           </Card>
 
-          {/* Resumo Lateral Sticky */}
+          {/* Resumo lateral */}
           <div className="lg:sticky lg:top-6 h-fit">
             <SalesSummaryCard
               customerName={customerName}
               routeText={flightSegments
-                .map((s) => (s.from && s.to ? `${s.from} → ${s.to}` : ""))
+                .map((s) =>
+                  s.from && s.to ? `${s.from} → ${s.to}` : ""
+                )
                 .filter(Boolean)
                 .join(" / ")}
               departureDate={flightSegments[0]?.date || ""}
