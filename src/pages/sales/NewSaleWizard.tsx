@@ -468,6 +468,11 @@ export default function NewSaleWizard() {
       const channel =
         saleSource === "internal_account" ? "internal" : "counter";
 
+      // 🔹 Encontrar método de pagamento selecionado
+      const selectedMethod = (activeMethods || []).find(
+        (m) => m.id === paymentMethod
+      );
+
       // 🔹 Dados enviados para o backend (incluindo custo / milhas)
       const saleFormData: any = {
         channel,
@@ -476,9 +481,10 @@ export default function NewSaleWizard() {
         customerPhone: customerPhone || null,
         passengers,
         tripType,
-        paymentMethod,
+        paymentMethod: selectedMethod?.method_type || null, // ✅ Envia method_type (pix, credit_card, etc)
         notes: notes || null,
         flightSegments,
+        passengerCpfs, // ✅ Enviar CPFs dos passageiros
 
         // financeiros
         priceTotal: revenueTotal, // número já parseado
