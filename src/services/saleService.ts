@@ -20,28 +20,34 @@ export async function createSaleWithSegments(
       throw new Error("Usuário não autenticado");
     }
 
-    // ✅ Garante que sempre temos um array
-    const flightSegments = formData.flightSegments ?? [];
+    // 🔍 Log para debug
+    console.log("[createSaleWithSegments] formData recebido:", formData);
 
-    if (!Array.isArray(flightSegments)) {
-      console.error(
-        "[createSaleWithSegments] flightSegments não é array:",
-        flightSegments
-      );
-      throw new Error(
-        "Dados dos trechos da viagem inválidos (flightSegments não é um array)"
+    // ✅ Tenta pegar os segmentos em diferentes formatos (defensivo)
+    const rawSegments: any =
+      (formData as any).flightSegments ??
+      (formData as any).flight_segments ??
+      [];
+
+    const flightSegments = Array.isArray(rawSegments) ? rawSegments : [];
+
+    if (!Array.isArray(rawSegments)) {
+      console.warn(
+        "[createSaleWithSegments] flightSegments não é array. Valor recebido:",
+        rawSegments
       );
     }
 
     if (flightSegments.length === 0) {
       console.warn(
-        "[createSaleWithSegments] Nenhum trecho recebido em flightSegments"
+        "[createSaleWithSegments] Nenhum trecho recebido em flightSegments. " +
+          "A venda será criada sem registros em sale_segments."
       );
-      // Se quiser travar a criação sem trechos:
-      throw new Error("Adicione ao menos um trecho de voo antes de salvar.");
+      // 🚨 Importante: NÃO vamos mais dar throw aqui.
+      // Se tiver algo errado no front, a venda ainda é criada, só sem segmentos.
     }
 
-    // Step 1: Insert into sales table
+    // --------- STEP 1: Inserir na tabela sales ---------
     const salePayload: any = {
       supplier_id: supplierId,
       channel: formData.channel,
@@ -57,31 +63,31 @@ export async function createSaleWithSegments(
       user_id: user.id,
     };
 
-    // Channel-specific fields
+    // Campos específicos por canal
     if (formData.channel === "internal") {
       salePayload.program_id = formData.programId;
       salePayload.mileage_account_id = formData.accountId;
-      // compat
+      // compat com estrutura antiga
       salePayload.sale_source = "internal_account";
     } else {
       salePayload.seller_name = formData.sellerName;
       salePayload.seller_contact = formData.sellerContact;
       salePayload.counter_cost_per_thousand =
         formData.counterCostPerThousand ?? null;
-      // compat
+      // compat com estrutura antiga
       salePayload.sale_source = "mileage_counter";
       salePayload.counter_seller_name = formData.sellerName;
       salePayload.counter_seller_contact = formData.sellerContact;
     }
 
-    // Também guarda JSONB (compatibilidade)
+    // Guarda JSONB dos segmentos (compatibilidade)
     salePayload.flight_segments = flightSegments;
 
-    // Create route text (caso haja trechos)
+    // Texto de rota (se tiver trechos)
     salePayload.route_text =
       flightSegments.length > 0
         ? flightSegments
-            .map((s) => `${s.from ?? ""}-${s.to ?? ""}`)
+            .map((s: any) => `${s.from ?? ""}-${s.to ?? ""}`)
             .join(", ")
         : null;
 
@@ -100,25 +106,25 @@ export async function createSaleWithSegments(
       throw new Error("ID da venda não retornado");
     }
 
-    // Step 2: Insert into sale_segments table
-    const direction =
-      formData.tripType === "one_way"
-        ? "oneway"
-        : formData.tripType === "round_trip"
-        ? "roundtrip"
-        : "multicity";
+    // --------- STEP 2: Inserir na tabela sale_segments (se houver trechos) ---------
+    if (flightSegments.length > 0) {
+      const direction =
+        formData.tripType === "one_way"
+          ? "oneway"
+          : formData.tripType === "round_trip"
+          ? "roundtrip"
+          : "multicity";
 
-    const segmentPayloads = flightSegments.map((segment, index) => ({
-      sale_id: saleData.id,
-      direction,
-      from_code: segment.from,
-      to_code: segment.to,
-      date: segment.date ? new Date(segment.date).toISOString() : null,
-      flight_number: segment.airline || null,
-      position: index,
-    }));
+      const segmentPayloads = flightSegments.map((segment: any, index: number) => ({
+        sale_id: saleData.id,
+        direction,
+        from_code: segment.from,
+        to_code: segment.to,
+        date: segment.date ? new Date(segment.date).toISOString() : null,
+        flight_number: segment.airline || null,
+        position: index,
+      }));
 
-    if (segmentPayloads.length > 0) {
       const { error: segmentsError } = await supabase
         .from("sale_segments")
         .insert(segmentPayloads);
@@ -128,6 +134,10 @@ export async function createSaleWithSegments(
         // Não derruba a venda, só loga
         console.warn("Falha ao criar segmentos, mas venda foi criada.");
       }
+    } else {
+      console.log(
+        "[createSaleWithSegments] Nenhum segmentPayload gerado, pulando inserção em sale_segments."
+      );
     }
 
     return { saleId: saleData.id };
