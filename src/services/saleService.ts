@@ -32,7 +32,6 @@ export async function createSaleWithSegments(
       throw new Error("Canal da venda (channel) não informado.");
     }
 
-    // Valida dados mínimos conforme o canal
     if (channel === "internal") {
       const programId = (formData as any).programId;
       const accountId = (formData as any).accountId;
@@ -73,12 +72,21 @@ export async function createSaleWithSegments(
       );
     }
 
+    // ✅ Calcula total de milhas usadas
+    const totalMilesUsed =
+      flightSegments.length > 0
+        ? flightSegments.reduce(
+            (sum: number, s: any) => sum + (Number(s.miles) || 0),
+            0
+          )
+        : 0;
+
     if (flightSegments.length === 0) {
       console.warn(
         "[createSaleWithSegments] Nenhum trecho recebido em flightSegments. " +
           "A venda será criada sem registros em sale_segments."
       );
-      // 👉 Não damos erro aqui de propósito; só não cria os segments
+      // Não damos erro, só ficamos com miles_used = 0
     }
 
     // -------------------------------------------------
@@ -94,24 +102,22 @@ export async function createSaleWithSegments(
       trip_type: formData.tripType,
       payment_method: formData.paymentMethod || null,
       notes: formData.notes || null,
-      // ❌ status removido (ENUM não aceita "draft")
       created_by: user.id,
       user_id: user.id,
+
+      // 🔹 Campo que o banco está exigindo (NOT NULL)
+      miles_used: totalMilesUsed,
     };
 
     if (channel === "internal") {
-      // Campos de conta própria
       salePayload.program_id = (formData as any).programId;
       salePayload.mileage_account_id = (formData as any).accountId;
-      // compat com estrutura antiga
       salePayload.sale_source = "internal_account";
     } else if (channel === "counter") {
-      // Campos de balcão de milhas
       salePayload.seller_name = (formData as any).sellerName;
       salePayload.seller_contact = (formData as any).sellerContact;
       salePayload.counter_cost_per_thousand =
         (formData as any).counterCostPerThousand ?? null;
-      // compat com estrutura antiga
       salePayload.sale_source = "mileage_counter";
       salePayload.counter_seller_name = (formData as any).sellerName;
       salePayload.counter_seller_contact = (formData as any).sellerContact;
@@ -175,7 +181,6 @@ export async function createSaleWithSegments(
 
       if (segmentsError) {
         console.error("Segments insert error:", segmentsError);
-        // Não derruba a venda, só loga
         console.warn("Falha ao criar segmentos, mas venda foi criada.");
       }
     } else {
