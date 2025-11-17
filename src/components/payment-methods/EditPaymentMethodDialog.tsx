@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -87,6 +87,9 @@ export const EditPaymentMethodDialog = ({ open, onOpenChange, method }: EditPaym
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>Editar Forma de Pagamento</DialogTitle>
+            <DialogDescription>
+              Atualize as configurações desta forma de pagamento
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">

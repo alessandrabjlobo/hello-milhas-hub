@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -103,9 +103,9 @@ export function PassengerCPFDialog({
             <UserPlus className="h-5 w-5" />
             CPFs dos Passageiros
           </DialogTitle>
-          <p className="text-sm text-muted-foreground">
+          <DialogDescription>
             Adicione {expectedCount} passageiro(s) com nome e CPF
-          </p>
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">

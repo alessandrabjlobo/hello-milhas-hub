@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -72,6 +73,9 @@ export const InviteUserDialog = ({ onUserInvited }: InviteUserDialogProps) => {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Convidar Novo Usuário</DialogTitle>
+          <DialogDescription>
+            Envie um convite para um novo membro da equipe
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">

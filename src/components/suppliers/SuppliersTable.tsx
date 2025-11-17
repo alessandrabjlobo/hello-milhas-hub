@@ -17,7 +17,7 @@ import { useMileageAccounts } from "@/hooks/useMileageAccounts";
 import { AddSupplierDialog } from "./AddSupplierDialog";
 import { EditSupplierDialog } from "./EditSupplierDialog";
 import { DeleteSupplierDialog } from "./DeleteSupplierDialog";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export const SuppliersTable = () => {
   const { suppliers, loading, createSupplier, updateSupplier, deleteSupplier } = useSuppliers();
@@ -142,6 +142,9 @@ export const SuppliersTable = () => {
           <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Contas de Milhagem</DialogTitle>
+              <DialogDescription>
+                Visualize todas as contas vinculadas a este fornecedor
+              </DialogDescription>
             </DialogHeader>
             <Table>
               <TableHeader>
