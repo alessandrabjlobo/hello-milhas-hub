@@ -70,7 +70,7 @@ export function RoundTripForm({ data, onChange }: RoundTripFormProps) {
       </div>
 
       <div className="space-y-2 mt-2">
-        <Label htmlFor="miles">Milhas por Passageiro (Ida + Volta) *</Label>
+        <Label htmlFor="miles">Milhas/pax (Ida + Volta) *</Label>
         <Input
           id="miles"
           type="number"
