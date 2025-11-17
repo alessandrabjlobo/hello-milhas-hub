@@ -447,30 +447,45 @@ useEffect(() => {
           .toFixed(2)
           .replace(".", ",");
         
-        if (result.interestRate === 0) {
-          // Sem juros
-          lines.push(`  ${i}x de R$ ${installmentValueFormatted}`);
-        } else {
-          // Com juros
-          const finalPriceFormatted = result.finalPrice
-            .toFixed(2)
-            .replace(".", ",");
-          
-          lines.push(
-            `  ${i}x de R$ ${installmentValueFormatted} (total: R$ ${finalPriceFormatted} - juros: ${result.interestRate.toFixed(3).replace(".", ",")}%)`
-          );
-        }
+        // Sempre mostrar apenas o valor da parcela (sem total e juros)
+        lines.push(`  ${i}x de R$ ${installmentValueFormatted}`);
       }
     }
 
-    // 2) Débito à vista
-    const debitConfig = interestConfigs.find(c => c.payment_type === 'debit' && c.is_active);
-    if (debitConfig) {
-      const debitValueFormatted = calculatedValues.price
-        .toFixed(2)
-        .replace(".", ",");
+    // 2) Débito - verificar se tem juros configurados
+    const debitConfigs = interestConfigs.filter(c => c.payment_type === 'debit' && c.is_active);
+    if (debitConfigs.length > 0) {
+      const maxDebitInstallments = Math.max(...debitConfigs.map(c => c.installments));
       
-      lines.push(`\n💳 *Débito à vista:* R$ ${debitValueFormatted}`);
+      // Verificar se alguma taxa é maior que 0
+      let hasDebitInterest = false;
+      if (debitConfigs[0].config_type === 'per_installment' && debitConfigs[0].per_installment_rates) {
+        hasDebitInterest = Object.values(debitConfigs[0].per_installment_rates).some(rate => rate > 0);
+      } else {
+        hasDebitInterest = (debitConfigs[0].interest_rate || 0) > 0;
+      }
+      
+      if (hasDebitInterest && maxDebitInstallments > 1) {
+        // Débito COM JUROS - mostrar tabela de parcelas
+        lines.push(`\n💳 *Débito:*`);
+        
+        for (let i = 1; i <= maxDebitInstallments; i++) {
+          const result = calculateInstallmentValue(calculatedValues.price, i, 'debit');
+          
+          const installmentValueFormatted = result.installmentValue
+            .toFixed(2)
+            .replace(".", ",");
+          
+          lines.push(`  ${i}x de R$ ${installmentValueFormatted}`);
+        }
+      } else {
+        // Débito SEM JUROS - à vista
+        const debitValueFormatted = calculatedValues.price
+          .toFixed(2)
+          .replace(".", ",");
+        
+        lines.push(`\n💳 *Débito à vista:* R$ ${debitValueFormatted}`);
+      }
     }
 
     // 3) Pix à vista
