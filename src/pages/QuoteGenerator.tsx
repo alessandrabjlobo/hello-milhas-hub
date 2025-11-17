@@ -14,7 +14,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { RoundTripForm } from "@/components/calculator/RoundTripForm";
 import { type FlightSegment } from "@/components/sales/FlightSegmentForm";
 import { useStorage } from "@/hooks/useStorage";
@@ -1255,14 +1255,18 @@ R$ ${costPerMileFormatted} o milheiro`;
         </div>
       </div>
 
-      {/* PREVIEW IMAGEM */}
-      <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
-          {previewImage && (
-            <img src={previewImage} alt="Preview" className="w-full h-auto rounded" />
-          )}
-        </DialogContent>
-      </Dialog>
+        {/* PREVIEW IMAGEM */}
+        <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+            <DialogTitle className="sr-only">Pré-visualização do anexo</DialogTitle>
+            <DialogDescription className="sr-only">
+              Visualização ampliada do print/anexo do orçamento.
+            </DialogDescription>
+            {previewImage && (
+              <img src={previewImage} alt="Preview do anexo" className="w-full h-auto rounded" />
+            )}
+          </DialogContent>
+        </Dialog>
     </div>
   );
 }

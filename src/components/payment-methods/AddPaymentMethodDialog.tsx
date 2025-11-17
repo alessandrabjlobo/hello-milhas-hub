@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -81,6 +81,9 @@ export const AddPaymentMethodDialog = ({ open, onOpenChange }: AddPaymentMethodD
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>Adicionar Forma de Pagamento</DialogTitle>
+            <DialogDescription>
+              Configure uma nova opção de pagamento para seus clientes
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">

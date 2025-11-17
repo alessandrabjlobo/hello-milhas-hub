@@ -1,6 +1,7 @@
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -101,6 +102,9 @@ export function TicketDetailDialog({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Detalhes da Passagem #{ticket.ticket_code}</DialogTitle>
+          <DialogDescription>
+            Informações completas da emissão da passagem
+          </DialogDescription>
         </DialogHeader>
         
         <div className="grid gap-4">

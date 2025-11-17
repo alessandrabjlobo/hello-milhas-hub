@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -99,6 +100,9 @@ export const AddMovementDialog = ({ accountId, onMovementAdded, showLabel = fals
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Nova Movimentação</DialogTitle>
+          <DialogDescription>
+            Registre uma entrada ou saída de milhas na conta
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">

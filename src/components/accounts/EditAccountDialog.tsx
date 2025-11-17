@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -81,6 +82,9 @@ export const EditAccountDialog = ({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Editar Conta de Milhagem</DialogTitle>
+          <DialogDescription>
+            Atualize as informações da conta selecionada
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">

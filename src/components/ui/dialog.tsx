@@ -1,3 +1,30 @@
+/**
+ * Dialog Component
+ * 
+ * IMPORTANTE - ACESSIBILIDADE:
+ * - Todo DialogContent DEVE ter um DialogTitle (use className="sr-only" se não quiser exibir)
+ * - Todo DialogContent DEVE ter um DialogDescription ou aria-describedby={undefined}
+ * 
+ * Exemplos:
+ * 
+ * 1. Dialog com título e descrição visíveis:
+ * <Dialog>
+ *   <DialogContent>
+ *     <DialogHeader>
+ *       <DialogTitle>Título</DialogTitle>
+ *       <DialogDescription>Descrição</DialogDescription>
+ *     </DialogHeader>
+ *   </DialogContent>
+ * </Dialog>
+ * 
+ * 2. Dialog sem título visual (ex: preview de imagem):
+ * <Dialog>
+ *   <DialogContent>
+ *     <DialogTitle className="sr-only">Título para leitores de tela</DialogTitle>
+ *     <DialogDescription className="sr-only">Descrição para leitores de tela</DialogDescription>
+ *   </DialogContent>
+ * </Dialog>
+ */
 import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
