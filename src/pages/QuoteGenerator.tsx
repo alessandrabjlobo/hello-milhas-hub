@@ -1,23 +1,11 @@
-import { ArrowLeft, FileText, User, Plane, Calculator, DollarSign, Upload, X, Copy, Download, Save, MessageSquare } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useState, useEffect, useMemo } from "react";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import html2canvas from "html2canvas";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Separator } from "@/components/ui/separator";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RoundTripForm, type RoundTripData } from "@/components/calculator/RoundTripForm";
-import { useStorage } from "@/hooks/useStorage";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { ProfitCalculator } from "@/components/calculator/ProfitCalculator";
+import { QuoteGenerator as QuoteGeneratorComponent } from "@/components/calculator/QuoteGenerator";
 
 export default function QuoteGenerator() {
   const navigate = useNavigate();
