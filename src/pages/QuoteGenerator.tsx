@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { RoundTripForm } from "@/components/calculator/RoundTripForm";
-import { FlightSegmentForm, type FlightSegment } from "@/components/sales/FlightSegmentForm";
+import { type FlightSegment } from "@/components/sales/FlightSegmentForm";
 import { useStorage } from "@/hooks/useStorage";
 import { useToast } from "@/hooks/use-toast";
 import { usePaymentInterestConfig } from "@/hooks/usePaymentInterestConfig";
@@ -53,14 +53,13 @@ export default function QuoteGenerator() {
     { from: "", to: "", date: "", miles: 0 }
   ]);
 
-  // Valores da Calculadora (inline) - fonte única de verdade
-  // Agora tratando milhas como "milhas por passageiro (/pax)"
+  // Valores da Calculadora (inline) - milhas/pax
   const [tripMiles, setTripMiles] = useState("50000");
   const [milesUsed, setMilesUsed] = useState("50000"); // milhas/pax
   const [costPerMile, setCostPerMile] = useState("29.00");
   const [boardingFee, setBoardingFee] = useState("35.00");
   const [passengers, setPassengers] = useState("2");
-  const [targetMargin, setTargetMargin] = useState("20");
+  const [targetMargin, setTargetMargin] = useState("20"); // markup nas milhas
   const [manualPrice, setManualPrice] = useState("");
 
   // Caderno do Orçamento
@@ -82,7 +81,7 @@ export default function QuoteGenerator() {
         const monthYear = format(date, "MMM/yyyy", { locale: ptBR });
         const autoTitle = `Viagem ${clientName} - ${roundTripData.destination} ${monthYear}`;
         setQuoteTitle(autoTitle);
-      } catch (error) {
+      } catch {
         // Data inválida, não gera título
       }
     }
@@ -108,7 +107,7 @@ export default function QuoteGenerator() {
 
   useEffect(() => {
     if (tripType === "multi_city" && totalMilesFromSegments > 0) {
-      // Aqui também tratamos como milhas/pax, você pode ajustar se quiser lógica diferente
+      // Milhas/pax = soma das milhas dos trechos
       setMilesUsed(totalMilesFromSegments.toString());
       setTripMiles(totalMilesFromSegments.toString());
     }
@@ -125,7 +124,11 @@ export default function QuoteGenerator() {
     }
   };
 
-  const handleUpdateSegment = (index: number, field: keyof FlightSegment, value: string | number) => {
+  const handleUpdateSegment = (
+    index: number,
+    field: keyof FlightSegment,
+    value: string | number
+  ) => {
     const updated = [...flightSegments];
     updated[index] = { ...updated[index], [field]: value };
     setFlightSegments(updated);
@@ -133,9 +136,12 @@ export default function QuoteGenerator() {
 
   // ========== CÁLCULOS FINANCEIROS (COM MILHAS/PAX + MARKUP MILHAS) ==========
   const calculatedValues = useMemo(() => {
-    const milesPerPassenger = parseFloat(milesUsed.replace(/\./g, "").replace(",", ".")) || 0; // milhas/pax
-    const costPerMileNum = parseFloat(costPerMile.replace(",", ".")) || 0;
-    const boardingFeeNum = parseFloat(boardingFee.replace(",", ".")) || 0;
+    const milesPerPassenger =
+      parseFloat(milesUsed.replace(/\./g, "").replace(",", ".")) || 0; // milhas/pax
+    const costPerMileNum =
+      parseFloat(costPerMile.replace(/\./g, "").replace(",", ".")) || 0;
+    const boardingFeeNum =
+      parseFloat(boardingFee.replace(/\./g, "").replace(",", ".")) || 0;
     const passengersNum = parseInt(passengers) || 1;
     const marginNum = parseFloat(targetMargin.replace(",", ".")) || 0;
 
@@ -169,7 +175,6 @@ export default function QuoteGenerator() {
 
     // Visão interna: markup das milhas (ignorando taxa de embarque)
     const finalPricePerPassenger = passengersNum > 0 ? finalPrice / passengersNum : 0;
-    // Preço "efetivo" das milhas/pax = preço/pax - taxa de embarque (repasse)
     const effectiveMilesPricePerPassenger = Math.max(
       finalPricePerPassenger - boardingFeeNum,
       0
@@ -285,34 +290,39 @@ Para confirmar sua viagem, basta enviar uma mensagem! 😊`;
   };
 
   const generateSupplierMessage = () => {
+    const milesPerPassenger =
+      parseFloat(milesUsed.replace(/\./g, "").replace(",", ".")) || 0;
+    const passengersNum = parseInt(passengers) || 1;
+    const totalMiles = milesPerPassenger * passengersNum;
+
+    const costPerMileNum =
+      parseFloat(costPerMile.replace(/\./g, "").replace(",", ".")) || 0;
+    const costPerMileFormatted = costPerMileNum.toFixed(2).replace(".", ",");
+
     const route =
       roundTripData.origin && roundTripData.destination
         ? `${roundTripData.origin} → ${roundTripData.destination}`
-        : "Consulte o roteiro";
-
-    const milesNum =
-      parseFloat(milesUsed.replace(/\./g, "").replace(",", ".")) || 0; // milhas/pax
-    const passengersNum = parseInt(passengers) || 1;
-    const totalMiles = milesNum * passengersNum;
+        : null;
 
     const departureFormatted = roundTripData.departureDate
       ? format(new Date(roundTripData.departureDate), "dd/MM/yyyy", { locale: ptBR })
-      : "A definir";
+      : null;
 
-    return `💼 *Solicitação de Milhas*
+    return `📣 *Balcão de Milhas*
 
-🎯 *Rota:* ${route}
-📅 *Data:* ${departureFormatted}
-✈️ *Milhas necessárias:* ${formatNumber(milesNum)} /pax
-📦 *Total de milhas:* ${formatNumber(totalMiles)}
-👥 *Passageiros:* ${passengers}
-💵 *Valor a depositar:* R$ ${calculatedValues.totalCost.toFixed(2).replace(".", ",")}
+Compro *${airline || "cia aérea a definir"}*
 
-📋 *Detalhes:*
-• Custo por milheiro: R$ ${costPerMile}
-• Taxa de embarque/pax: R$ ${boardingFee}
+Quantidade de milhas: ${formatNumber(totalMiles)}
+Quantidade de CPFs: ${passengersNum}
+Custo do milheiro: R$ ${costPerMileFormatted}
 
-Aguardo confirmação para prosseguir com a emissão! 🤝`;
+${
+  route || departureFormatted
+    ? `Referência de rota/data: ${
+        route ? route : ""
+      }${route && departureFormatted ? " - " : ""}${departureFormatted ?? ""}\n`
+    : ""
+}Obs.: Taxa de embarque/pax será repassada ao cliente: R$ ${boardingFee}`;
   };
 
   // ========== COPIAR MENSAGEM ==========
@@ -409,8 +419,7 @@ Aguardo confirmação para prosseguir com a emissão! 🤝`;
         client_phone: clientPhone || null,
         route,
         departure_date: roundTripData.departureDate || null,
-        // aqui você decide se quer salvar milhas/pax ou total_milhas – estou salvando total
-        miles_needed: totalMiles,
+        miles_needed: totalMiles, // salva total de milhas
         total_price: calculatedValues.price,
         passengers: passengersNum,
         trip_type: tripType,
@@ -427,9 +436,6 @@ Aguardo confirmação para prosseguir com a emissão! 🤝`;
         title: "Orçamento salvo!",
         description: "O orçamento foi salvo com sucesso no banco de dados"
       });
-
-      // Opcional: limpar formulário ou navegar
-      // navigate("/quotes");
     } catch (error: any) {
       console.error("Erro ao salvar:", error);
       toast({
@@ -466,8 +472,18 @@ Aguardo confirmação para prosseguir com a emissão! 🤝`;
         <div className="space-y-4">
           {/* ========== FORMULÁRIO COMPACTO ========== */}
           <Card>
-            <CardHeader>
-              <CardTitle>📝 Dados do Orçamento</CardTitle>
+            <CardHeader className="flex flex-col gap-1">
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle>📝 Dados do Orçamento</CardTitle>
+                {quoteTitle && (
+                  <span
+                    className="text-xs md:text-sm text-muted-foreground truncate max-w-[220px] md:max-w-xs"
+                    title={quoteTitle}
+                  >
+                    {quoteTitle}
+                  </span>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Dados do Cliente */}
@@ -530,6 +546,19 @@ Aguardo confirmação para prosseguir com a emissão! 🤝`;
                   </RadioGroup>
                 </div>
 
+                {/* Cia Aérea (para Balcão) */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <Label htmlFor="airline">Cia Aérea (para Balcão)</Label>
+                    <Input
+                      id="airline"
+                      value={airline}
+                      onChange={(e) => setAirline(e.target.value)}
+                      placeholder="Ex: LATAM, GOL, Smiles..."
+                    />
+                  </div>
+                </div>
+
                 {/* RoundTripForm - Origem/Destino/Datas */}
                 {tripType === "round_trip" && (
                   <RoundTripForm data={roundTripData} onChange={setRoundTripData} />
@@ -580,9 +609,85 @@ Aguardo confirmação para prosseguir com a emissão! 🤝`;
                 )}
 
                 {tripType === "multi_city" && (
-                  <div className="p-4 bg-muted rounded-lg text-sm text-muted-foreground">
-                    💡 Para múltiplos trechos, preencha os dados básicos e detalhe no campo
-                    de notas.
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      {flightSegments.map((segment, index) => (
+                        <div
+                          key={index}
+                          className="grid grid-cols-1 md:grid-cols-4 gap-2 items-end border rounded-lg p-3 bg-muted/40"
+                        >
+                          <div>
+                            <Label>Origem</Label>
+                            <Input
+                              value={segment.from}
+                              onChange={(e) =>
+                                handleUpdateSegment(index, "from", e.target.value)
+                              }
+                              placeholder="Ex: GRU"
+                            />
+                          </div>
+                          <div>
+                            <Label>Destino</Label>
+                            <Input
+                              value={segment.to}
+                              onChange={(e) =>
+                                handleUpdateSegment(index, "to", e.target.value)
+                              }
+                              placeholder="Ex: MIA"
+                            />
+                          </div>
+                          <div>
+                            <Label>Data</Label>
+                            <Input
+                              type="date"
+                              value={segment.date}
+                              onChange={(e) =>
+                                handleUpdateSegment(index, "date", e.target.value)
+                              }
+                            />
+                          </div>
+                          <div>
+                            <Label>Milhas/pax</Label>
+                            <div className="flex gap-2">
+                              <Input
+                                value={segment.miles || ""}
+                                onChange={(e) =>
+                                  handleUpdateSegment(
+                                    index,
+                                    "miles",
+                                    Number(e.target.value.replace(/\D/g, "")) || 0
+                                  )
+                                }
+                                placeholder="10000"
+                              />
+                              {flightSegments.length > 1 && (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => handleRemoveSegment(index)}
+                                >
+                                  <X className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleAddSegment}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Adicionar trecho
+                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                      As milhas/pax de cada trecho são somadas automaticamente e enviadas
+                      para a calculadora de margem.
+                    </p>
                   </div>
                 )}
               </div>
@@ -640,7 +745,7 @@ Aguardo confirmação para prosseguir com a emissão! 🤝`;
                   />
                 </div>
                 <div>
-                  <Label htmlFor="passengers">Nº de Passageiros</Label>
+                  <Label htmlFor="passengers">Nº de Passageiros / CPFs</Label>
                   <Input
                     id="passengers"
                     value={passengers}
@@ -649,7 +754,9 @@ Aguardo confirmação para prosseguir com a emissão! 🤝`;
                   />
                 </div>
                 <div>
-                  <Label htmlFor="targetMargin">Margem Desejada (%)</Label>
+                  <Label htmlFor="targetMargin">
+                    Markup desejado nas milhas (%)
+                  </Label>
                   <Input
                     id="targetMargin"
                     value={targetMargin}
@@ -853,7 +960,7 @@ Aguardo confirmação para prosseguir com a emissão! 🤝`;
               <Tabs value={activeMessageTab} onValueChange={setActiveMessageTab}>
                 <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="client">Cliente</TabsTrigger>
-                  <TabsTrigger value="supplier">Fornecedor</TabsTrigger>
+                  <TabsTrigger value="supplier">Balcão</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="client" className="space-y-2 mt-4">
@@ -886,11 +993,11 @@ Aguardo confirmação para prosseguir com a emissão! 🤝`;
                     variant="outline"
                     className="w-full"
                     onClick={() =>
-                      handleCopyMessage(generateSupplierMessage(), "fornecedor")
+                      handleCopyMessage(generateSupplierMessage(), "balcão")
                     }
                   >
                     <Copy className="mr-2 h-4 w-4" />
-                    Copiar Mensagem do Fornecedor
+                    Copiar Mensagem do Balcão
                   </Button>
                 </TabsContent>
               </Tabs>
