@@ -907,7 +907,7 @@ R$ ${costPerMileFormatted} o milheiro`;
                   id="notes"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Observações, prints, tabelas de comparação, detalhes da negociação..."
+                  placeholder="Observações, detalhes da negociação..."
                   rows={6}
                   className="mt-2"
                 />
