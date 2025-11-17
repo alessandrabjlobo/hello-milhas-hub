@@ -6,13 +6,22 @@ import { getSupplierId } from "@/lib/getSupplierId";
 /**
  * Normaliza per_installment_rates para garantir Record<number, number>
  * Supabase pode retornar chaves como strings, precisamos converter
+ * Também converte strings com vírgula (ex: "12,511") para number
  */
 function normalizeRates(obj: unknown): Record<number, number> {
   if (!obj || typeof obj !== "object") return {};
   const out: Record<number, number> = {};
   for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
     const nk = Number(k);
-    const nv = typeof v === "string" ? parseFloat(v) : Number(v);
+    let nv: number;
+    
+    if (typeof v === "string") {
+      // Converter string com vírgula para number (ex: "12,511" -> 12.511)
+      nv = parseFloat(v.replace(",", "."));
+    } else {
+      nv = Number(v);
+    }
+    
     if (!Number.isNaN(nk) && !Number.isNaN(nv)) out[nk] = nv;
   }
   return out;
@@ -194,11 +203,38 @@ export const usePaymentInterestConfig = () => {
 
   const calculateInstallmentValue = (
     totalPrice: number,
-    installments: number
+    installments: number,
+    paymentType: 'debit' | 'credit' = 'credit'
   ): { installmentValue: number; finalPrice: number; interestRate: number } => {
-    const config = (configs || []).find((c) => c.installments === installments);
+    // Para débito, SEMPRE retornar valor à vista sem juros
+    if (paymentType === 'debit') {
+      return {
+        installmentValue: totalPrice,
+        finalPrice: totalPrice,
+        interestRate: 0,
+      };
+    }
+
+    // Para crédito, buscar configuração ativa
+    const creditConfig = (configs || []).find(
+      (c) => c.payment_type === 'credit' && c.is_active
+    );
     
-    if (!config || config.interest_rate === 0) {
+    if (!creditConfig) {
+      console.warn("⚠️ [INTEREST] Nenhuma configuração de crédito ativa encontrada");
+      return {
+        installmentValue: totalPrice / installments,
+        finalPrice: totalPrice,
+        interestRate: 0,
+      };
+    }
+
+    // Validar se o número de parcelas solicitado está dentro do limite
+    if (installments > creditConfig.installments) {
+      console.warn("⚠️ [INTEREST] Parcelas solicitadas excedem o máximo configurado", {
+        solicitadas: installments,
+        maximo: creditConfig.installments
+      });
       return {
         installmentValue: totalPrice / installments,
         finalPrice: totalPrice,
@@ -209,32 +245,27 @@ export const usePaymentInterestConfig = () => {
     let finalPrice: number;
     let effectiveRate: number;
 
-    if (config.config_type === 'per_installment' && config.per_installment_rates) {
-      // Calcular com taxa personalizada por parcela
-      const rate = config.per_installment_rates[installments];
+    // Usar juros personalizados por parcela
+    if (creditConfig.config_type === 'per_installment' && creditConfig.per_installment_rates) {
+      const rate = creditConfig.per_installment_rates[installments];
       
-      if (rate === undefined || rate === null) {
-        console.warn("⚠️ [INTEREST] Taxa por parcela não encontrada, usando interest_rate total", { 
-          installments, 
-          configId: config.id,
-          available_rates: Object.keys(config.per_installment_rates)
-        });
-        effectiveRate = config.interest_rate;
+      if (rate === undefined || rate === null || rate === 0) {
+        console.log("🧮 [INTEREST] Parcela sem juros:", { installments });
+        effectiveRate = 0;
+        finalPrice = totalPrice;
       } else {
-        console.log("🧮 [INTEREST] Cálculo por parcela:", { 
+        console.log("🧮 [INTEREST] Aplicando taxa personalizada:", { 
           installments, 
-          rateAplicada: rate, 
-          configId: config.id,
+          rate,
           totalPrice
         });
         effectiveRate = rate;
+        finalPrice = totalPrice * (1 + effectiveRate / 100);
       }
-      
-      finalPrice = totalPrice * (1 + effectiveRate / 100);
     } else {
-      // Calcular com taxa total
-      effectiveRate = config.interest_rate;
-      finalPrice = totalPrice * (1 + config.interest_rate / 100);
+      // Usar taxa total (fallback)
+      effectiveRate = creditConfig.interest_rate || 0;
+      finalPrice = totalPrice * (1 + effectiveRate / 100);
     }
 
     const installmentValue = finalPrice / installments;
