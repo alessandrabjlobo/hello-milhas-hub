@@ -29,8 +29,7 @@ export default function QuoteGenerator() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { uploading, uploadTicketFile } = useStorage();
-  const { configs: interestConfigs, getCreditConfigs, getDebitRate } =
-    usePaymentInterestConfig();
+  const { configs: interestConfigs } = usePaymentInterestConfig();
   const { activeMethods } = usePaymentMethods();
 
   // ========== ESTADOS ==========
@@ -57,7 +56,7 @@ export default function QuoteGenerator() {
   // Calculadora (milhas/pax)
   const [tripMiles, setTripMiles] = useState("50000");
   const [milesUsed, setMilesUsed] = useState("50000"); // milhas/pax
-  const [costPerMile, setCostPerMile] = useState("29.00"); // custo do milheiro (1000 milhas)
+  const [costPerMile, setCostPerMile] = useState("29.00"); // custo do milheiro
   const [boardingFee, setBoardingFee] = useState("35.00");
   const [passengers, setPassengers] = useState("2");
   const [targetMargin, setTargetMargin] = useState("20"); // markup nas milhas
@@ -72,7 +71,6 @@ export default function QuoteGenerator() {
   // UI
   const [saving, setSaving] = useState(false);
   const [activeMessageTab, setActiveMessageTab] = useState("client");
-  const [showQuotePreview, setShowQuotePreview] = useState(false);
 
   // ========== AUTO-GERAÇÃO DO NOME DO ORÇAMENTO ==========
   useEffect(() => {
@@ -101,8 +99,7 @@ export default function QuoteGenerator() {
     }
   }, [milesUsed]);
 
-  // Quando estiver em ida / ida e volta e o RoundTripForm tiver um campo de milhas,
-  // usamos esse valor para alimentar a calculadora (milhas/pax)
+  // Para ida / ida e volta: usar roundTripData.miles como milhas/pax
   useEffect(() => {
     if (tripType !== "multi_city" && roundTripData.miles && roundTripData.miles > 0) {
       const v = roundTripData.miles.toString();
@@ -112,18 +109,20 @@ export default function QuoteGenerator() {
   }, [tripType, roundTripData.miles]);
 
   // ========== MULTI-TRECHOS: CALCULAR TOTAL DE MILHAS ==========
-  const totalMilesFromSegments = useMemo(() => {
-    return flightSegments.reduce((sum, seg) => sum + (seg.miles || 0), 0);
-  }, [flightSegments]);
+  const totalMilesFromSegments = useMemo(
+    () => flightSegments.reduce((sum, seg) => sum + (seg.miles || 0), 0),
+    [flightSegments]
+  );
 
   useEffect(() => {
     if (tripType === "multi_city" && totalMilesFromSegments > 0) {
-      setMilesUsed(totalMilesFromSegments.toString());
-      setTripMiles(totalMilesFromSegments.toString());
+      const v = totalMilesFromSegments.toString();
+      setMilesUsed(v);
+      setTripMiles(v);
     }
   }, [tripType, totalMilesFromSegments]);
 
-  // ========== FUNÇÕES PARA MULTI-TRECHOS ==========
+  // ========== FUNÇÕES MULTI-TRECHOS ==========
   const handleAddSegment = () => {
     setFlightSegments([...flightSegments, { from: "", to: "", date: "", miles: 0 }]);
   };
@@ -149,44 +148,47 @@ export default function QuoteGenerator() {
     parseFloat(value.replace(/\./g, "").replace(",", ".")) || 0;
 
   const parseCurrency = (value: string) =>
-    parseFloat(value.replace(",", ".")) || 0;
+    parseFloat(value.replace(/\./g, "").replace(",", ".")) || 0;
+
+  // ========== DESCRIÇÃO DE PAGAMENTO ==========
+  const paymentOptionsDescription = useMemo(() => {
+    if (!activeMethods || activeMethods.length === 0) {
+      return "Pix, cartão e demais formas configuradas.";
+    }
+    const labels = activeMethods
+      .map((m: any) => m.display_name || m.name || m.label || m.type)
+      .filter(Boolean);
+    return labels.join(" | ");
+  }, [activeMethods]);
 
   // ========== CÁLCULOS FINANCEIROS ==========
   const calculatedValues = useMemo(() => {
     const milesPerPassenger = parseMiles(milesUsed); // milhas/pax
-    const costPerMileNum = parseCurrency(costPerMile); // custo do milheiro (1000 milhas)
+    const costPerMileNum = parseCurrency(costPerMile); // custo do milheiro
     const boardingFeeNum = parseCurrency(boardingFee);
     const passengersNum = parseInt(passengers) || 1;
     const marginNum = parseCurrency(targetMargin);
 
-    // Milhas totais = milhas/pax * quantidade de passageiros
     const totalMiles = milesPerPassenger * passengersNum;
 
-    // Custo só das milhas (/pax e total)
     const costMilesPerPassenger = (milesPerPassenger / 1000) * costPerMileNum;
     const totalMilesCost = costMilesPerPassenger * passengersNum;
 
-    // Custo total por passageiro = milhas + taxa de embarque (repasse)
     const costPerPassenger = costMilesPerPassenger + boardingFeeNum;
-
-    // Custo total da operação (inclui taxa de embarque)
     const totalCost = costPerPassenger * passengersNum;
 
-    // Preço sugerido por passageiro: markup apenas sobre as milhas + taxa repassada
     const suggestedPricePerPassenger =
       costMilesPerPassenger * (1 + marginNum / 100) + boardingFeeNum;
     const suggestedPrice = suggestedPricePerPassenger * passengersNum;
 
-    // Se houver preço manual, usar ele como preço final total (todos os passageiros)
     let finalPrice = suggestedPrice;
     if (manualPrice) {
-      finalPrice = parseCurrency(manualPrice.replace(/\./g, "")) || suggestedPrice;
+      finalPrice = parseCurrency(manualPrice) || suggestedPrice;
     }
 
     const profit = finalPrice - totalCost;
     const profitMargin = finalPrice > 0 ? (profit / finalPrice) * 100 : 0;
 
-    // Visão interna: markup das milhas (ignorando taxa de embarque)
     const finalPricePerPassenger = passengersNum > 0 ? finalPrice / passengersNum : 0;
     const effectiveMilesPricePerPassenger = Math.max(
       finalPricePerPassenger - boardingFeeNum,
@@ -255,7 +257,7 @@ export default function QuoteGenerator() {
     });
   };
 
-  // ========== MENSAGENS ==========
+  // ========== MENSAGEM CLIENTE ==========
   const generateClientMessage = () => {
     const route =
       roundTripData.origin && roundTripData.destination
@@ -293,11 +295,12 @@ Olá *${clientName || "Cliente"}*! 👋
 
 ✅ Milhas incluídas
 ✅ Taxas de embarque incluídas
-✅ Pagamento facilitado
+✅ Opções de pagamento: ${paymentOptionsDescription}
 
 Para confirmar sua viagem, basta enviar uma mensagem! 😊`;
   };
 
+  // ========== MENSAGEM BALCÃO ==========
   const generateSupplierMessage = () => {
     const milesPerPassenger = parseMiles(milesUsed);
     const passengersNum = parseInt(passengers) || 1;
@@ -306,28 +309,15 @@ Para confirmar sua viagem, basta enviar uma mensagem! 😊`;
     const costPerMileNum = parseCurrency(costPerMile);
     const costPerMileFormatted = costPerMileNum.toFixed(2).replace(".", ",");
 
-    const route =
-      roundTripData.origin && roundTripData.destination
-        ? `${roundTripData.origin} → ${roundTripData.destination}`
-        : null;
-
-    const departureFormatted = roundTripData.departureDate
-      ? format(new Date(roundTripData.departureDate), "dd/MM/yyyy", { locale: ptBR })
-      : null;
+    const clientMessage = generateClientMessage();
 
     return `Compro *${airline || "cia aérea a definir"}*
 
-Quantidade de milhas: ${formatNumber(totalMiles)}
-Quantidade de CPFs: ${passengersNum}
-Custo do milheiro (1000 milhas): R$ ${costPerMileFormatted}${
-      route || departureFormatted
-        ? `
+${formatNumber(totalMiles)}
+${passengersNum} CPF(s)
+R$ ${costPerMileFormatted}
 
-Ref.: ${route ? route : ""}${
-            route && departureFormatted ? " - " : ""
-          }${departureFormatted ?? ""}`
-        : ""
-    }`;
+${clientMessage}`;
   };
 
   const handleCopyMessage = (message: string, type: string) => {
@@ -411,7 +401,7 @@ Ref.: ${route ? route : ""}${
           ? `${roundTripData.origin} → ${roundTripData.destination}`
           : roundTripData.destination;
 
-      const milesNum = parseMiles(milesUsed); // milhas/pax
+      const milesNum = parseMiles(milesUsed);
       const passengersNum = parseInt(passengers) || 1;
       const totalMiles = milesNum * passengersNum;
 
@@ -455,23 +445,16 @@ Ref.: ${route ? route : ""}${
   return (
     <div id="quote-workspace" className="container max-w-7xl mx-auto p-6 space-y-6">
       {/* HEADER */}
-      <div className="flex flex-col gap-1">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold">Workspace de Orçamentos</h1>
-            <p className="text-muted-foreground">
-              Sistema integrado para criar orçamentos profissionais
-            </p>
-          </div>
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <div>
+          <h1 className="text-3xl font-bold">Workspace de Orçamentos</h1>
+          <p className="text-muted-foreground">
+            Sistema integrado para criar orçamentos profissionais
+          </p>
         </div>
-        {quoteTitle && (
-          <span className="ml-12 text-xs text-muted-foreground italic">
-            Orçamento: {quoteTitle}
-          </span>
-        )}
       </div>
 
       {/* GRID PRINCIPAL */}
@@ -480,17 +463,19 @@ Ref.: ${route ? route : ""}${
         <div className="space-y-4">
           {/* DADOS DO ORÇAMENTO */}
           <Card>
-            <CardHeader className="flex flex-col gap-1">
-              <div className="flex items-center justify-between gap-2">
-                <CardTitle>📝 Dados do Orçamento</CardTitle>
-                {quoteTitle && (
-                  <span
-                    className="text-xs md:text-sm text-muted-foreground truncate max-w-[220px] md:max-w-xs"
-                    title={quoteTitle}
-                  >
-                    {quoteTitle}
-                  </span>
-                )}
+            <CardHeader className="space-y-2">
+              <CardTitle>📝 Dados do Orçamento</CardTitle>
+              <div>
+                <Label htmlFor="quoteTitle" className="text-xs text-muted-foreground">
+                  Nome do Orçamento
+                </Label>
+                <Input
+                  id="quoteTitle"
+                  value={quoteTitle}
+                  onChange={(e) => setQuoteTitle(e.target.value)}
+                  placeholder="Ex: Viagem João - Miami Nov/2025"
+                  className="mt-1"
+                />
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -562,18 +547,19 @@ Ref.: ${route ? route : ""}${
                       id="airline"
                       value={airline}
                       onChange={(e) => setAirline(e.target.value)}
-                      placeholder="Ex: LATAM, GOL, Smiles..."
+                      placeholder="Ex: LATAM, GOL..."
                     />
                   </div>
                 </div>
 
-                {/* RoundTrip / One Way / Multi-city */}
+                {/* Round trip */}
                 {tripType === "round_trip" && (
                   <RoundTripForm data={roundTripData} onChange={setRoundTripData} />
                 )}
 
+                {/* Só ida */}
                 {tripType === "one_way" && (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                     <div>
                       <Label htmlFor="origin">Origem *</Label>
                       <Input
@@ -613,9 +599,26 @@ Ref.: ${route ? route : ""}${
                         }
                       />
                     </div>
+                    <div>
+                      <Label htmlFor="oneWayMiles">Milhas/pax</Label>
+                      <Input
+                        id="oneWayMiles"
+                        value={roundTripData.miles ? roundTripData.miles.toString() : ""}
+                        onChange={(e) => {
+                          const numeric = e.target.value.replace(/\D/g, "");
+                          const milesValue = numeric ? Number(numeric) : 0;
+                          setRoundTripData({
+                            ...roundTripData,
+                            miles: milesValue
+                          });
+                        }}
+                        placeholder="30000"
+                      />
+                    </div>
                   </div>
                 )}
 
+                {/* Multi-city */}
                 {tripType === "multi_city" && (
                   <div className="space-y-3">
                     <div className="space-y-2">
@@ -698,22 +701,6 @@ Ref.: ${route ? route : ""}${
                     </p>
                   </div>
                 )}
-              </div>
-
-              <Separator />
-
-              {/* Nome do Orçamento */}
-              <div>
-                <Label htmlFor="quoteTitle">Nome do Orçamento</Label>
-                <Input
-                  id="quoteTitle"
-                  value={quoteTitle}
-                  onChange={(e) => setQuoteTitle(e.target.value)}
-                  placeholder="Ex: Viagem João - Miami Nov/2025"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  ✨ Gerado automaticamente, mas você pode editar
-                </p>
               </div>
             </CardContent>
           </Card>
@@ -986,7 +973,7 @@ Ref.: ${route ? route : ""}${
                   <Textarea
                     value={generateSupplierMessage()}
                     readOnly
-                    rows={10}
+                    rows={14}
                     className="font-mono text-xs"
                   />
                   <Button
