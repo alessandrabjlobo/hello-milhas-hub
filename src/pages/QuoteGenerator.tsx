@@ -1,6 +1,6 @@
 import { ArrowLeft, Upload, X, Copy, Download, Save, Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, type ChangeEvent } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import html2canvas from "html2canvas";
@@ -24,6 +24,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatNumber } from "@/lib/utils";
 
 type TripType = "one_way" | "round_trip" | "multi_city";
+
+const parseLocalDateFromInput = (value: string) => {
+  if (!value) return null;
+  const [year, month, day] = value.split("-");
+  return new Date(Number(year), Number(month) - 1, Number(day));
+};
+
 
 export default function QuoteGenerator() {
   const navigate = useNavigate();
@@ -73,23 +80,27 @@ export default function QuoteGenerator() {
   const [activeMessageTab, setActiveMessageTab] = useState("client");
 
   // ========== AUTO-GERAÇÃO DO NOME DO ORÇAMENTO ==========
-  useEffect(() => {
-    if (
-      clientName &&
-      roundTripData.destination &&
-      roundTripData.departureDate &&
-      !quoteTitle
-    ) {
-      try {
-        const date = new Date(roundTripData.departureDate);
+useEffect(() => {
+  if (
+    clientName &&
+    roundTripData.destination &&
+    roundTripData.departureDate &&
+    !quoteTitle
+  ) {
+    try {
+      const date = parseLocalDateFromInput(roundTripData.departureDate);
+
+      if (date) {
         const monthYear = format(date, "MMM/yyyy", { locale: ptBR });
         const autoTitle = `Viagem ${clientName} - ${roundTripData.destination} ${monthYear}`;
         setQuoteTitle(autoTitle);
-      } catch {
-        // ignore
       }
+    } catch {
+      // ignore
     }
-  }, [clientName, roundTripData.destination, roundTripData.departureDate, quoteTitle]);
+  }
+}, [clientName, roundTripData.destination, roundTripData.departureDate, quoteTitle]);
+
 
   // ========== SINCRONIZAÇÃO FORMULÁRIO ↔ CALCULADORA ==========
   useEffect(() => {
@@ -242,35 +253,35 @@ export default function QuoteGenerator() {
   }, [milesUsed, costPerMile, boardingFee, passengers, targetMargin, manualPrice]);
 
   // ========== UPLOAD DE IMAGENS ==========
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+ const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      toast({
-        title: "Erro de autenticação",
-        description: "Faça login para fazer upload de imagens",
-        variant: "destructive",
-      });
-      return;
-    }
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    toast({
+      title: "Erro de autenticação",
+      description: "Faça login para fazer upload de imagens",
+      variant: "destructive",
+    });
+    return;
+  }
 
-    const tempQuoteId = `quote-${Date.now()}`;
-    const url = await uploadTicketFile(user.id, tempQuoteId, file);
+  const tempQuoteId = `quote-${Date.now()}`;
+  const url = await uploadTicketFile(user.id, tempQuoteId, file);
 
-    if (url) {
-      setAttachments([...attachments, url]);
-      toast({
-        title: "Print adicionado!",
-        description: "Imagem salva com sucesso",
-      });
-    }
+  if (url) {
+    setAttachments([...attachments, url]);
+    toast({
+      title: "Print adicionado!",
+      description: "Imagem salva com sucesso",
+    });
+  }
 
-    e.target.value = "";
-  };
+  e.target.value = "";
+};
 
   const handleRemoveAttachment = (index: number) => {
     setAttachments(attachments.filter((_, i) => i !== index));
@@ -287,14 +298,21 @@ export default function QuoteGenerator() {
         ? `${roundTripData.origin} → ${roundTripData.destination}`
         : "Consulte o roteiro completo";
 
-    const departureFormatted = roundTripData.departureDate
-      ? format(new Date(roundTripData.departureDate), "dd/MM/yyyy", { locale: ptBR })
-      : "A definir";
+   const departureDateObj = parseLocalDateFromInput(roundTripData.departureDate);
+const returnDateObj =
+  tripType === "round_trip"
+    ? parseLocalDateFromInput(roundTripData.returnDate)
+    : null;
 
-    const returnFormatted =
-      roundTripData.returnDate && tripType === "round_trip"
-        ? format(new Date(roundTripData.returnDate), "dd/MM/yyyy", { locale: ptBR })
-        : null;
+const departureFormatted = departureDateObj
+  ? format(departureDateObj, "dd/MM/yyyy", { locale: ptBR })
+  : "A definir";
+
+const returnFormatted =
+  tripType === "round_trip" && returnDateObj
+    ? format(returnDateObj, "dd/MM/yyyy", { locale: ptBR })
+    : null;
+
 
     const tripTypeText =
       tripType === "round_trip"
