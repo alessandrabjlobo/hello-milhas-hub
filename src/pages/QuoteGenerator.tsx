@@ -56,7 +56,7 @@ export default function QuoteGenerator() {
   // Calculadora (milhas/pax)
   const [tripMiles, setTripMiles] = useState("50000");
   const [milesUsed, setMilesUsed] = useState("50000"); // milhas/pax
-  const [costPerMile, setCostPerMile] = useState("29.00"); // custo do milheiro
+  const [costPerMile, setCostPerMile] = useState("29.00"); // valor do milheiro
   const [boardingFee, setBoardingFee] = useState("35.00");
   const [passengers, setPassengers] = useState("2");
   const [targetMargin, setTargetMargin] = useState("20"); // markup nas milhas
@@ -74,7 +74,12 @@ export default function QuoteGenerator() {
 
   // ========== AUTO-GERAÇÃO DO NOME DO ORÇAMENTO ==========
   useEffect(() => {
-    if (clientName && roundTripData.destination && roundTripData.departureDate && !quoteTitle) {
+    if (
+      clientName &&
+      roundTripData.destination &&
+      roundTripData.departureDate &&
+      !quoteTitle
+    ) {
       try {
         const date = new Date(roundTripData.departureDate);
         const monthYear = format(date, "MMM/yyyy", { locale: ptBR });
@@ -164,7 +169,7 @@ export default function QuoteGenerator() {
   // ========== CÁLCULOS FINANCEIROS ==========
   const calculatedValues = useMemo(() => {
     const milesPerPassenger = parseMiles(milesUsed); // milhas/pax
-    const costPerMileNum = parseCurrency(costPerMile); // custo do milheiro
+    const costPerMileNum = parseCurrency(costPerMile); // valor do milheiro
     const boardingFeeNum = parseCurrency(boardingFee);
     const passengersNum = parseInt(passengers) || 1;
     const marginNum = parseCurrency(targetMargin);
@@ -444,16 +449,31 @@ ${clientMessage}`;
   // ========== RENDER ==========
   return (
     <div id="quote-workspace" className="container max-w-7xl mx-auto p-6 space-y-6">
-      {/* HEADER */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold">Workspace de Orçamentos</h1>
-          <p className="text-muted-foreground">
-            Sistema integrado para criar orçamentos profissionais
-          </p>
+      {/* HEADER + MARCADOR DO NOME DO ORÇAMENTO */}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold">Workspace de Orçamentos</h1>
+            <p className="text-muted-foreground">
+              Sistema integrado para criar orçamentos profissionais
+            </p>
+          </div>
+        </div>
+
+        <div className="max-w-md">
+          <Label htmlFor="quoteTitleTop" className="text-xs text-muted-foreground">
+            Nome do Orçamento
+          </Label>
+          <Input
+            id="quoteTitleTop"
+            value={quoteTitle}
+            onChange={(e) => setQuoteTitle(e.target.value)}
+            placeholder="Será gerado automaticamente, você pode editar"
+            className="mt-1"
+          />
         </div>
       </div>
 
@@ -463,20 +483,8 @@ ${clientMessage}`;
         <div className="space-y-4">
           {/* DADOS DO ORÇAMENTO */}
           <Card>
-            <CardHeader className="space-y-2">
+            <CardHeader>
               <CardTitle>📝 Dados do Orçamento</CardTitle>
-              <div>
-                <Label htmlFor="quoteTitle" className="text-xs text-muted-foreground">
-                  Nome do Orçamento
-                </Label>
-                <Input
-                  id="quoteTitle"
-                  value={quoteTitle}
-                  onChange={(e) => setQuoteTitle(e.target.value)}
-                  placeholder="Ex: Viagem João - Miami Nov/2025"
-                  className="mt-1"
-                />
-              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Cliente */}
@@ -722,7 +730,7 @@ ${clientMessage}`;
                   />
                 </div>
                 <div>
-                  <Label htmlFor="costPerMile">Custo/Milheiro (R$)</Label>
+                  <Label htmlFor="costPerMile">Valor Milheiro (R$)</Label>
                   <Input
                     id="costPerMile"
                     value={costPerMile}
@@ -993,11 +1001,7 @@ ${clientMessage}`;
 
           {/* AÇÕES */}
           <div className="space-y-2">
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={handleExportAsJPG}
-            >
+            <Button variant="outline" className="w-full" onClick={handleExportAsJPG}>
               <Download className="mr-2 h-4 w-4" />
               Baixar Orçamento como JPG
             </Button>
