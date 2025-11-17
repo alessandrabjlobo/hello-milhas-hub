@@ -54,8 +54,9 @@ export default function QuoteGenerator() {
   ]);
 
   // Valores da Calculadora (inline) - fonte única de verdade
+  // Agora tratando milhas como "milhas por passageiro (/pax)"
   const [tripMiles, setTripMiles] = useState("50000");
-  const [milesUsed, setMilesUsed] = useState("50000");
+  const [milesUsed, setMilesUsed] = useState("50000"); // milhas/pax
   const [costPerMile, setCostPerMile] = useState("29.00");
   const [boardingFee, setBoardingFee] = useState("35.00");
   const [passengers, setPassengers] = useState("2");
@@ -78,7 +79,7 @@ export default function QuoteGenerator() {
     if (clientName && roundTripData.destination && roundTripData.departureDate && !quoteTitle) {
       try {
         const date = new Date(roundTripData.departureDate);
-        const monthYear = format(date, 'MMM/yyyy', { locale: ptBR });
+        const monthYear = format(date, "MMM/yyyy", { locale: ptBR });
         const autoTitle = `Viagem ${clientName} - ${roundTripData.destination} ${monthYear}`;
         setQuoteTitle(autoTitle);
       } catch (error) {
@@ -107,6 +108,7 @@ export default function QuoteGenerator() {
 
   useEffect(() => {
     if (tripType === "multi_city" && totalMilesFromSegments > 0) {
+      // Aqui também tratamos como milhas/pax, você pode ajustar se quiser lógica diferente
       setMilesUsed(totalMilesFromSegments.toString());
       setTripMiles(totalMilesFromSegments.toString());
     }
@@ -129,37 +131,73 @@ export default function QuoteGenerator() {
     setFlightSegments(updated);
   };
 
-  // ========== CÁLCULOS FINANCEIROS CORRIGIDOS ==========
+  // ========== CÁLCULOS FINANCEIROS (COM MILHAS/PAX + MARKUP MILHAS) ==========
   const calculatedValues = useMemo(() => {
-    const milesNum = parseFloat(milesUsed.replace(/\./g, '').replace(',', '.')) || 0;
-    const costPerMileNum = parseFloat(costPerMile.replace(',', '.')) || 0;
-    const boardingFeeNum = parseFloat(boardingFee.replace(',', '.')) || 0;
+    const milesPerPassenger = parseFloat(milesUsed.replace(/\./g, "").replace(",", ".")) || 0; // milhas/pax
+    const costPerMileNum = parseFloat(costPerMile.replace(",", ".")) || 0;
+    const boardingFeeNum = parseFloat(boardingFee.replace(",", ".")) || 0;
     const passengersNum = parseInt(passengers) || 1;
-    const marginNum = parseFloat(targetMargin.replace(',', '.')) || 0;
+    const marginNum = parseFloat(targetMargin.replace(",", ".")) || 0;
 
-    // ✅ FÓRMULA CORRETA
-    // Custo por passageiro = ((milhas / 1000) * custo_milheiro) + taxa_embarque
-    const costPerPassenger = (milesNum / 1000) * costPerMileNum + boardingFeeNum;
+    // Milhas totais = milhas/pax * quantidade de passageiros
+    const totalMiles = milesPerPassenger * passengersNum;
+
+    // Custo só das milhas (/pax e total)
+    const costMilesPerPassenger = (milesPerPassenger / 1000) * costPerMileNum;
+    const totalMilesCost = costMilesPerPassenger * passengersNum;
+
+    // Custo total por passageiro = milhas + taxa de embarque (repasse)
+    const costPerPassenger = costMilesPerPassenger + boardingFeeNum;
+
+    // Custo total da operação (inclui taxa de embarque)
     const totalCost = costPerPassenger * passengersNum;
 
-    // Preço sugerido por passageiro = ((milhas / 1000) * custo_milheiro) * (1 + taxa_lucro) + taxa_embarque
-    const pricePerPassenger = ((milesNum / 1000) * costPerMileNum) * (1 + marginNum / 100) + boardingFeeNum;
-    const suggestedPrice = pricePerPassenger * passengersNum;
+    // Preço sugerido por passageiro: markup apenas sobre as milhas + taxa repassada
+    const suggestedPricePerPassenger =
+      costMilesPerPassenger * (1 + marginNum / 100) + boardingFeeNum;
+    const suggestedPrice = suggestedPricePerPassenger * passengersNum;
 
-    // Se houver preço manual, usar ele
+    // Se houver preço manual, usar ele como preço final total (todos os passageiros)
     let finalPrice = suggestedPrice;
     if (manualPrice) {
-      finalPrice = parseFloat(manualPrice.replace(/\./g, '').replace(',', '.')) || suggestedPrice;
+      finalPrice =
+        parseFloat(manualPrice.replace(/\./g, "").replace(",", ".")) || suggestedPrice;
     }
 
     const profit = finalPrice - totalCost;
     const profitMargin = finalPrice > 0 ? (profit / finalPrice) * 100 : 0;
 
+    // Visão interna: markup das milhas (ignorando taxa de embarque)
+    const finalPricePerPassenger = passengersNum > 0 ? finalPrice / passengersNum : 0;
+    // Preço "efetivo" das milhas/pax = preço/pax - taxa de embarque (repasse)
+    const effectiveMilesPricePerPassenger = Math.max(
+      finalPricePerPassenger - boardingFeeNum,
+      0
+    );
+
+    let milesMarkup = 0;
+    if (costMilesPerPassenger > 0) {
+      milesMarkup =
+        ((effectiveMilesPricePerPassenger - costMilesPerPassenger) /
+          costMilesPerPassenger) *
+        100;
+    }
+
     return {
+      // visão principal
       totalCost,
       price: finalPrice,
       profit,
-      profitMargin
+      profitMargin,
+
+      // visão interna / detalhada
+      milesPerPassenger,
+      totalMiles,
+      costMilesPerPassenger,
+      totalMilesCost,
+      costPerPassenger,
+      finalPricePerPassenger,
+      milesMarkup
     };
   }, [milesUsed, costPerMile, boardingFee, passengers, targetMargin, manualPrice]);
 
@@ -168,7 +206,9 @@ export default function QuoteGenerator() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user }
+    } = await supabase.auth.getUser();
     if (!user) {
       toast({
         title: "Erro de autenticação",
@@ -180,12 +220,12 @@ export default function QuoteGenerator() {
 
     const tempQuoteId = `quote-${Date.now()}`;
     const url = await uploadTicketFile(user.id, tempQuoteId, file);
-    
+
     if (url) {
       setAttachments([...attachments, url]);
-      toast({ 
-        title: "Print adicionado!", 
-        description: "Imagem salva com sucesso" 
+      toast({
+        title: "Print adicionado!",
+        description: "Imagem salva com sucesso"
       });
     }
 
@@ -195,39 +235,47 @@ export default function QuoteGenerator() {
 
   const handleRemoveAttachment = (index: number) => {
     setAttachments(attachments.filter((_, i) => i !== index));
-    toast({ 
+    toast({
       title: "Print removido",
-      description: "Imagem removida do orçamento" 
+      description: "Imagem removida do orçamento"
     });
   };
 
   // ========== GERAÇÃO DE MENSAGENS (INLINE) ==========
   const generateClientMessage = () => {
-    const route = roundTripData.origin && roundTripData.destination
-      ? `${roundTripData.origin} → ${roundTripData.destination}`
-      : "Consulte o roteiro completo";
+    const route =
+      roundTripData.origin && roundTripData.destination
+        ? `${roundTripData.origin} → ${roundTripData.destination}`
+        : "Consulte o roteiro completo";
 
     const departureFormatted = roundTripData.departureDate
-      ? format(new Date(roundTripData.departureDate), 'dd/MM/yyyy', { locale: ptBR })
+      ? format(new Date(roundTripData.departureDate), "dd/MM/yyyy", { locale: ptBR })
       : "A definir";
 
-    const returnFormatted = roundTripData.returnDate && tripType === "round_trip"
-      ? format(new Date(roundTripData.returnDate), 'dd/MM/yyyy', { locale: ptBR })
-      : null;
+    const returnFormatted =
+      roundTripData.returnDate && tripType === "round_trip"
+        ? format(new Date(roundTripData.returnDate), "dd/MM/yyyy", { locale: ptBR })
+        : null;
 
-    const tripTypeText = tripType === "round_trip" ? "Ida e Volta" : 
-                        tripType === "one_way" ? "Somente Ida" : "Múltiplos Trechos";
+    const tripTypeText =
+      tripType === "round_trip"
+        ? "Ida e Volta"
+        : tripType === "one_way"
+        ? "Somente Ida"
+        : "Múltiplos Trechos";
 
     return `🎫 *Orçamento de Passagem Aérea*
 
-Olá *${clientName || 'Cliente'}*! 👋
+Olá *${clientName || "Cliente"}*! 👋
 
 📍 *Rota:* ${route}
 ✈️ *Tipo:* ${tripTypeText}
-📅 *Data Ida:* ${departureFormatted}${returnFormatted ? `\n🔄 *Data Volta:* ${returnFormatted}` : ''}
+📅 *Data Ida:* ${departureFormatted}${
+      returnFormatted ? `\n🔄 *Data Volta:* ${returnFormatted}` : ""
+    }
 👥 *Passageiros:* ${passengers}
 
-💰 *Valor Total:* R$ ${calculatedValues.price.toFixed(2).replace('.', ',')}
+💰 *Valor Total:* R$ ${calculatedValues.price.toFixed(2).replace(".", ",")}
 
 ✅ Milhas incluídas
 ✅ Taxas de embarque incluídas
@@ -237,23 +285,28 @@ Para confirmar sua viagem, basta enviar uma mensagem! 😊`;
   };
 
   const generateSupplierMessage = () => {
-    const route = roundTripData.origin && roundTripData.destination
-      ? `${roundTripData.origin} → ${roundTripData.destination}`
-      : "Consulte o roteiro";
+    const route =
+      roundTripData.origin && roundTripData.destination
+        ? `${roundTripData.origin} → ${roundTripData.destination}`
+        : "Consulte o roteiro";
 
-    const milesNum = parseFloat(milesUsed.replace(/\./g, '').replace(',', '.')) || 0;
-    
+    const milesNum =
+      parseFloat(milesUsed.replace(/\./g, "").replace(",", ".")) || 0; // milhas/pax
+    const passengersNum = parseInt(passengers) || 1;
+    const totalMiles = milesNum * passengersNum;
+
     const departureFormatted = roundTripData.departureDate
-      ? format(new Date(roundTripData.departureDate), 'dd/MM/yyyy', { locale: ptBR })
+      ? format(new Date(roundTripData.departureDate), "dd/MM/yyyy", { locale: ptBR })
       : "A definir";
 
     return `💼 *Solicitação de Milhas*
 
 🎯 *Rota:* ${route}
 📅 *Data:* ${departureFormatted}
-✈️ *Milhas necessárias:* ${formatNumber(milesNum)}
+✈️ *Milhas necessárias:* ${formatNumber(milesNum)} /pax
+📦 *Total de milhas:* ${formatNumber(totalMiles)}
 👥 *Passageiros:* ${passengers}
-💵 *Valor a depositar:* R$ ${calculatedValues.totalCost.toFixed(2).replace('.', ',')}
+💵 *Valor a depositar:* R$ ${calculatedValues.totalCost.toFixed(2).replace(".", ",")}
 
 📋 *Detalhes:*
 • Custo por milheiro: R$ ${costPerMile}
@@ -265,15 +318,15 @@ Aguardo confirmação para prosseguir com a emissão! 🤝`;
   // ========== COPIAR MENSAGEM ==========
   const handleCopyMessage = (message: string, type: string) => {
     navigator.clipboard.writeText(message);
-    toast({ 
-      title: "Mensagem copiada!", 
-      description: `Mensagem para ${type} copiada para a área de transferência` 
+    toast({
+      title: "Mensagem copiada!",
+      description: `Mensagem para ${type} copiada para a área de transferência`
     });
   };
 
   // ========== EXPORTAR COMO JPG ==========
   const handleExportAsJPG = async () => {
-    const element = document.getElementById('quote-workspace');
+    const element = document.getElementById("quote-workspace");
     if (!element) {
       toast({
         title: "Erro ao exportar",
@@ -286,29 +339,29 @@ Aguardo confirmação para prosseguir com a emissão! 🤝`;
     try {
       const canvas = await html2canvas(element, {
         scale: 2,
-        backgroundColor: '#ffffff',
+        backgroundColor: "#ffffff",
         logging: false
       });
 
-      const link = document.createElement('a');
-      const filename = clientName 
-        ? `orcamento-${clientName.replace(/\s+/g, '-').toLowerCase()}.jpg`
-        : 'orcamento.jpg';
-      
+      const link = document.createElement("a");
+      const filename = clientName
+        ? `orcamento-${clientName.replace(/\s+/g, "-").toLowerCase()}.jpg`
+        : "orcamento.jpg";
+
       link.download = filename;
-      link.href = canvas.toDataURL('image/jpeg', 0.9);
+      link.href = canvas.toDataURL("image/jpeg", 0.9);
       link.click();
 
-      toast({ 
-        title: "Orçamento exportado!", 
-        description: "Imagem salva com sucesso" 
+      toast({
+        title: "Orçamento exportado!",
+        description: "Imagem salva com sucesso"
       });
     } catch (error) {
-      console.error('Erro ao exportar:', error);
-      toast({ 
-        title: "Erro ao exportar", 
-        description: "Não foi possível gerar a imagem", 
-        variant: "destructive" 
+      console.error("Erro ao exportar:", error);
+      toast({
+        title: "Erro ao exportar",
+        description: "Não foi possível gerar a imagem",
+        variant: "destructive"
       });
     }
   };
@@ -327,7 +380,9 @@ Aguardo confirmação para prosseguir com a emissão! 🤝`;
     setSaving(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user }
+      } = await supabase.auth.getUser();
       if (!user) {
         toast({
           title: "Erro de autenticação",
@@ -337,11 +392,15 @@ Aguardo confirmação para prosseguir com a emissão! 🤝`;
         return;
       }
 
-      const route = roundTripData.origin && roundTripData.destination
-        ? `${roundTripData.origin} → ${roundTripData.destination}`
-        : roundTripData.destination;
+      const route =
+        roundTripData.origin && roundTripData.destination
+          ? `${roundTripData.origin} → ${roundTripData.destination}`
+          : roundTripData.destination;
 
-      const milesNum = parseFloat(milesUsed.replace(/\./g, '').replace(',', '.')) || 0;
+      const milesNum =
+        parseFloat(milesUsed.replace(/\./g, "").replace(",", ".")) || 0; // milhas/pax
+      const passengersNum = parseInt(passengers) || 1;
+      const totalMiles = milesNum * passengersNum;
 
       const { error } = await supabase.from("quotes").insert({
         user_id: user.id,
@@ -350,32 +409,33 @@ Aguardo confirmação para prosseguir com a emissão! 🤝`;
         client_phone: clientPhone || null,
         route,
         departure_date: roundTripData.departureDate || null,
-        miles_needed: milesNum,
+        // aqui você decide se quer salvar milhas/pax ou total_milhas – estou salvando total
+        miles_needed: totalMiles,
         total_price: calculatedValues.price,
-        passengers: parseInt(passengers) || 1,
+        passengers: passengersNum,
         trip_type: tripType,
-        boarding_fee: parseFloat(boardingFee.replace(',', '.')) || 0,
+        boarding_fee: parseFloat(boardingFee.replace(",", ".")) || 0,
         notes: notes || null,
         attachments: attachments.length > 0 ? attachments : null,
         flight_segments: [roundTripData],
-        status: 'pending'
+        status: "pending"
       });
 
       if (error) throw error;
 
-      toast({ 
-        title: "Orçamento salvo!", 
-        description: "O orçamento foi salvo com sucesso no banco de dados" 
+      toast({
+        title: "Orçamento salvo!",
+        description: "O orçamento foi salvo com sucesso no banco de dados"
       });
 
       // Opcional: limpar formulário ou navegar
       // navigate("/quotes");
     } catch (error: any) {
-      console.error('Erro ao salvar:', error);
-      toast({ 
-        title: "Erro ao salvar", 
-        description: error.message || "Não foi possível salvar o orçamento", 
-        variant: "destructive" 
+      console.error("Erro ao salvar:", error);
+      toast({
+        title: "Erro ao salvar",
+        description: error.message || "Não foi possível salvar o orçamento",
+        variant: "destructive"
       });
     } finally {
       setSaving(false);
@@ -400,19 +460,16 @@ Aguardo confirmação para prosseguir com a emissão! 🤝`;
 
       {/* ========== GRID 2 COLUNAS ========== */}
       <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-6">
-        
         {/* ================================================== */}
         {/* COLUNA ESQUERDA - FORMULÁRIO + CALCULADORA        */}
         {/* ================================================== */}
         <div className="space-y-4">
-          
           {/* ========== FORMULÁRIO COMPACTO ========== */}
           <Card>
             <CardHeader>
               <CardTitle>📝 Dados do Orçamento</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              
               {/* Dados do Cliente */}
               <div className="space-y-3">
                 <h3 className="font-semibold text-sm">Cliente</h3>
@@ -443,12 +500,12 @@ Aguardo confirmação para prosseguir com a emissão! 🤝`;
               {/* Detalhes da Viagem */}
               <div className="space-y-3">
                 <h3 className="font-semibold text-sm">Detalhes da Viagem</h3>
-                
+
                 {/* Tipo de Viagem */}
                 <div>
                   <Label>Tipo de Viagem</Label>
-                  <RadioGroup 
-                    value={tripType} 
+                  <RadioGroup
+                    value={tripType}
                     onValueChange={(value) => setTripType(value as TripType)}
                     className="flex flex-wrap gap-4 mt-2"
                   >
@@ -475,10 +532,7 @@ Aguardo confirmação para prosseguir com a emissão! 🤝`;
 
                 {/* RoundTripForm - Origem/Destino/Datas */}
                 {tripType === "round_trip" && (
-                  <RoundTripForm
-                    data={roundTripData}
-                    onChange={setRoundTripData}
-                  />
+                  <RoundTripForm data={roundTripData} onChange={setRoundTripData} />
                 )}
 
                 {tripType === "one_way" && (
@@ -488,7 +542,9 @@ Aguardo confirmação para prosseguir com a emissão! 🤝`;
                       <Input
                         id="origin"
                         value={roundTripData.origin}
-                        onChange={(e) => setRoundTripData({ ...roundTripData, origin: e.target.value })}
+                        onChange={(e) =>
+                          setRoundTripData({ ...roundTripData, origin: e.target.value })
+                        }
                         placeholder="Ex: GRU"
                       />
                     </div>
@@ -497,7 +553,12 @@ Aguardo confirmação para prosseguir com a emissão! 🤝`;
                       <Input
                         id="destination"
                         value={roundTripData.destination}
-                        onChange={(e) => setRoundTripData({ ...roundTripData, destination: e.target.value })}
+                        onChange={(e) =>
+                          setRoundTripData({
+                            ...roundTripData,
+                            destination: e.target.value
+                          })
+                        }
                         placeholder="Ex: MIA"
                       />
                     </div>
@@ -507,7 +568,12 @@ Aguardo confirmação para prosseguir com a emissão! 🤝`;
                         id="departureDate"
                         type="date"
                         value={roundTripData.departureDate}
-                        onChange={(e) => setRoundTripData({ ...roundTripData, departureDate: e.target.value })}
+                        onChange={(e) =>
+                          setRoundTripData({
+                            ...roundTripData,
+                            departureDate: e.target.value
+                          })
+                        }
                       />
                     </div>
                   </div>
@@ -515,7 +581,8 @@ Aguardo confirmação para prosseguir com a emissão! 🤝`;
 
                 {tripType === "multi_city" && (
                   <div className="p-4 bg-muted rounded-lg text-sm text-muted-foreground">
-                    💡 Para múltiplos trechos, preencha os dados básicos e detalhe no campo de notas.
+                    💡 Para múltiplos trechos, preencha os dados básicos e detalhe no campo
+                    de notas.
                   </div>
                 )}
               </div>
@@ -535,7 +602,6 @@ Aguardo confirmação para prosseguir com a emissão! 🤝`;
                   ✨ Gerado automaticamente, mas você pode editar
                 </p>
               </div>
-
             </CardContent>
           </Card>
 
@@ -545,10 +611,9 @@ Aguardo confirmação para prosseguir com a emissão! 🤝`;
               <CardTitle>🧮 Calculadora de Margem</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label htmlFor="milesUsed">Milhas Usadas</Label>
+                  <Label htmlFor="milesUsed">Milhas/pax</Label>
                   <Input
                     id="milesUsed"
                     value={milesUsed}
@@ -606,55 +671,77 @@ Aguardo confirmação para prosseguir com a emissão! 🤝`;
               <Separator />
 
               {/* Preview dos Valores Calculados */}
-              <div className="p-4 bg-primary/5 rounded-lg space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Custo Total:</span>
+              <div className="p-4 bg-primary/5 rounded-lg space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Milhas/pax:</span>
                   <span className="font-semibold">
-                    R$ {calculatedValues.totalCost.toFixed(2).replace('.', ',')}
+                    {formatNumber(calculatedValues.milesPerPassenger || 0)} /pax
                   </span>
                 </div>
-                <div className="flex justify-between text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Total de milhas:</span>
+                  <span className="font-semibold">
+                    {formatNumber(calculatedValues.totalMiles || 0)}
+                  </span>
+                </div>
+
+                <Separator className="my-2" />
+
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Custo Total (incl. taxa):</span>
+                  <span className="font-semibold">
+                    R$ {calculatedValues.totalCost.toFixed(2).replace(".", ",")}
+                  </span>
+                </div>
+                <div className="flex justify-between">
                   <span className="text-muted-foreground">Preço Sugerido:</span>
                   <span className="font-semibold text-primary">
-                    R$ {calculatedValues.price.toFixed(2).replace('.', ',')}
+                    R$ {calculatedValues.price.toFixed(2).replace(".", ",")}
                   </span>
                 </div>
-                <div className="flex justify-between text-sm">
+                <div className="flex justify-between">
                   <span className="text-muted-foreground">Lucro:</span>
                   <span className="font-semibold text-green-600">
-                    R$ {calculatedValues.profit.toFixed(2).replace('.', ',')}
+                    R$ {calculatedValues.profit.toFixed(2).replace(".", ",")}
                   </span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Margem:</span>
-                  <Badge variant={calculatedValues.profitMargin >= 20 ? "default" : "secondary"}>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Margem sobre o preço:</span>
+                  <Badge
+                    variant={calculatedValues.profitMargin >= 20 ? "default" : "secondary"}
+                  >
                     {calculatedValues.profitMargin.toFixed(1)}%
                   </Badge>
                 </div>
-              </div>
 
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">
+                    Markup das milhas (interno):
+                  </span>
+                  <Badge variant="outline">
+                    {calculatedValues.milesMarkup.toFixed(1)}%
+                  </Badge>
+                </div>
+              </div>
             </CardContent>
           </Card>
-
         </div>
 
         {/* ================================================== */}
         {/* COLUNA DIREITA - CADERNO + RESUMO + MENSAGENS     */}
         {/* ================================================== */}
         <div className="space-y-4">
-          
           {/* ========== CADERNO DO ORÇAMENTO ========== */}
           <Card>
             <CardHeader>
               <CardTitle>📔 Caderno do Orçamento</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              
               {/* Upload de Prints */}
               <div>
                 <Label>Prints e Anexos</Label>
-                <input 
-                  type="file" 
+                <input
+                  type="file"
                   accept="image/*"
                   onChange={handleFileUpload}
                   className="hidden"
@@ -664,25 +751,25 @@ Aguardo confirmação para prosseguir com a emissão! 🤝`;
                 <Button
                   variant="outline"
                   className="w-full mt-2"
-                  onClick={() => document.getElementById('file-upload')?.click()}
+                  onClick={() => document.getElementById("file-upload")?.click()}
                   disabled={uploading}
                 >
                   <Upload className="mr-2 h-4 w-4" />
                   {uploading ? "Enviando..." : "Adicionar Print"}
                 </Button>
-                
+
                 {/* Grid de Miniaturas */}
                 {attachments.length > 0 && (
                   <div className="grid grid-cols-3 gap-2 mt-3">
                     {attachments.map((url, idx) => (
-                      <div 
+                      <div
                         key={idx}
                         className="relative group cursor-pointer"
                         onClick={() => setPreviewImage(url)}
                       >
-                        <img 
-                          src={url} 
-                          alt={`Anexo ${idx + 1}`} 
+                        <img
+                          src={url}
+                          alt={`Anexo ${idx + 1}`}
                           className="w-full h-20 object-cover rounded border border-border hover:border-primary transition-colors"
                         />
                         <Button
@@ -716,7 +803,6 @@ Aguardo confirmação para prosseguir com a emissão! 🤝`;
                   className="mt-2"
                 />
               </div>
-
             </CardContent>
           </Card>
 
@@ -729,26 +815,26 @@ Aguardo confirmação para prosseguir com a emissão! 🤝`;
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Custo Total:</span>
                 <span className="font-semibold">
-                  R$ {calculatedValues.totalCost.toFixed(2).replace('.', ',')}
+                  R$ {calculatedValues.totalCost.toFixed(2).replace(".", ",")}
                 </span>
               </div>
               <Separator />
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Preço de Venda:</span>
                 <span className="text-xl font-bold text-primary">
-                  R$ {calculatedValues.price.toFixed(2).replace('.', ',')}
+                  R$ {calculatedValues.price.toFixed(2).replace(".", ",")}
                 </span>
               </div>
               <Separator />
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Lucro:</span>
                 <span className="font-semibold text-green-600">
-                  R$ {calculatedValues.profit.toFixed(2).replace('.', ',')}
+                  R$ {calculatedValues.profit.toFixed(2).replace(".", ",")}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Margem:</span>
-                <Badge 
+                <span className="text-muted-foreground">Margem sobre o preço:</span>
+                <Badge
                   variant={calculatedValues.profitMargin >= 20 ? "default" : "secondary"}
                   className="text-sm"
                 >
@@ -769,35 +855,39 @@ Aguardo confirmação para prosseguir com a emissão! 🤝`;
                   <TabsTrigger value="client">Cliente</TabsTrigger>
                   <TabsTrigger value="supplier">Fornecedor</TabsTrigger>
                 </TabsList>
-                
+
                 <TabsContent value="client" className="space-y-2 mt-4">
-                  <Textarea 
-                    value={generateClientMessage()} 
-                    readOnly 
+                  <Textarea
+                    value={generateClientMessage()}
+                    readOnly
                     rows={12}
                     className="font-mono text-xs"
                   />
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="w-full"
-                    onClick={() => handleCopyMessage(generateClientMessage(), "cliente")}
+                    onClick={() =>
+                      handleCopyMessage(generateClientMessage(), "cliente")
+                    }
                   >
                     <Copy className="mr-2 h-4 w-4" />
                     Copiar Mensagem do Cliente
                   </Button>
                 </TabsContent>
-                
+
                 <TabsContent value="supplier" className="space-y-2 mt-4">
-                  <Textarea 
-                    value={generateSupplierMessage()} 
-                    readOnly 
+                  <Textarea
+                    value={generateSupplierMessage()}
+                    readOnly
                     rows={12}
                     className="font-mono text-xs"
                   />
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="w-full"
-                    onClick={() => handleCopyMessage(generateSupplierMessage(), "fornecedor")}
+                    onClick={() =>
+                      handleCopyMessage(generateSupplierMessage(), "fornecedor")
+                    }
                   >
                     <Copy className="mr-2 h-4 w-4" />
                     Copiar Mensagem do Fornecedor
@@ -809,17 +899,17 @@ Aguardo confirmação para prosseguir com a emissão! 🤝`;
 
           {/* ========== AÇÕES ========== */}
           <div className="space-y-2">
-            <Button 
-              variant="outline" 
-              className="w-full" 
+            <Button
+              variant="outline"
+              className="w-full"
               onClick={handleExportAsJPG}
             >
               <Download className="mr-2 h-4 w-4" />
               Baixar Orçamento como JPG
             </Button>
-            <Button 
-              className="w-full" 
-              size="lg" 
+            <Button
+              className="w-full"
+              size="lg"
               onClick={handleSaveQuote}
               disabled={saving || uploading}
             >
@@ -827,7 +917,6 @@ Aguardo confirmação para prosseguir com a emissão! 🤝`;
               {saving ? "Salvando..." : "Salvar Orçamento"}
             </Button>
           </div>
-
         </div>
       </div>
 
@@ -835,11 +924,7 @@ Aguardo confirmação para prosseguir com a emissão! 🤝`;
       <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
           {previewImage && (
-            <img 
-              src={previewImage} 
-              alt="Preview" 
-              className="w-full h-auto rounded"
-            />
+            <img src={previewImage} alt="Preview" className="w-full h-auto rounded" />
           )}
         </DialogContent>
       </Dialog>
