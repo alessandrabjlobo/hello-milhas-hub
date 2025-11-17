@@ -663,6 +663,7 @@ export type Database = {
           company_name: string | null
           converted_at: string | null
           converted_to_sale_id: string | null
+          cost_per_mile: number | null
           created_at: string
           departure_date: string | null
           final_price_with_interest: number | null
@@ -692,6 +693,7 @@ export type Database = {
           company_name?: string | null
           converted_at?: string | null
           converted_to_sale_id?: string | null
+          cost_per_mile?: number | null
           created_at?: string
           departure_date?: string | null
           final_price_with_interest?: number | null
@@ -721,6 +723,7 @@ export type Database = {
           company_name?: string | null
           converted_at?: string | null
           converted_to_sale_id?: string | null
+          cost_per_mile?: number | null
           created_at?: string
           departure_date?: string | null
           final_price_with_interest?: number | null
