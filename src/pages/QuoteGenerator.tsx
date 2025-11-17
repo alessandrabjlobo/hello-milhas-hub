@@ -339,6 +339,38 @@ ${passengersNum} CPF(s)
 R$ ${costPerMileFormatted} o milheiro`;
 };
 
+  // ========== COPIAR MENSAGENS ==========
+  const handleCopyMessage = async (message: string, type: string) => {
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(message);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = message;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        textArea.style.top = "0";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textArea);
+      }
+
+      toast({
+        title: "Mensagem copiada!",
+        description: `Mensagem para ${type} copiada para a área de transferência`,
+      });
+    } catch (error) {
+      console.error("Erro ao copiar mensagem:", error);
+      toast({
+        title: "Erro ao copiar",
+        description: "Não foi possível copiar a mensagem. Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
+
 
   // ========== EXPORTAR COMO JPG ==========
   const handleExportAsJPG = async () => {
