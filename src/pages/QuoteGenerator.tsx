@@ -1,5 +1,5 @@
 import { ArrowLeft, Upload, X, Copy, Download, Save, Plus } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useState, useEffect, useMemo, type ChangeEvent } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -7,6 +7,7 @@ import html2canvas from "html2canvas";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -34,12 +35,15 @@ const parseLocalDateFromInput = (value: string) => {
 
 export default function QuoteGenerator() {
   const navigate = useNavigate();
+  const { quoteId } = useParams();
   const { toast } = useToast();
   const { uploading, uploadTicketFile } = useStorage();
   const { configs: interestConfigs } = usePaymentInterestConfig();
   const { activeMethods } = usePaymentMethods();
 
   // ========== ESTADOS ==========
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [loadingQuote, setLoadingQuote] = useState(false);
   // Dados do Cliente
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
@@ -101,6 +105,80 @@ useEffect(() => {
   }
 }, [clientName, roundTripData.destination, roundTripData.departureDate, quoteTitle]);
 
+  // ========== CARREGAR ORÇAMENTO EXISTENTE ==========
+  const loadExistingQuote = async (id: string) => {
+    try {
+      setLoadingQuote(true);
+      const { data, error } = await supabase
+        .from("quotes")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        console.log("📦 [QuoteGenerator] Carregando orçamento existente:", data);
+        
+        setClientName(data.client_name || "");
+        setClientPhone(data.client_phone || "");
+        setAirline(data.route?.split(" → ")[0] || "");
+        
+        setTripType((data.trip_type || "round_trip") as TripType);
+        setPassengers(data.passengers?.toString() || "1");
+        
+        setMilesUsed(data.miles_needed?.toString() || "0");
+        setBoardingFee(data.boarding_fee?.toString() || "0");
+        
+        const costPerMileCalc = data.miles_needed > 0 
+          ? ((data.total_price - (data.boarding_fee * data.passengers)) / (data.miles_needed / 1000)).toFixed(2)
+          : "0";
+        setCostPerMile(costPerMileCalc.replace(".", ","));
+        
+        if (data.trip_type === "round_trip" && data.flight_segments?.[0]) {
+          const segment = data.flight_segments[0] as any;
+          setRoundTripData({
+            origin: segment.origin || "",
+            destination: segment.destination || "",
+            departureDate: segment.departureDate || "",
+            returnDate: segment.returnDate || "",
+            miles: data.miles_needed || 0
+          });
+        } else if (data.trip_type === "multi_city" && Array.isArray(data.flight_segments)) {
+          setFlightSegments(data.flight_segments as unknown as FlightSegment[]);
+        }
+        
+        if (Array.isArray(data.attachments)) {
+          setAttachments(data.attachments as unknown as string[]);
+        }
+        
+        setNotes(data.notes || "");
+        setQuoteTitle(data.quote_title || "");
+        setIsEditMode(true);
+        
+        toast({
+          title: "Orçamento carregado",
+          description: "Dados carregados com sucesso"
+        });
+      }
+    } catch (error: any) {
+      console.error("❌ [QuoteGenerator] Erro ao carregar:", error);
+      toast({
+        title: "Erro ao carregar orçamento",
+        description: error.message,
+        variant: "destructive"
+      });
+      navigate("/quotes");
+    } finally {
+      setLoadingQuote(false);
+    }
+  };
+
+  useEffect(() => {
+    if (quoteId) {
+      loadExistingQuote(quoteId);
+    }
+  }, [quoteId]);
 
   // ========== SINCRONIZAÇÃO FORMULÁRIO ↔ CALCULADORA ==========
   useEffect(() => {
@@ -269,8 +347,24 @@ useEffect(() => {
     return;
   }
 
+  // Carregar supplier_id do perfil para RLS
+  const { data: profileData } = await supabase
+    .from('profiles')
+    .select('supplier_id')
+    .eq('id', user.id)
+    .single();
+
+  if (!profileData?.supplier_id) {
+    toast({
+      title: "Erro",
+      description: "Perfil de fornecedor não encontrado",
+      variant: "destructive"
+    });
+    return;
+  }
+
   const tempQuoteId = `quote-${Date.now()}`;
-  const url = await uploadTicketFile(user.id, tempQuoteId, file);
+  const url = await uploadTicketFile(profileData.supplier_id, tempQuoteId, file);
 
   if (url) {
     setAttachments([...attachments, url]);
@@ -434,10 +528,10 @@ R$ ${costPerMileFormatted} o milheiro`;
 
   // ========== SALVAR ORÇAMENTO ==========
   const handleSaveQuote = async () => {
-    // ✅ Validar campos obrigatórios
+    // Validação de campos obrigatórios
     const errors: string[] = [];
     
-    if (!clientName) errors.push("Nome do cliente");
+    if (!clientName.trim()) errors.push("Nome do cliente");
     if (!roundTripData.destination && flightSegments.every(s => !s.to)) {
       errors.push("Destino da viagem");
     }
@@ -452,29 +546,20 @@ R$ ${costPerMileFormatted} o milheiro`;
       return;
     }
 
-    setSaving(true);
-
     try {
+      setSaving(true);
+      
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) {
-        toast({
-          title: "Erro de autenticação",
-          description: "Faça login para salvar orçamentos",
-          variant: "destructive",
-        });
-        return;
-      }
+      if (!user) throw new Error("Usuário não autenticado");
 
-      const route =
-        roundTripData.origin && roundTripData.destination
-          ? `${roundTripData.origin} → ${roundTripData.destination}`
-          : roundTripData.destination;
-
-      const milesNum = parseMiles(milesUsed);
       const passengersNum = parseInt(passengers) || 1;
-      const totalMiles = milesNum * passengersNum;
+      const route =
+        tripType === "round_trip"
+          ? `${roundTripData.origin} → ${roundTripData.destination}`
+          : "Multi-city";
+      const totalMiles = parseInt(milesUsed) || 0;
 
       console.log('[SAVE QUOTE] Dados a serem salvos:', {
         user_id: user.id,
@@ -487,7 +572,7 @@ R$ ${costPerMileFormatted} o milheiro`;
         flight_segments_count: tripType === "multi_city" ? flightSegments.length : 1,
       });
 
-      const { error } = await supabase.from("quotes").insert([{
+      const quoteData = {
         user_id: user.id,
         quote_title: quoteTitle || null,
         client_name: clientName,
@@ -501,31 +586,74 @@ R$ ${costPerMileFormatted} o milheiro`;
         boarding_fee: parseCurrency(boardingFee),
         notes: notes || null,
         attachments: attachments.length > 0 ? attachments : null,
-        flight_segments: (tripType === "multi_city" ? flightSegments : [roundTripData]) as any,
-        status: "pending",
-      }]);
+        flight_segments: tripType === "multi_city" 
+          ? flightSegments 
+          : [roundTripData] as any,
+        status: "pending" as const,
+      };
 
-      if (error) {
-        console.error('[SAVE QUOTE] Erro detalhado:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code,
+      let savedQuoteId: string;
+
+      if (isEditMode && quoteId) {
+        // UPDATE - Edição de orçamento existente
+        const { error } = await supabase
+          .from("quotes")
+          .update(quoteData)
+          .eq("id", quoteId);
+
+        if (error) {
+          console.error('[SAVE QUOTE] Erro detalhado:', {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code,
+          });
+          throw error;
+        }
+        
+        savedQuoteId = quoteId;
+        
+        console.log('[SAVE QUOTE] Orçamento atualizado com sucesso!');
+        
+        toast({
+          title: "Orçamento atualizado!",
+          description: "As alterações foram salvas com sucesso"
         });
-        throw error;
+      } else {
+        // INSERT - Novo orçamento
+        const { data, error } = await supabase
+          .from("quotes")
+          .insert([quoteData])
+          .select()
+          .single();
+
+        if (error) {
+          console.error('[SAVE QUOTE] Erro detalhado:', {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code,
+          });
+          throw error;
+        }
+        
+        savedQuoteId = data.id;
+        
+        console.log('[SAVE QUOTE] Orçamento salvo com sucesso!');
+        
+        toast({
+          title: "Orçamento salvo!",
+          description: "O orçamento foi criado com sucesso"
+        });
       }
 
-      console.log('[SAVE QUOTE] Orçamento salvo com sucesso!');
-
-      toast({
-        title: "Orçamento salvo!",
-        description: "O orçamento foi salvo com sucesso no banco de dados",
-      });
+      setTimeout(() => {
+        navigate("/quotes");
+      }, 1500);
     } catch (error: any) {
-      console.error("Erro ao salvar:", error);
       toast({
-        title: "Erro ao salvar",
-        description: error.message || "Não foi possível salvar o orçamento",
+        title: "Erro ao salvar orçamento",
+        description: error.message,
         variant: "destructive",
       });
     } finally {
@@ -534,6 +662,28 @@ R$ ${costPerMileFormatted} o milheiro`;
   };
 
   // ========== RENDER ==========
+  if (loadingQuote) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background to-muted p-6">
+        <Card className="max-w-7xl mx-auto">
+          <CardHeader>
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-64" />
+              <Skeleton className="h-4 w-96" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-32 w-full" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div id="quote-workspace" className="container max-w-7xl mx-auto p-6 space-y-6">
       {/* HEADER + MARCADOR DO NOME DO ORÇAMENTO */}
