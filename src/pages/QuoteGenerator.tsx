@@ -441,7 +441,7 @@ useEffect(() => {
       
       // Gerar linha para cada parcela de 1x até maxInstallments
       for (let i = 1; i <= maxInstallments; i++) {
-        const result = calculateInstallmentValue(calculatedValues.price, i);
+        const result = calculateInstallmentValue(calculatedValues.price, i, 'credit');
         
         const installmentValueFormatted = result.installmentValue
           .toFixed(2)
@@ -457,7 +457,7 @@ useEffect(() => {
             .replace(".", ",");
           
           lines.push(
-            `  ${i}x de R$ ${installmentValueFormatted} (total: R$ ${finalPriceFormatted} - juros: ${result.interestRate.toFixed(2)}%)`
+            `  ${i}x de R$ ${installmentValueFormatted} (total: R$ ${finalPriceFormatted} - juros: ${result.interestRate.toFixed(3).replace(".", ",")}%)`
           );
         }
       }
@@ -466,8 +466,7 @@ useEffect(() => {
     // 2) Débito à vista
     const debitConfig = interestConfigs.find(c => c.payment_type === 'debit' && c.is_active);
     if (debitConfig) {
-      const debitResult = calculateInstallmentValue(calculatedValues.price, 1);
-      const debitValueFormatted = debitResult.installmentValue
+      const debitValueFormatted = calculatedValues.price
         .toFixed(2)
         .replace(".", ",");
       
