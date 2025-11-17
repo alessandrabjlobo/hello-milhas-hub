@@ -323,33 +323,22 @@ Olá *${clientName || "Cliente"}*! 👋
 Para confirmar sua viagem, basta enviar uma mensagem! 😊`;
   };
 
-  // ========== MENSAGEM BALCÃO ==========
-  const generateSupplierMessage = () => {
-    const milesPerPassenger = parseMiles(milesUsed);
-    const passengersNum = parseInt(passengers) || 1;
-    const totalMiles = milesPerPassenger * passengersNum;
+// ========== MENSAGEM BALCÃO ==========
+const generateSupplierMessage = () => {
+  const milesPerPassenger = parseMiles(milesUsed);
+  const passengersNum = parseInt(passengers) || 1;
+  const totalMiles = milesPerPassenger * passengersNum;
 
-    const costPerMileNum = parseCurrency(costPerMile);
-    const costPerMileFormatted = costPerMileNum.toFixed(2).replace(".", ",");
+  const costPerMileNum = parseCurrency(costPerMile);
+  const costPerMileFormatted = costPerMileNum.toFixed(2).replace(".", ",");
 
-    const clientMessage = generateClientMessage();
+  return `Compro *${airline || "cia aérea a definir"}*
 
-    return `Compro *${airline || "cia aérea a definir"}*
-
-${formatNumber(totalMiles)}
+${formatNumber(totalMiles)} milhas
 ${passengersNum} CPF(s)
-R$ ${costPerMileFormatted}
+R$ ${costPerMileFormatted} o milheiro`;
+};
 
-${clientMessage}`;
-  };
-
-  const handleCopyMessage = (message: string, type: string) => {
-    navigator.clipboard.writeText(message);
-    toast({
-      title: "Mensagem copiada!",
-      description: `Mensagem para ${type} copiada para a área de transferência`,
-    });
-  };
 
   // ========== EXPORTAR COMO JPG ==========
   const handleExportAsJPG = async () => {
