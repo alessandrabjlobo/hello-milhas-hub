@@ -49,13 +49,24 @@ export default function PaymentInterestSettings() {
   const handleOpenDialog = (config?: typeof editingConfig) => {
     if (config) {
       console.log('🔧 [EDIT] Carregando configuração:', config);
+      
+      // Normalizar taxas ao carregar (garantir Record<number, number>)
+      const normalizedRates = config.per_installment_rates 
+        ? Object.fromEntries(
+            Object.entries(config.per_installment_rates).map(([k, v]) => [
+              Number(k), 
+              typeof v === 'string' ? parseFloat(v) : Number(v)
+            ])
+          )
+        : {};
+      
       setEditingConfig(config);
       setPaymentType(config.payment_type || 'credit');
       setInstallments(config.installments.toString());
       setInterestRate(config.interest_rate.toString());
       setConfigType(config.config_type || 'total');
-      setPerInstallmentRates(config.per_installment_rates || {});
-      console.log('✅ [EDIT] Taxas por parcela carregadas:', config.per_installment_rates);
+      setPerInstallmentRates(normalizedRates);
+      console.log('✅ [EDIT] Taxas por parcela carregadas (normalizadas):', normalizedRates);
     } else {
       setEditingConfig(null);
       setPaymentType('credit');
@@ -397,11 +408,14 @@ export default function PaymentInterestSettings() {
                         type="number"
                         step="0.001"
                         placeholder="0.000"
-                        value={perInstallmentRates[num] || ''}
-                        onChange={(e) => setPerInstallmentRates(prev => ({
-                          ...prev,
-                          [num]: parseFloat(e.target.value) || 0
-                        }))}
+                        value={perInstallmentRates[num] ?? ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setPerInstallmentRates(prev => ({
+                            ...prev,
+                            [num]: val === '' ? 0 : parseFloat(val) || 0
+                          }));
+                        }}
                         className="h-8 text-sm"
                       />
                     </div>
