@@ -3,11 +3,21 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, MapPin, DollarSign, FileText, ExternalLink, CheckCircle2, LayoutGrid, List, Edit2 } from "lucide-react";
+import { Calendar, MapPin, DollarSign, FileText, ExternalLink, CheckCircle2, LayoutGrid, List, Edit2, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Quote {
   id: string;
@@ -29,6 +39,8 @@ const QuoteHistory = () => {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "pending" | "converted">("all");
   const [viewMode, setViewMode] = useState<"cards" | "list">("list");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [quoteToDelete, setQuoteToDelete] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -76,6 +88,41 @@ const QuoteHistory = () => {
   const handleConvert = (quoteId: string) => {
     // Navigate to new sale wizard with quote data pre-filled
     navigate(`/sales/new?quoteId=${quoteId}`);
+  };
+
+  const handleDeleteClick = (quoteId: string) => {
+    setQuoteToDelete(quoteId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!quoteToDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from("quotes")
+        .delete()
+        .eq("id", quoteToDelete);
+
+      if (error) throw error;
+
+      toast({
+        title: "Orçamento excluído",
+        description: "O orçamento foi removido com sucesso",
+      });
+
+      // Atualizar lista
+      setQuotes(quotes.filter(q => q.id !== quoteToDelete));
+    } catch (error: any) {
+      toast({
+        title: "Erro ao excluir orçamento",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteDialogOpen(false);
+      setQuoteToDelete(null);
+    }
   };
 
   const getStatusBadge = (quote: Quote) => {
@@ -241,6 +288,13 @@ const QuoteHistory = () => {
                           Ver Venda
                         </Button>
                       )}
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => handleDeleteClick(quote.id)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -321,6 +375,13 @@ const QuoteHistory = () => {
                         Ver Venda
                       </Button>
                     )}
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => handleDeleteClick(quote.id)}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
                   </div>
                 </div>
               </CardContent>
@@ -328,6 +389,26 @@ const QuoteHistory = () => {
           ))}
         </div>
       )}
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este orçamento? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
