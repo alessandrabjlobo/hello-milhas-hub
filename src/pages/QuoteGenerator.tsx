@@ -67,7 +67,7 @@ export default function QuoteGenerator() {
   // Calculadora (milhas/pax)
   const [tripMiles, setTripMiles] = useState("50000");
   const [milesUsed, setMilesUsed] = useState("50000"); // milhas/pax
-  const [costPerMile, setCostPerMile] = useState("29,00"); // valor do milheiro
+  const [costPerMile, setCostPerMile] = useState("29,00"); // valor do milheiro (salvo no banco)
   const [boardingFee, setBoardingFee] = useState("35,00");
   const [passengers, setPassengers] = useState("2");
   const [targetMargin, setTargetMargin] = useState("20"); // markup nas milhas
@@ -131,22 +131,19 @@ const loadExistingQuote = async (id: string) => {
       setMilesUsed(data.miles_needed?.toString() || "0");
       setBoardingFee(data.boarding_fee?.toString() || "0");
 
-      // ✅ recalcula o milheiro usando TOTAL DE MILHAS (milhas/pax * passageiros)
-      const milesPerPassenger = data.miles_needed || 0;
-      const passengersNum = data.passengers || 1;
-      const totalMiles = milesPerPassenger * passengersNum;
-      const boardingFeeNum = data.boarding_fee || 0;
-      const totalBoardingFees = boardingFeeNum * passengersNum;
-
-      const costPerMileCalc =
-        totalMiles > 0
-          ? (
-              (data.total_price - totalBoardingFees) /
-              (totalMiles / 1000)
-            ).toFixed(2)
-          : "0";
-
-      setCostPerMile(costPerMileCalc.replace(".", ","));
+      // ✅ Carregar cost_per_mile salvo (em vez de recalcular)
+      if (data.cost_per_mile != null) {
+        // Formatar com 2 casas decimais e substituir ponto por vírgula
+        const formatted = Number(data.cost_per_mile)
+          .toFixed(2)
+          .replace(".", ",");
+        setCostPerMile(formatted);
+        console.log(`✅ [LOAD] Valor do milheiro carregado: R$ ${formatted}`);
+      } else {
+        // Fallback para orçamentos antigos sem cost_per_mile
+        setCostPerMile("29,00");
+        console.warn("⚠️ [LOAD] cost_per_mile não encontrado, usando padrão: R$ 29,00");
+      }
       
       if (data.trip_type === "round_trip" && data.flight_segments?.[0]) {
         const segment = data.flight_segments[0] as any;
@@ -597,6 +594,9 @@ R$ ${costPerMileFormatted} o milheiro`;
           : "Multi-city";
       const totalMiles = parseInt(milesUsed) || 0;
 
+      // ✅ Converter valor do milheiro para número
+      const costPerMileNum = parseCurrency(costPerMile);
+
       console.log('[SAVE QUOTE] Dados a serem salvos:', {
         user_id: user.id,
         client_name: clientName,
@@ -604,6 +604,7 @@ R$ ${costPerMileFormatted} o milheiro`;
         total_price: calculatedValues.price,
         passengers: passengersNum,
         trip_type: tripType,
+        cost_per_mile: costPerMileNum,
         attachments_count: attachments.length,
         flight_segments_count: tripType === "multi_city" ? flightSegments.length : 1,
       });
@@ -620,6 +621,7 @@ R$ ${costPerMileFormatted} o milheiro`;
         passengers: passengersNum,
         trip_type: tripType,
         boarding_fee: parseCurrency(boardingFee),
+        cost_per_mile: costPerMileNum,
         notes: notes || null,
         attachments: attachments.length > 0 ? attachments : null,
         flight_segments: tripType === "multi_city" 
