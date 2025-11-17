@@ -672,6 +672,7 @@ export type Database = {
           installments: number | null
           interest_rate: number | null
           miles_needed: number
+          notes: string | null
           passengers: number | null
           payment_methods: string[] | null
           route: string | null
@@ -699,6 +700,7 @@ export type Database = {
           installments?: number | null
           interest_rate?: number | null
           miles_needed: number
+          notes?: string | null
           passengers?: number | null
           payment_methods?: string[] | null
           route?: string | null
@@ -726,6 +728,7 @@ export type Database = {
           installments?: number | null
           interest_rate?: number | null
           miles_needed?: number
+          notes?: string | null
           passengers?: number | null
           payment_methods?: string[] | null
           route?: string | null
