@@ -1,6 +1,6 @@
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Plane, ArrowRight } from "lucide-react";
+import { Plane } from "lucide-react";
 
 export interface RoundTripData {
   origin: string;
@@ -78,19 +78,6 @@ export function RoundTripForm({ data, onChange }: RoundTripFormProps) {
           value={data.miles || ""}
           onChange={(e) => updateField("miles", parseInt(e.target.value) || 0)}
         />
-        <p className="text-xs text-muted-foreground">
-          Quantidade de milhas necessária para 1 passageiro fazer ida e volta completa
-          <br />
-          💡 Exemplo: Se o trecho ida custa 25.000 e volta 25.000, informe 50.000
-        </p>
-      </div>
-
-      <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground pt-2">
-        <span>{data.origin || "Origem"}</span>
-        <ArrowRight className="h-4 w-4" />
-        <span>{data.destination || "Destino"}</span>
-        <ArrowRight className="h-4 w-4" />
-        <span>{data.origin || "Origem"}</span>
       </div>
     </div>
   );
