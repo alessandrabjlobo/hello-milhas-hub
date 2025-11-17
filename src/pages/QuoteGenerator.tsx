@@ -29,7 +29,8 @@ export default function QuoteGenerator() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { uploading, uploadTicketFile } = useStorage();
-  const { configs: interestConfigs, getCreditConfigs, getDebitRate } = usePaymentInterestConfig();
+  const { configs: interestConfigs, getCreditConfigs, getDebitRate } =
+    usePaymentInterestConfig();
   const { activeMethods } = usePaymentMethods();
 
   // ========== ESTADOS ==========
@@ -53,10 +54,10 @@ export default function QuoteGenerator() {
     { from: "", to: "", date: "", miles: 0 }
   ]);
 
-  // Valores da Calculadora (inline) - milhas/pax
+  // Calculadora (milhas/pax)
   const [tripMiles, setTripMiles] = useState("50000");
   const [milesUsed, setMilesUsed] = useState("50000"); // milhas/pax
-  const [costPerMile, setCostPerMile] = useState("29.00");
+  const [costPerMile, setCostPerMile] = useState("29.00"); // custo do milheiro (1000 milhas)
   const [boardingFee, setBoardingFee] = useState("35.00");
   const [passengers, setPassengers] = useState("2");
   const [targetMargin, setTargetMargin] = useState("20"); // markup nas milhas
@@ -68,7 +69,7 @@ export default function QuoteGenerator() {
   const [attachments, setAttachments] = useState<string[]>([]);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
-  // UI States
+  // UI
   const [saving, setSaving] = useState(false);
   const [activeMessageTab, setActiveMessageTab] = useState("client");
   const [showQuotePreview, setShowQuotePreview] = useState(false);
@@ -82,7 +83,7 @@ export default function QuoteGenerator() {
         const autoTitle = `Viagem ${clientName} - ${roundTripData.destination} ${monthYear}`;
         setQuoteTitle(autoTitle);
       } catch {
-        // Data inválida, não gera título
+        // ignore
       }
     }
   }, [clientName, roundTripData.destination, roundTripData.departureDate, quoteTitle]);
@@ -100,6 +101,16 @@ export default function QuoteGenerator() {
     }
   }, [milesUsed]);
 
+  // Quando estiver em ida / ida e volta e o RoundTripForm tiver um campo de milhas,
+  // usamos esse valor para alimentar a calculadora (milhas/pax)
+  useEffect(() => {
+    if (tripType !== "multi_city" && roundTripData.miles && roundTripData.miles > 0) {
+      const v = roundTripData.miles.toString();
+      setMilesUsed(v);
+      setTripMiles(v);
+    }
+  }, [tripType, roundTripData.miles]);
+
   // ========== MULTI-TRECHOS: CALCULAR TOTAL DE MILHAS ==========
   const totalMilesFromSegments = useMemo(() => {
     return flightSegments.reduce((sum, seg) => sum + (seg.miles || 0), 0);
@@ -107,13 +118,12 @@ export default function QuoteGenerator() {
 
   useEffect(() => {
     if (tripType === "multi_city" && totalMilesFromSegments > 0) {
-      // Milhas/pax = soma das milhas dos trechos
       setMilesUsed(totalMilesFromSegments.toString());
       setTripMiles(totalMilesFromSegments.toString());
     }
   }, [tripType, totalMilesFromSegments]);
 
-  // ========== FUNÇÕES PARA GERENCIAR MULTI-TRECHOS ==========
+  // ========== FUNÇÕES PARA MULTI-TRECHOS ==========
   const handleAddSegment = () => {
     setFlightSegments([...flightSegments, { from: "", to: "", date: "", miles: 0 }]);
   };
@@ -134,16 +144,20 @@ export default function QuoteGenerator() {
     setFlightSegments(updated);
   };
 
-  // ========== CÁLCULOS FINANCEIROS (COM MILHAS/PAX + MARKUP MILHAS) ==========
+  // Helpers de parse
+  const parseMiles = (value: string) =>
+    parseFloat(value.replace(/\./g, "").replace(",", ".")) || 0;
+
+  const parseCurrency = (value: string) =>
+    parseFloat(value.replace(",", ".")) || 0;
+
+  // ========== CÁLCULOS FINANCEIROS ==========
   const calculatedValues = useMemo(() => {
-    const milesPerPassenger =
-      parseFloat(milesUsed.replace(/\./g, "").replace(",", ".")) || 0; // milhas/pax
-    const costPerMileNum =
-      parseFloat(costPerMile.replace(/\./g, "").replace(",", ".")) || 0;
-    const boardingFeeNum =
-      parseFloat(boardingFee.replace(/\./g, "").replace(",", ".")) || 0;
+    const milesPerPassenger = parseMiles(milesUsed); // milhas/pax
+    const costPerMileNum = parseCurrency(costPerMile); // custo do milheiro (1000 milhas)
+    const boardingFeeNum = parseCurrency(boardingFee);
     const passengersNum = parseInt(passengers) || 1;
-    const marginNum = parseFloat(targetMargin.replace(",", ".")) || 0;
+    const marginNum = parseCurrency(targetMargin);
 
     // Milhas totais = milhas/pax * quantidade de passageiros
     const totalMiles = milesPerPassenger * passengersNum;
@@ -166,8 +180,7 @@ export default function QuoteGenerator() {
     // Se houver preço manual, usar ele como preço final total (todos os passageiros)
     let finalPrice = suggestedPrice;
     if (manualPrice) {
-      finalPrice =
-        parseFloat(manualPrice.replace(/\./g, "").replace(",", ".")) || suggestedPrice;
+      finalPrice = parseCurrency(manualPrice.replace(/\./g, "")) || suggestedPrice;
     }
 
     const profit = finalPrice - totalCost;
@@ -189,13 +202,10 @@ export default function QuoteGenerator() {
     }
 
     return {
-      // visão principal
       totalCost,
       price: finalPrice,
       profit,
       profitMargin,
-
-      // visão interna / detalhada
       milesPerPassenger,
       totalMiles,
       costMilesPerPassenger,
@@ -234,7 +244,6 @@ export default function QuoteGenerator() {
       });
     }
 
-    // Reset input
     e.target.value = "";
   };
 
@@ -246,7 +255,7 @@ export default function QuoteGenerator() {
     });
   };
 
-  // ========== GERAÇÃO DE MENSAGENS (INLINE) ==========
+  // ========== MENSAGENS ==========
   const generateClientMessage = () => {
     const route =
       roundTripData.origin && roundTripData.destination
@@ -290,13 +299,11 @@ Para confirmar sua viagem, basta enviar uma mensagem! 😊`;
   };
 
   const generateSupplierMessage = () => {
-    const milesPerPassenger =
-      parseFloat(milesUsed.replace(/\./g, "").replace(",", ".")) || 0;
+    const milesPerPassenger = parseMiles(milesUsed);
     const passengersNum = parseInt(passengers) || 1;
     const totalMiles = milesPerPassenger * passengersNum;
 
-    const costPerMileNum =
-      parseFloat(costPerMile.replace(/\./g, "").replace(",", ".")) || 0;
+    const costPerMileNum = parseCurrency(costPerMile);
     const costPerMileFormatted = costPerMileNum.toFixed(2).replace(".", ",");
 
     const route =
@@ -308,24 +315,21 @@ Para confirmar sua viagem, basta enviar uma mensagem! 😊`;
       ? format(new Date(roundTripData.departureDate), "dd/MM/yyyy", { locale: ptBR })
       : null;
 
-    return `📣 *Balcão de Milhas*
-
-Compro *${airline || "cia aérea a definir"}*
+    return `Compro *${airline || "cia aérea a definir"}*
 
 Quantidade de milhas: ${formatNumber(totalMiles)}
 Quantidade de CPFs: ${passengersNum}
-Custo do milheiro: R$ ${costPerMileFormatted}
+Custo do milheiro (1000 milhas): R$ ${costPerMileFormatted}${
+      route || departureFormatted
+        ? `
 
-${
-  route || departureFormatted
-    ? `Referência de rota/data: ${
-        route ? route : ""
-      }${route && departureFormatted ? " - " : ""}${departureFormatted ?? ""}\n`
-    : ""
-}Obs.: Taxa de embarque/pax será repassada ao cliente: R$ ${boardingFee}`;
+Ref.: ${route ? route : ""}${
+            route && departureFormatted ? " - " : ""
+          }${departureFormatted ?? ""}`
+        : ""
+    }`;
   };
 
-  // ========== COPIAR MENSAGEM ==========
   const handleCopyMessage = (message: string, type: string) => {
     navigator.clipboard.writeText(message);
     toast({
@@ -376,7 +380,7 @@ ${
     }
   };
 
-  // ========== SALVAR ORÇAMENTO NO SUPABASE ==========
+  // ========== SALVAR ORÇAMENTO ==========
   const handleSaveQuote = async () => {
     if (!clientName || !roundTripData.destination || !calculatedValues.price) {
       toast({
@@ -407,8 +411,7 @@ ${
           ? `${roundTripData.origin} → ${roundTripData.destination}`
           : roundTripData.destination;
 
-      const milesNum =
-        parseFloat(milesUsed.replace(/\./g, "").replace(",", ".")) || 0; // milhas/pax
+      const milesNum = parseMiles(milesUsed); // milhas/pax
       const passengersNum = parseInt(passengers) || 1;
       const totalMiles = milesNum * passengersNum;
 
@@ -419,11 +422,11 @@ ${
         client_phone: clientPhone || null,
         route,
         departure_date: roundTripData.departureDate || null,
-        miles_needed: totalMiles, // salva total de milhas
+        miles_needed: totalMiles,
         total_price: calculatedValues.price,
         passengers: passengersNum,
         trip_type: tripType,
-        boarding_fee: parseFloat(boardingFee.replace(",", ".")) || 0,
+        boarding_fee: parseCurrency(boardingFee),
         notes: notes || null,
         attachments: attachments.length > 0 ? attachments : null,
         flight_segments: [roundTripData],
@@ -451,26 +454,31 @@ ${
   // ========== RENDER ==========
   return (
     <div id="quote-workspace" className="container max-w-7xl mx-auto p-6 space-y-6">
-      {/* ========== HEADER ========== */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold">Workspace de Orçamentos</h1>
-          <p className="text-muted-foreground">
-            Sistema integrado para criar orçamentos profissionais
-          </p>
+      {/* HEADER */}
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold">Workspace de Orçamentos</h1>
+            <p className="text-muted-foreground">
+              Sistema integrado para criar orçamentos profissionais
+            </p>
+          </div>
         </div>
+        {quoteTitle && (
+          <span className="ml-12 text-xs text-muted-foreground italic">
+            Orçamento: {quoteTitle}
+          </span>
+        )}
       </div>
 
-      {/* ========== GRID 2 COLUNAS ========== */}
+      {/* GRID PRINCIPAL */}
       <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-6">
-        {/* ================================================== */}
-        {/* COLUNA ESQUERDA - FORMULÁRIO + CALCULADORA        */}
-        {/* ================================================== */}
+        {/* COLUNA ESQUERDA */}
         <div className="space-y-4">
-          {/* ========== FORMULÁRIO COMPACTO ========== */}
+          {/* DADOS DO ORÇAMENTO */}
           <Card>
             <CardHeader className="flex flex-col gap-1">
               <div className="flex items-center justify-between gap-2">
@@ -486,7 +494,7 @@ ${
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Dados do Cliente */}
+              {/* Cliente */}
               <div className="space-y-3">
                 <h3 className="font-semibold text-sm">Cliente</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -546,10 +554,10 @@ ${
                   </RadioGroup>
                 </div>
 
-                {/* Cia Aérea (para Balcão) */}
+                {/* Cia Aérea */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
-                    <Label htmlFor="airline">Cia Aérea (para Balcão)</Label>
+                    <Label htmlFor="airline">Cia Aérea</Label>
                     <Input
                       id="airline"
                       value={airline}
@@ -559,7 +567,7 @@ ${
                   </div>
                 </div>
 
-                {/* RoundTripForm - Origem/Destino/Datas */}
+                {/* RoundTrip / One Way / Multi-city */}
                 {tripType === "round_trip" && (
                   <RoundTripForm data={roundTripData} onChange={setRoundTripData} />
                 )}
@@ -710,7 +718,7 @@ ${
             </CardContent>
           </Card>
 
-          {/* ========== CALCULADORA INTEGRADA ========== */}
+          {/* CALCULADORA */}
           <Card>
             <CardHeader>
               <CardTitle>🧮 Calculadora de Margem</CardTitle>
@@ -723,7 +731,7 @@ ${
                     id="milesUsed"
                     value={milesUsed}
                     onChange={(e) => setMilesUsed(e.target.value)}
-                    placeholder="50000"
+                    placeholder="30000"
                   />
                 </div>
                 <div>
@@ -732,7 +740,7 @@ ${
                     id="costPerMile"
                     value={costPerMile}
                     onChange={(e) => setCostPerMile(e.target.value)}
-                    placeholder="29.00"
+                    placeholder="29,00"
                   />
                 </div>
                 <div>
@@ -741,7 +749,7 @@ ${
                     id="boardingFee"
                     value={boardingFee}
                     onChange={(e) => setBoardingFee(e.target.value)}
-                    placeholder="35.00"
+                    placeholder="35,00"
                   />
                 </div>
                 <div>
@@ -754,9 +762,7 @@ ${
                   />
                 </div>
                 <div>
-                  <Label htmlFor="targetMargin">
-                    Markup desejado nas milhas (%)
-                  </Label>
+                  <Label htmlFor="targetMargin">Markup desejado nas milhas (%)</Label>
                   <Input
                     id="targetMargin"
                     value={targetMargin}
@@ -777,7 +783,6 @@ ${
 
               <Separator />
 
-              {/* Preview dos Valores Calculados */}
               <div className="p-4 bg-primary/5 rounded-lg space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Milhas/pax:</span>
@@ -834,17 +839,14 @@ ${
           </Card>
         </div>
 
-        {/* ================================================== */}
-        {/* COLUNA DIREITA - CADERNO + RESUMO + MENSAGENS     */}
-        {/* ================================================== */}
+        {/* COLUNA DIREITA */}
         <div className="space-y-4">
-          {/* ========== CADERNO DO ORÇAMENTO ========== */}
+          {/* CADERNO */}
           <Card>
             <CardHeader>
               <CardTitle>📔 Caderno do Orçamento</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Upload de Prints */}
               <div>
                 <Label>Prints e Anexos</Label>
                 <input
@@ -865,7 +867,6 @@ ${
                   {uploading ? "Enviando..." : "Adicionar Print"}
                 </Button>
 
-                {/* Grid de Miniaturas */}
                 {attachments.length > 0 && (
                   <div className="grid grid-cols-3 gap-2 mt-3">
                     {attachments.map((url, idx) => (
@@ -898,7 +899,6 @@ ${
 
               <Separator />
 
-              {/* Notas */}
               <div>
                 <Label htmlFor="notes">Anotações</Label>
                 <Textarea
@@ -913,7 +913,7 @@ ${
             </CardContent>
           </Card>
 
-          {/* ========== RESUMO FINANCEIRO ========== */}
+          {/* RESUMO */}
           <Card>
             <CardHeader>
               <CardTitle>💰 Resumo Financeiro</CardTitle>
@@ -951,7 +951,7 @@ ${
             </CardContent>
           </Card>
 
-          {/* ========== MENSAGENS PRONTAS ========== */}
+          {/* MENSAGENS */}
           <Card>
             <CardHeader>
               <CardTitle>💬 Mensagens Prontas</CardTitle>
@@ -986,7 +986,7 @@ ${
                   <Textarea
                     value={generateSupplierMessage()}
                     readOnly
-                    rows={12}
+                    rows={10}
                     className="font-mono text-xs"
                   />
                   <Button
@@ -1004,7 +1004,7 @@ ${
             </CardContent>
           </Card>
 
-          {/* ========== AÇÕES ========== */}
+          {/* AÇÕES */}
           <div className="space-y-2">
             <Button
               variant="outline"
@@ -1027,7 +1027,7 @@ ${
         </div>
       </div>
 
-      {/* ========== MODAL DE PREVIEW DE IMAGEM ========== */}
+      {/* PREVIEW IMAGEM */}
       <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
           {previewImage && (
