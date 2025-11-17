@@ -3,6 +3,21 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { getSupplierId } from "@/lib/getSupplierId";
 
+/**
+ * Normaliza per_installment_rates para garantir Record<number, number>
+ * Supabase pode retornar chaves como strings, precisamos converter
+ */
+function normalizeRates(obj: unknown): Record<number, number> {
+  if (!obj || typeof obj !== "object") return {};
+  const out: Record<number, number> = {};
+  for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+    const nk = Number(k);
+    const nv = typeof v === "string" ? parseFloat(v) : Number(v);
+    if (!Number.isNaN(nk) && !Number.isNaN(nv)) out[nk] = nv;
+  }
+  return out;
+}
+
 export interface PaymentInterestConfig {
   id: string;
   supplier_id: string;
@@ -34,7 +49,17 @@ export const usePaymentInterestConfig = () => {
         .order("installments", { ascending: true });
 
       if (error) throw error;
-      setConfigs((data as any) || []);
+      
+      console.log("🔎 [INTEREST] Configs carregadas (raw):", data);
+      
+      // Normalizar per_installment_rates para garantir Record<number, number>
+      const normalizedConfigs = (data as any[] || []).map((config: any) => ({
+        ...config,
+        per_installment_rates: normalizeRates(config.per_installment_rates)
+      }));
+      
+      console.log("🔎 [INTEREST] Configs normalizadas:", normalizedConfigs);
+      setConfigs(normalizedConfigs);
     } catch (error: any) {
       toast({
         title: "Erro ao carregar configurações",
@@ -63,16 +88,24 @@ export const usePaymentInterestConfig = () => {
   }) => {
     try {
       const { supplierId } = await getSupplierId();
+      
+      const normalizedRates = data.config_type === 'per_installment' 
+        ? normalizeRates(data.per_installment_rates) 
+        : {};
 
-      const { error } = await supabase.from("credit_interest_config" as any).insert({
+      const payload = {
         supplier_id: supplierId,
         installments: data.installments,
         interest_rate: data.interest_rate,
         payment_type: data.payment_type,
         config_type: data.config_type || 'total',
-        per_installment_rates: data.per_installment_rates || {},
+        per_installment_rates: normalizedRates,
         is_active: true,
-      } as any);
+      };
+      
+      console.log("💾 [INTEREST][CREATE] Payload completo:", payload);
+
+      const { error } = await supabase.from("credit_interest_config" as any).insert(payload as any);
 
       if (error) throw error;
 
@@ -100,9 +133,18 @@ export const usePaymentInterestConfig = () => {
     per_installment_rates?: Record<number, number>;
   }) => {
     try {
+      const normalizedData = {
+        ...data,
+        per_installment_rates: data.config_type === 'per_installment' 
+          ? normalizeRates(data.per_installment_rates) 
+          : {}
+      };
+      
+      console.log("💾 [INTEREST][UPDATE] Payload completo:", { id, ...normalizedData });
+
       const { error } = await supabase
         .from("credit_interest_config" as any)
-        .update(data as any)
+        .update(normalizedData as any)
         .eq("id", id);
 
       if (error) throw error;
@@ -169,9 +211,26 @@ export const usePaymentInterestConfig = () => {
 
     if (config.config_type === 'per_installment' && config.per_installment_rates) {
       // Calcular com taxa personalizada por parcela
-      const rate = config.per_installment_rates[installments] || config.interest_rate;
-      effectiveRate = rate;
-      finalPrice = totalPrice * (1 + rate / 100);
+      const rate = config.per_installment_rates[installments];
+      
+      if (rate === undefined || rate === null) {
+        console.warn("⚠️ [INTEREST] Taxa por parcela não encontrada, usando interest_rate total", { 
+          installments, 
+          configId: config.id,
+          available_rates: Object.keys(config.per_installment_rates)
+        });
+        effectiveRate = config.interest_rate;
+      } else {
+        console.log("🧮 [INTEREST] Cálculo por parcela:", { 
+          installments, 
+          rateAplicada: rate, 
+          configId: config.id,
+          totalPrice
+        });
+        effectiveRate = rate;
+      }
+      
+      finalPrice = totalPrice * (1 + effectiveRate / 100);
     } else {
       // Calcular com taxa total
       effectiveRate = config.interest_rate;
