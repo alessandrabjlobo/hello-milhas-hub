@@ -17,41 +17,41 @@ export default function QuoteGenerator() {
         <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
-      <div>
-        <h1 className="text-3xl font-bold">Gerador de Orçamentos</h1>
-        <p className="text-muted-foreground">
-          Crie orçamentos profissionais e envie por WhatsApp
-        </p>
+        <div>
+          <h1 className="text-3xl font-bold">Gerador de Orçamentos</h1>
+          <p className="text-muted-foreground">
+            Crie orçamentos profissionais e envie por WhatsApp
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1.2fr] gap-6">
+        {/* COLUNA ESQUERDA - Calculadora + Caderno */}
+        <div className="space-y-4">
+          {/* Calculadora (MESMO componente da página /calculator) */}
+          <ProfitCalculator />
+
+          {/* Caderno do Orçamento */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Caderno do Orçamento</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Cole aqui os prints, tabelas, comparativos e anotações deste orçamento..."
+                rows={8}
+              />
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* COLUNA DIREITA - Formulário de Orçamento EXISTENTE */}
+        <div>
+          <QuoteGeneratorComponent />
+        </div>
       </div>
     </div>
-
-    <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1.2fr] gap-6">
-      {/* COLUNA ESQUERDA - Calculadora + Caderno */}
-      <div className="space-y-4">
-        {/* Calculadora (MESMO componente da página /calculator) */}
-        <ProfitCalculator />
-
-        {/* Caderno do Orçamento */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Caderno do Orçamento</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Cole aqui os prints, tabelas, comparativos e anotações deste orçamento..."
-              rows={8}
-            />
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* COLUNA DIREITA - Formulário de Orçamento EXISTENTE */}
-      <div>
-        <QuoteGeneratorComponent />
-      </div>
-    </div>
-  </div>
   );
 }

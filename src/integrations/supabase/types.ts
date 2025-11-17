@@ -675,6 +675,7 @@ export type Database = {
           notes: string | null
           passengers: number | null
           payment_methods: string[] | null
+          quote_title: string | null
           route: string | null
           sent_at: string | null
           status: Database["public"]["Enums"]["quote_status"]
@@ -703,6 +704,7 @@ export type Database = {
           notes?: string | null
           passengers?: number | null
           payment_methods?: string[] | null
+          quote_title?: string | null
           route?: string | null
           sent_at?: string | null
           status?: Database["public"]["Enums"]["quote_status"]
@@ -731,6 +733,7 @@ export type Database = {
           notes?: string | null
           passengers?: number | null
           payment_methods?: string[] | null
+          quote_title?: string | null
           route?: string | null
           sent_at?: string | null
           status?: Database["public"]["Enums"]["quote_status"]
