@@ -463,7 +463,7 @@ R$ ${costPerMileFormatted} o milheiro`;
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold">Workspace de Orçamentos</h1>
+            <h1 className="text-3xl font-bold">Gerador de Orçamentos</h1>
             <p className="text-muted-foreground">
               Sistema integrado para criar orçamentos profissionais
             </p>
