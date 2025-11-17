@@ -48,12 +48,14 @@ export default function PaymentInterestSettings() {
 
   const handleOpenDialog = (config?: typeof editingConfig) => {
     if (config) {
+      console.log('🔧 [EDIT] Carregando configuração:', config);
       setEditingConfig(config);
       setPaymentType(config.payment_type || 'credit');
       setInstallments(config.installments.toString());
       setInterestRate(config.interest_rate.toString());
       setConfigType(config.config_type || 'total');
       setPerInstallmentRates(config.per_installment_rates || {});
+      console.log('✅ [EDIT] Taxas por parcela carregadas:', config.per_installment_rates);
     } else {
       setEditingConfig(null);
       setPaymentType('credit');
@@ -84,6 +86,13 @@ export default function PaymentInterestSettings() {
 
     let success = false;
     if (editingConfig) {
+      console.log('💾 [UPDATE] Salvando config:', {
+        id: editingConfig.id,
+        installments: installmentsNum,
+        interest_rate: configType === 'total' ? interestRateNum : 0,
+        config_type: configType,
+        per_installment_rates: configType === 'per_installment' ? perInstallmentRates : {},
+      });
       success = await updateConfig(editingConfig.id, {
         installments: installmentsNum,
         interest_rate: configType === 'total' ? interestRateNum : 0,
@@ -91,6 +100,13 @@ export default function PaymentInterestSettings() {
         per_installment_rates: configType === 'per_installment' ? perInstallmentRates : {},
       });
     } else {
+      console.log('💾 [CREATE] Criando config:', {
+        installments: installmentsNum,
+        interest_rate: configType === 'total' ? interestRateNum : 0,
+        payment_type: paymentType,
+        config_type: configType,
+        per_installment_rates: configType === 'per_installment' ? perInstallmentRates : {},
+      });
       success = await createConfig({
         installments: installmentsNum,
         interest_rate: configType === 'total' ? interestRateNum : 0,
@@ -183,6 +199,8 @@ export default function PaymentInterestSettings() {
                             installments: config.installments,
                             interest_rate: config.interest_rate,
                             payment_type: config.payment_type,
+                            config_type: config.config_type,                    // Necessário para "Juros Personalizado"
+                            per_installment_rates: config.per_installment_rates, // Taxas individuais por parcela
                           })}
                         >
                           <Pencil className="h-4 w-4" />

@@ -295,13 +295,21 @@ useEffect(() => {
   };
 
   // ========== DESCRIÇÃO DE PAGAMENTO ==========
+  // Busca as formas de pagamento ativas configuradas pelo fornecedor
+  // e gera uma string formatada para a mensagem ao cliente
   const paymentOptionsDescription = useMemo(() => {
     if (!activeMethods || activeMethods.length === 0) {
-      return "Pix, cartão e demais formas configuradas.";
+      return "Pix, Cartão de Crédito e Cartão de Débito";
     }
     const labels = activeMethods
-      .map((m: any) => m.display_name || m.name || m.label || m.type)
+      .map((m) => m.method_name) // Campo correto: method_name
       .filter(Boolean);
+    
+    // Fallback secundário caso nenhum método tenha method_name
+    if (labels.length === 0) {
+      return "Pix, Cartão de Crédito e Cartão de Débito";
+    }
+    
     return labels.join(" | ");
   }, [activeMethods]);
 
@@ -455,7 +463,7 @@ Olá *${clientName || "Cliente"}*! 👋
 📍 *Rota:* ${route}
 ✈️ *Tipo:* ${tripTypeText}
 📅 *Data Ida:* ${departureFormatted}${
-      returnFormatted ? `\n🔄 *Data Volta:* ${returnFormatted}` : ""
+      returnFormatted ? `\n*Data Volta:* ${returnFormatted}` : ""
     }
 👥 *Passageiros:* ${passengers}
 
@@ -463,7 +471,7 @@ Olá *${clientName || "Cliente"}*! 👋
 
 ✅ Milhas incluídas
 ✅ Taxas de embarque incluídas
-✅ Opções de pagamento: ${paymentOptionsDescription}
+✅ Opções de pagamento: ${paymentOptionsDescription || "Pix, Cartão de Crédito e Cartão de Débito"}
 
 Para confirmar sua viagem, basta enviar uma mensagem! 😊`;
   };
