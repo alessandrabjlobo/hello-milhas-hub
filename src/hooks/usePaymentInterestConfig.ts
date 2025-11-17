@@ -206,22 +206,20 @@ export const usePaymentInterestConfig = () => {
     installments: number,
     paymentType: 'debit' | 'credit' = 'credit'
   ): { installmentValue: number; finalPrice: number; interestRate: number } => {
-    // Para débito, SEMPRE retornar valor à vista sem juros
-    if (paymentType === 'debit') {
-      return {
-        installmentValue: totalPrice,
-        finalPrice: totalPrice,
-        interestRate: 0,
-      };
-    }
+    console.log("🧮 [INTEREST] Calculating installment value:", {
+      totalPrice,
+      installments,
+      paymentType,
+      configs: configs?.length,
+    });
 
-    // Para crédito, buscar configuração ativa
-    const creditConfig = (configs || []).find(
-      (c) => c.payment_type === 'credit' && c.is_active
+    // Buscar configuração ativa baseada no payment_type
+    const activeConfig = (configs || []).find(
+      (c) => c.payment_type === paymentType && c.is_active
     );
-    
-    if (!creditConfig) {
-      console.warn("⚠️ [INTEREST] Nenhuma configuração de crédito ativa encontrada");
+
+    if (!activeConfig) {
+      console.warn(`⚠️ [INTEREST] Nenhuma configuração de ${paymentType} ativa encontrada`);
       return {
         installmentValue: totalPrice / installments,
         finalPrice: totalPrice,
@@ -230,10 +228,11 @@ export const usePaymentInterestConfig = () => {
     }
 
     // Validar se o número de parcelas solicitado está dentro do limite
-    if (installments > creditConfig.installments) {
+    if (installments > activeConfig.installments) {
       console.warn("⚠️ [INTEREST] Parcelas solicitadas excedem o máximo configurado", {
         solicitadas: installments,
-        maximo: creditConfig.installments
+        maximo: activeConfig.installments,
+        tipo: paymentType
       });
       return {
         installmentValue: totalPrice / installments,
@@ -246,15 +245,15 @@ export const usePaymentInterestConfig = () => {
     let effectiveRate: number;
 
     // Usar juros personalizados por parcela
-    if (creditConfig.config_type === 'per_installment' && creditConfig.per_installment_rates) {
-      const rate = creditConfig.per_installment_rates[installments];
+    if (activeConfig.config_type === 'per_installment' && activeConfig.per_installment_rates) {
+      const rate = activeConfig.per_installment_rates[installments];
       
       if (rate === undefined || rate === null || rate === 0) {
-        console.log("🧮 [INTEREST] Parcela sem juros:", { installments });
+        console.log(`🧮 [INTEREST] ${paymentType} - Parcela sem juros:`, { installments });
         effectiveRate = 0;
         finalPrice = totalPrice;
       } else {
-        console.log("🧮 [INTEREST] Aplicando taxa personalizada:", { 
+        console.log(`🧮 [INTEREST] ${paymentType} - Aplicando taxa personalizada:`, { 
           installments, 
           rate,
           totalPrice
@@ -264,7 +263,7 @@ export const usePaymentInterestConfig = () => {
       }
     } else {
       // Usar taxa total (fallback)
-      effectiveRate = creditConfig.interest_rate || 0;
+      effectiveRate = activeConfig.interest_rate || 0;
       finalPrice = totalPrice * (1 + effectiveRate / 100);
     }
 
