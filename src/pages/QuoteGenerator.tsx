@@ -1,4 +1,4 @@
-import { ArrowLeft, Upload, X, Copy, Download, Save } from "lucide-react";
+import { ArrowLeft, Upload, X, Copy, Download, Save, Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect, useMemo } from "react";
 import { format } from "date-fns";
@@ -15,8 +15,11 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { RoundTripForm } from "@/components/calculator/RoundTripForm";
+import { FlightSegmentForm, type FlightSegment } from "@/components/sales/FlightSegmentForm";
 import { useStorage } from "@/hooks/useStorage";
 import { useToast } from "@/hooks/use-toast";
+import { usePaymentInterestConfig } from "@/hooks/usePaymentInterestConfig";
+import { usePaymentMethods } from "@/hooks/usePaymentMethods";
 import { supabase } from "@/integrations/supabase/client";
 import { formatNumber } from "@/lib/utils";
 
@@ -26,11 +29,14 @@ export default function QuoteGenerator() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { uploading, uploadTicketFile } = useStorage();
+  const { configs: interestConfigs, getCreditConfigs, getDebitRate } = usePaymentInterestConfig();
+  const { activeMethods } = usePaymentMethods();
 
   // ========== ESTADOS ==========
   // Dados do Cliente
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
+  const [airline, setAirline] = useState("");
 
   // Dados da Viagem
   const [tripType, setTripType] = useState<TripType>("round_trip");
@@ -42,7 +48,13 @@ export default function QuoteGenerator() {
     miles: 0
   });
 
-  // Valores da Calculadora (inline)
+  // Multi-city segments
+  const [flightSegments, setFlightSegments] = useState<FlightSegment[]>([
+    { from: "", to: "", date: "", miles: 0 }
+  ]);
+
+  // Valores da Calculadora (inline) - fonte única de verdade
+  const [tripMiles, setTripMiles] = useState("50000");
   const [milesUsed, setMilesUsed] = useState("50000");
   const [costPerMile, setCostPerMile] = useState("29.00");
   const [boardingFee, setBoardingFee] = useState("35.00");
@@ -59,6 +71,7 @@ export default function QuoteGenerator() {
   // UI States
   const [saving, setSaving] = useState(false);
   const [activeMessageTab, setActiveMessageTab] = useState("client");
+  const [showQuotePreview, setShowQuotePreview] = useState(false);
 
   // ========== AUTO-GERAÇÃO DO NOME DO ORÇAMENTO ==========
   useEffect(() => {
@@ -74,7 +87,49 @@ export default function QuoteGenerator() {
     }
   }, [clientName, roundTripData.destination, roundTripData.departureDate, quoteTitle]);
 
-  // ========== CÁLCULOS FINANCEIROS (INLINE) ==========
+  // ========== SINCRONIZAÇÃO FORMULÁRIO ↔ CALCULADORA ==========
+  useEffect(() => {
+    if (tripMiles !== milesUsed) {
+      setMilesUsed(tripMiles);
+    }
+  }, [tripMiles]);
+
+  useEffect(() => {
+    if (milesUsed !== tripMiles) {
+      setTripMiles(milesUsed);
+    }
+  }, [milesUsed]);
+
+  // ========== MULTI-TRECHOS: CALCULAR TOTAL DE MILHAS ==========
+  const totalMilesFromSegments = useMemo(() => {
+    return flightSegments.reduce((sum, seg) => sum + (seg.miles || 0), 0);
+  }, [flightSegments]);
+
+  useEffect(() => {
+    if (tripType === "multi_city" && totalMilesFromSegments > 0) {
+      setMilesUsed(totalMilesFromSegments.toString());
+      setTripMiles(totalMilesFromSegments.toString());
+    }
+  }, [tripType, totalMilesFromSegments]);
+
+  // ========== FUNÇÕES PARA GERENCIAR MULTI-TRECHOS ==========
+  const handleAddSegment = () => {
+    setFlightSegments([...flightSegments, { from: "", to: "", date: "", miles: 0 }]);
+  };
+
+  const handleRemoveSegment = (index: number) => {
+    if (flightSegments.length > 1) {
+      setFlightSegments(flightSegments.filter((_, i) => i !== index));
+    }
+  };
+
+  const handleUpdateSegment = (index: number, field: keyof FlightSegment, value: string | number) => {
+    const updated = [...flightSegments];
+    updated[index] = { ...updated[index], [field]: value };
+    setFlightSegments(updated);
+  };
+
+  // ========== CÁLCULOS FINANCEIROS CORRIGIDOS ==========
   const calculatedValues = useMemo(() => {
     const milesNum = parseFloat(milesUsed.replace(/\./g, '').replace(',', '.')) || 0;
     const costPerMileNum = parseFloat(costPerMile.replace(',', '.')) || 0;
@@ -82,24 +137,27 @@ export default function QuoteGenerator() {
     const passengersNum = parseInt(passengers) || 1;
     const marginNum = parseFloat(targetMargin.replace(',', '.')) || 0;
 
-    // Custo por passageiro: (milhas / 1000) * custo_por_milheiro + taxa_embarque
+    // ✅ FÓRMULA CORRETA
+    // Custo por passageiro = ((milhas / 1000) * custo_milheiro) + taxa_embarque
     const costPerPassenger = (milesNum / 1000) * costPerMileNum + boardingFeeNum;
     const totalCost = costPerPassenger * passengersNum;
 
-    // Preço de venda
-    let suggestedPrice = totalCost;
+    // Preço sugerido por passageiro = ((milhas / 1000) * custo_milheiro) * (1 + taxa_lucro) + taxa_embarque
+    const pricePerPassenger = ((milesNum / 1000) * costPerMileNum) * (1 + marginNum / 100) + boardingFeeNum;
+    const suggestedPrice = pricePerPassenger * passengersNum;
+
+    // Se houver preço manual, usar ele
+    let finalPrice = suggestedPrice;
     if (manualPrice) {
-      suggestedPrice = parseFloat(manualPrice.replace(/\./g, '').replace(',', '.')) || totalCost;
-    } else if (marginNum > 0 && marginNum < 100) {
-      suggestedPrice = totalCost / (1 - marginNum / 100);
+      finalPrice = parseFloat(manualPrice.replace(/\./g, '').replace(',', '.')) || suggestedPrice;
     }
 
-    const profit = suggestedPrice - totalCost;
-    const profitMargin = suggestedPrice > 0 ? (profit / suggestedPrice) * 100 : 0;
+    const profit = finalPrice - totalCost;
+    const profitMargin = finalPrice > 0 ? (profit / finalPrice) * 100 : 0;
 
     return {
       totalCost,
-      price: suggestedPrice,
+      price: finalPrice,
       profit,
       profitMargin
     };

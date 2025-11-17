@@ -14,24 +14,38 @@ export const useStorage = () => {
     try {
       setUploading(true);
       const fileExt = file.name.split(".").pop();
-      const fileName = `${Date.now()}.${fileExt}`;
-      const filePath = `${supplierId}/${saleId}/${fileName}`;
+      const timestamp = Date.now();
+      const fileName = `${timestamp}.${fileExt}`;
+      
+      // ✅ SIMPLIFICAR PATH (evitar caracteres especiais)
+      // Usar apenas: quotes/{timestamp}-{filename}
+      const filePath = `quotes/${fileName}`;
+
+      console.log('[UPLOAD] Tentando upload para:', filePath);
 
       const { error: uploadError } = await supabase.storage
         .from("tickets")
-        .upload(filePath, file);
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('[UPLOAD] Erro:', uploadError);
+        throw uploadError;
+      }
 
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("tickets").getPublicUrl(filePath);
+      const { data: { publicUrl } } = supabase.storage
+        .from("tickets")
+        .getPublicUrl(filePath);
 
+      console.log('[UPLOAD] Sucesso! URL:', publicUrl);
       return publicUrl;
     } catch (error: any) {
+      console.error('[UPLOAD] Erro completo:', error);
       toast({
         title: "Erro no upload",
-        description: error.message,
+        description: error.message || "Não foi possível enviar o arquivo",
         variant: "destructive",
       });
       return null;
