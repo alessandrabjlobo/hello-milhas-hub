@@ -37,7 +37,7 @@ export default function QuoteGenerator() {
   const navigate = useNavigate();
   const { quoteId } = useParams();
   const { toast } = useToast();
-  const { uploading, uploadTicketFile } = useStorage();
+  const { uploading, uploadTicketFile, refreshSignedUrls } = useStorage();
   const { configs: interestConfigs } = usePaymentInterestConfig();
   const { activeMethods } = usePaymentMethods();
 
@@ -148,8 +148,24 @@ useEffect(() => {
           setFlightSegments(data.flight_segments as unknown as FlightSegment[]);
         }
         
-        if (Array.isArray(data.attachments)) {
-          setAttachments(data.attachments as unknown as string[]);
+        if (Array.isArray(data.attachments) && data.attachments.length > 0) {
+          toast({
+            title: "Carregando anexos...",
+            description: "Validando imagens do orçamento"
+          });
+          
+          // Regenerar signed URLs para garantir que não expiraram
+          const refreshedUrls = await refreshSignedUrls(data.attachments as string[]);
+          setAttachments(refreshedUrls);
+          
+          // Atualizar no banco com as novas URLs se mudaram
+          if (JSON.stringify(refreshedUrls) !== JSON.stringify(data.attachments)) {
+            await supabase
+              .from("quotes")
+              .update({ attachments: refreshedUrls })
+              .eq("id", quoteId);
+            console.log('[LOAD] URLs atualizadas no banco');
+          }
         }
         
         setNotes(data.notes || "");
