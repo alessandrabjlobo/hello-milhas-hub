@@ -416,10 +416,19 @@ R$ ${costPerMileFormatted} o milheiro`;
 
   // ========== SALVAR ORÇAMENTO ==========
   const handleSaveQuote = async () => {
-    if (!clientName || !roundTripData.destination || !calculatedValues.price) {
+    // ✅ Validar campos obrigatórios
+    const errors: string[] = [];
+    
+    if (!clientName) errors.push("Nome do cliente");
+    if (!roundTripData.destination && flightSegments.every(s => !s.to)) {
+      errors.push("Destino da viagem");
+    }
+    if (calculatedValues.price <= 0) errors.push("Valores calculados");
+    
+    if (errors.length > 0) {
       toast({
-        title: "Campos obrigatórios",
-        description: "Preencha nome do cliente, destino e calcule os valores",
+        title: "Campos obrigatórios faltando",
+        description: `Preencha: ${errors.join(", ")}`,
         variant: "destructive",
       });
       return;
@@ -449,7 +458,18 @@ R$ ${costPerMileFormatted} o milheiro`;
       const passengersNum = parseInt(passengers) || 1;
       const totalMiles = milesNum * passengersNum;
 
-      const { error } = await supabase.from("quotes").insert({
+      console.log('[SAVE QUOTE] Dados a serem salvos:', {
+        user_id: user.id,
+        client_name: clientName,
+        miles_needed: totalMiles,
+        total_price: calculatedValues.price,
+        passengers: passengersNum,
+        trip_type: tripType,
+        attachments_count: attachments.length,
+        flight_segments_count: tripType === "multi_city" ? flightSegments.length : 1,
+      });
+
+      const { error } = await supabase.from("quotes").insert([{
         user_id: user.id,
         quote_title: quoteTitle || null,
         client_name: clientName,
@@ -463,11 +483,21 @@ R$ ${costPerMileFormatted} o milheiro`;
         boarding_fee: parseCurrency(boardingFee),
         notes: notes || null,
         attachments: attachments.length > 0 ? attachments : null,
-        flight_segments: [roundTripData],
+        flight_segments: (tripType === "multi_city" ? flightSegments : [roundTripData]) as any,
         status: "pending",
-      });
+      }]);
 
-      if (error) throw error;
+      if (error) {
+        console.error('[SAVE QUOTE] Erro detalhado:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+        });
+        throw error;
+      }
+
+      console.log('[SAVE QUOTE] Orçamento salvo com sucesso!');
 
       toast({
         title: "Orçamento salvo!",

@@ -17,9 +17,9 @@ export const useStorage = () => {
       const timestamp = Date.now();
       const fileName = `${timestamp}.${fileExt}`;
       
-      // ✅ SIMPLIFICAR PATH (evitar caracteres especiais)
-      // Usar apenas: quotes/{timestamp}-{filename}
-      const filePath = `quotes/${fileName}`;
+      // ✅ PATH COM ISOLAMENTO POR USUÁRIO (respeita RLS)
+      // Formato: userId/quotes/filename
+      const filePath = `${supplierId}/quotes/${fileName}`;
 
       console.log('[UPLOAD] Tentando upload para:', filePath);
 
