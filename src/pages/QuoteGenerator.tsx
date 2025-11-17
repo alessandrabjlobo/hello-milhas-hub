@@ -426,6 +426,52 @@ useEffect(() => {
     });
   };
 
+  // ========== DESCRIÇÃO DE PARCELAMENTO ==========
+  const buildInstallmentsDescription = () => {
+    if (!interestConfigs || interestConfigs.length === 0) return "";
+
+    const lines: string[] = [];
+
+    // 1) Crédito
+    const creditConfigs = interestConfigs.filter(c => c.payment_type === 'credit' && c.is_active);
+    if (creditConfigs.length > 0) {
+      // Encontrar o maior número de parcelas disponível
+      const maxInstallments = Math.max(...creditConfigs.map(c => c.installments));
+      
+      // Verificar se todas as taxas são zero
+      const allZero = creditConfigs.every(config => {
+        if (config.config_type === 'per_installment' && config.per_installment_rates) {
+          // Verificar se todas as taxas personalizadas são zero
+          return Object.values(config.per_installment_rates).every(rate => rate === 0);
+        }
+        // Se for taxa total, verificar interest_rate
+        return config.interest_rate === 0;
+      });
+
+      if (allZero) {
+        lines.push(`💳 Cartão de Crédito em até ${maxInstallments}x sem juros`);
+      } else {
+        lines.push(`💳 Cartão de Crédito em até ${maxInstallments}x com juros conforme tabela`);
+      }
+    }
+
+    // 2) Débito
+    const debitConfig = interestConfigs.find(c => c.payment_type === 'debit' && c.is_active);
+    if (debitConfig) {
+      lines.push(`💳 Débito à vista`);
+    }
+
+    // 3) Pix (se estiver nos activeMethods e não tiver config específica de juros)
+    const hasPix = activeMethods?.some(m => 
+      m.method_name?.toLowerCase().includes('pix')
+    );
+    if (hasPix && !interestConfigs.some(c => c.payment_type === 'pix' as any)) {
+      lines.push(`🔁 Pix à vista`);
+    }
+
+    return lines.length > 0 ? lines.join('\n') : "";
+  };
+
   // ========== MENSAGEM CLIENTE ==========
   const generateClientMessage = () => {
     const route =
@@ -433,21 +479,26 @@ useEffect(() => {
         ? `${roundTripData.origin} → ${roundTripData.destination}`
         : "Consulte o roteiro completo";
 
-   const departureDateObj = parseLocalDateFromInput(roundTripData.departureDate);
-const returnDateObj =
-  tripType === "round_trip"
-    ? parseLocalDateFromInput(roundTripData.returnDate)
-    : null;
+    const departureDateObj = parseLocalDateFromInput(roundTripData.departureDate);
+    const returnDateObj =
+      tripType === "round_trip"
+        ? parseLocalDateFromInput(roundTripData.returnDate)
+        : null;
 
-const departureFormatted = departureDateObj
-  ? format(departureDateObj, "dd/MM/yyyy", { locale: ptBR })
-  : "A definir";
+    const departureFormatted = departureDateObj
+      ? format(departureDateObj, "dd/MM/yyyy", { locale: ptBR })
+      : "A definir";
 
-const returnFormatted =
-  tripType === "round_trip" && returnDateObj
-    ? format(returnDateObj, "dd/MM/yyyy", { locale: ptBR })
-    : null;
+    const returnFormatted =
+      tripType === "round_trip" && returnDateObj
+        ? format(returnDateObj, "dd/MM/yyyy", { locale: ptBR })
+        : null;
 
+    // Bloco de datas formatado
+    const datesBlock =
+      tripType === "round_trip" && returnFormatted
+        ? `📅 *Data Ida:* ${departureFormatted}\n📅 *Data Volta:* ${returnFormatted}`
+        : `📅 *Data:* ${departureFormatted}`;
 
     const tripTypeText =
       tripType === "round_trip"
@@ -456,22 +507,25 @@ const returnFormatted =
         ? "Somente Ida"
         : "Múltiplos Trechos";
 
+    // Descrição de parcelamento
+    const installmentsText = buildInstallmentsDescription();
+    const paymentText = paymentOptionsDescription || "Pix, Cartão de Crédito e Cartão de Débito";
+
     return `🎫 *Orçamento de Passagem Aérea*
 
 Olá *${clientName || "Cliente"}*! 👋
 
 📍 *Rota:* ${route}
 ✈️ *Tipo:* ${tripTypeText}
-📅 *Data Ida:* ${departureFormatted}${
-      returnFormatted ? `\n*Data Volta:* ${returnFormatted}` : ""
-    }
+${datesBlock}
 👥 *Passageiros:* ${passengers}
 
 💰 *Valor Total:* R$ ${calculatedValues.price.toFixed(2).replace(".", ",")}
 
 ✅ Milhas incluídas
 ✅ Taxas de embarque incluídas
-✅ Opções de pagamento: ${paymentOptionsDescription || "Pix, Cartão de Crédito e Cartão de Débito"}
+✅ Opções de pagamento: ${paymentText}
+${installmentsText ? `\n${installmentsText}` : ""}
 
 Para confirmar sua viagem, basta enviar uma mensagem! 😊`;
   };
