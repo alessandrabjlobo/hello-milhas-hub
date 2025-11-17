@@ -38,7 +38,7 @@ export default function QuoteGenerator() {
   const { quoteId } = useParams();
   const { toast } = useToast();
   const { uploading, uploadTicketFile, refreshSignedUrls } = useStorage();
-  const { configs: interestConfigs } = usePaymentInterestConfig();
+  const { configs: interestConfigs, calculateInstallmentValue } = usePaymentInterestConfig();
   const { activeMethods } = usePaymentMethods();
 
   // ========== ESTADOS ==========
@@ -122,7 +122,7 @@ const loadExistingQuote = async (id: string) => {
       
       setClientName(data.client_name || "");
       setClientPhone(data.client_phone || "");
-      setAirline(data.route?.split(" → ")[0] || "");
+      setAirline(data.company_name || "");
       
       setTripType((data.trip_type || "round_trip") as TripType);
       setPassengers(data.passengers?.toString() || "1");
@@ -426,47 +426,64 @@ useEffect(() => {
     });
   };
 
-  // ========== DESCRIÇÃO DE PARCELAMENTO ==========
+  // ========== DESCRIÇÃO DE PARCELAMENTO COM TABELA ==========
   const buildInstallmentsDescription = () => {
     if (!interestConfigs || interestConfigs.length === 0) return "";
 
     const lines: string[] = [];
 
-    // 1) Crédito
+    // 1) Crédito - COM TABELA DE PARCELAS
     const creditConfigs = interestConfigs.filter(c => c.payment_type === 'credit' && c.is_active);
     if (creditConfigs.length > 0) {
-      // Encontrar o maior número de parcelas disponível
       const maxInstallments = Math.max(...creditConfigs.map(c => c.installments));
       
-      // Verificar se todas as taxas são zero
-      const allZero = creditConfigs.every(config => {
-        if (config.config_type === 'per_installment' && config.per_installment_rates) {
-          // Verificar se todas as taxas personalizadas são zero
-          return Object.values(config.per_installment_rates).every(rate => rate === 0);
+      lines.push(`💳 *Cartão de Crédito:*`);
+      
+      // Gerar linha para cada parcela de 1x até maxInstallments
+      for (let i = 1; i <= maxInstallments; i++) {
+        const result = calculateInstallmentValue(calculatedValues.price, i);
+        
+        const installmentValueFormatted = result.installmentValue
+          .toFixed(2)
+          .replace(".", ",");
+        
+        if (result.interestRate === 0) {
+          // Sem juros
+          lines.push(`  ${i}x de R$ ${installmentValueFormatted}`);
+        } else {
+          // Com juros
+          const finalPriceFormatted = result.finalPrice
+            .toFixed(2)
+            .replace(".", ",");
+          
+          lines.push(
+            `  ${i}x de R$ ${installmentValueFormatted} (total: R$ ${finalPriceFormatted} - juros: ${result.interestRate.toFixed(2)}%)`
+          );
         }
-        // Se for taxa total, verificar interest_rate
-        return config.interest_rate === 0;
-      });
-
-      if (allZero) {
-        lines.push(`💳 Cartão de Crédito em até ${maxInstallments}x sem juros`);
-      } else {
-        lines.push(`💳 Cartão de Crédito em até ${maxInstallments}x com juros conforme tabela`);
       }
     }
 
-    // 2) Débito
+    // 2) Débito à vista
     const debitConfig = interestConfigs.find(c => c.payment_type === 'debit' && c.is_active);
     if (debitConfig) {
-      lines.push(`💳 Débito à vista`);
+      const debitResult = calculateInstallmentValue(calculatedValues.price, 1);
+      const debitValueFormatted = debitResult.installmentValue
+        .toFixed(2)
+        .replace(".", ",");
+      
+      lines.push(`\n💳 *Débito à vista:* R$ ${debitValueFormatted}`);
     }
 
-    // 3) Pix (se estiver nos activeMethods e não tiver config específica de juros)
+    // 3) Pix à vista
     const hasPix = activeMethods?.some(m => 
       m.method_name?.toLowerCase().includes('pix')
     );
     if (hasPix && !interestConfigs.some(c => c.payment_type === 'pix' as any)) {
-      lines.push(`🔁 Pix à vista`);
+      const pixValueFormatted = calculatedValues.price
+        .toFixed(2)
+        .replace(".", ",");
+      
+      lines.push(`\n🔁 *Pix à vista:* R$ ${pixValueFormatted}`);
     }
 
     return lines.length > 0 ? lines.join('\n') : "";
@@ -676,6 +693,7 @@ R$ ${costPerMileFormatted} o milheiro`;
         quote_title: quoteTitle || null,
         client_name: clientName,
         client_phone: clientPhone || null,
+        company_name: airline || null,
         route,
         departure_date: roundTripData.departureDate || null,
         miles_needed: totalMiles,
