@@ -45,19 +45,19 @@ export default function QuoteGenerator() {
     destination: "",
     departureDate: "",
     returnDate: "",
-    miles: 0
+    miles: 0,
   });
 
   // Multi-city segments
   const [flightSegments, setFlightSegments] = useState<FlightSegment[]>([
-    { from: "", to: "", date: "", miles: 0 }
+    { from: "", to: "", date: "", miles: 0 },
   ]);
 
   // Calculadora (milhas/pax)
   const [tripMiles, setTripMiles] = useState("50000");
   const [milesUsed, setMilesUsed] = useState("50000"); // milhas/pax
-  const [costPerMile, setCostPerMile] = useState("29.00"); // valor do milheiro
-  const [boardingFee, setBoardingFee] = useState("35.00");
+  const [costPerMile, setCostPerMile] = useState("29,00"); // valor do milheiro
+  const [boardingFee, setBoardingFee] = useState("35,00");
   const [passengers, setPassengers] = useState("2");
   const [targetMargin, setTargetMargin] = useState("20"); // markup nas milhas
   const [manualPrice, setManualPrice] = useState("");
@@ -152,8 +152,25 @@ export default function QuoteGenerator() {
   const parseMiles = (value: string) =>
     parseFloat(value.replace(/\./g, "").replace(",", ".")) || 0;
 
-  const parseCurrency = (value: string) =>
-    parseFloat(value.replace(/\./g, "").replace(",", ".")) || 0;
+  // >>> NOVO parseCurrency, aceitanto BR e US e distintos milhares <<<
+  const parseCurrency = (value: string) => {
+    if (!value) return 0;
+    const cleaned = value.replace(/\s/g, "");
+    if (!cleaned) return 0;
+
+    // Tem vírgula: formato BR -> vírgula decimal, ponto de milhar
+    if (cleaned.includes(",")) {
+      return parseFloat(cleaned.replace(/\./g, "").replace(",", "."));
+    }
+
+    // Sem vírgula: se for "123.45" ou "29.0" (1–2 casas), trata ponto como decimal
+    if (/^\d+\.\d{1,2}$/.test(cleaned)) {
+      return parseFloat(cleaned);
+    }
+
+    // Caso contrário, trata ponto como separador de milhar: "2.970" -> 2970
+    return parseFloat(cleaned.replace(/\./g, ""));
+  };
 
   // ========== DESCRIÇÃO DE PAGAMENTO ==========
   const paymentOptionsDescription = useMemo(() => {
@@ -176,6 +193,7 @@ export default function QuoteGenerator() {
 
     const totalMiles = milesPerPassenger * passengersNum;
 
+    // AQUI está o /1000 correto
     const costMilesPerPassenger = (milesPerPassenger / 1000) * costPerMileNum;
     const totalMilesCost = costMilesPerPassenger * passengersNum;
 
@@ -219,7 +237,7 @@ export default function QuoteGenerator() {
       totalMilesCost,
       costPerPassenger,
       finalPricePerPassenger,
-      milesMarkup
+      milesMarkup,
     };
   }, [milesUsed, costPerMile, boardingFee, passengers, targetMargin, manualPrice]);
 
@@ -229,13 +247,13 @@ export default function QuoteGenerator() {
     if (!file) return;
 
     const {
-      data: { user }
+      data: { user },
     } = await supabase.auth.getUser();
     if (!user) {
       toast({
         title: "Erro de autenticação",
         description: "Faça login para fazer upload de imagens",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -247,7 +265,7 @@ export default function QuoteGenerator() {
       setAttachments([...attachments, url]);
       toast({
         title: "Print adicionado!",
-        description: "Imagem salva com sucesso"
+        description: "Imagem salva com sucesso",
       });
     }
 
@@ -258,7 +276,7 @@ export default function QuoteGenerator() {
     setAttachments(attachments.filter((_, i) => i !== index));
     toast({
       title: "Print removido",
-      description: "Imagem removida do orçamento"
+      description: "Imagem removida do orçamento",
     });
   };
 
@@ -329,7 +347,7 @@ ${clientMessage}`;
     navigator.clipboard.writeText(message);
     toast({
       title: "Mensagem copiada!",
-      description: `Mensagem para ${type} copiada para a área de transferência`
+      description: `Mensagem para ${type} copiada para a área de transferência`,
     });
   };
 
@@ -340,7 +358,7 @@ ${clientMessage}`;
       toast({
         title: "Erro ao exportar",
         description: "Elemento não encontrado",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -349,7 +367,7 @@ ${clientMessage}`;
       const canvas = await html2canvas(element, {
         scale: 2,
         backgroundColor: "#ffffff",
-        logging: false
+        logging: false,
       });
 
       const link = document.createElement("a");
@@ -363,14 +381,14 @@ ${clientMessage}`;
 
       toast({
         title: "Orçamento exportado!",
-        description: "Imagem salva com sucesso"
+        description: "Imagem salva com sucesso",
       });
     } catch (error) {
       console.error("Erro ao exportar:", error);
       toast({
         title: "Erro ao exportar",
         description: "Não foi possível gerar a imagem",
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
@@ -381,7 +399,7 @@ ${clientMessage}`;
       toast({
         title: "Campos obrigatórios",
         description: "Preencha nome do cliente, destino e calcule os valores",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -390,13 +408,13 @@ ${clientMessage}`;
 
     try {
       const {
-        data: { user }
+        data: { user },
       } = await supabase.auth.getUser();
       if (!user) {
         toast({
           title: "Erro de autenticação",
           description: "Faça login para salvar orçamentos",
-          variant: "destructive"
+          variant: "destructive",
         });
         return;
       }
@@ -425,21 +443,21 @@ ${clientMessage}`;
         notes: notes || null,
         attachments: attachments.length > 0 ? attachments : null,
         flight_segments: [roundTripData],
-        status: "pending"
+        status: "pending",
       });
 
       if (error) throw error;
 
       toast({
         title: "Orçamento salvo!",
-        description: "O orçamento foi salvo com sucesso no banco de dados"
+        description: "O orçamento foi salvo com sucesso no banco de dados",
       });
     } catch (error: any) {
       console.error("Erro ao salvar:", error);
       toast({
         title: "Erro ao salvar",
         description: error.message || "Não foi possível salvar o orçamento",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setSaving(false);
@@ -587,7 +605,7 @@ ${clientMessage}`;
                         onChange={(e) =>
                           setRoundTripData({
                             ...roundTripData,
-                            destination: e.target.value
+                            destination: e.target.value,
                           })
                         }
                         placeholder="Ex: MIA"
@@ -602,7 +620,7 @@ ${clientMessage}`;
                         onChange={(e) =>
                           setRoundTripData({
                             ...roundTripData,
-                            departureDate: e.target.value
+                            departureDate: e.target.value,
                           })
                         }
                       />
@@ -617,7 +635,7 @@ ${clientMessage}`;
                           const milesValue = numeric ? Number(numeric) : 0;
                           setRoundTripData({
                             ...roundTripData,
-                            miles: milesValue
+                            miles: milesValue,
                           });
                         }}
                         placeholder="30000"
