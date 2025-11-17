@@ -35,12 +35,18 @@ export const useStorage = () => {
         throw uploadError;
       }
 
-      const { data: { publicUrl } } = supabase.storage
+      // Gerar signed URL com validade de 1 ano
+      const { data, error: signedUrlError } = await supabase.storage
         .from("tickets")
-        .getPublicUrl(filePath);
+        .createSignedUrl(filePath, 31536000); // 365 dias em segundos
 
-      console.log('[UPLOAD] Sucesso! URL:', publicUrl);
-      return publicUrl;
+      if (signedUrlError) {
+        console.error('[UPLOAD] Erro ao gerar signed URL:', signedUrlError);
+        throw signedUrlError;
+      }
+
+      console.log('[UPLOAD] Sucesso! Signed URL:', data.signedUrl);
+      return data.signedUrl;
     } catch (error: any) {
       console.error('[UPLOAD] Erro completo:', error);
       toast({
@@ -72,9 +78,51 @@ export const useStorage = () => {
     }
   };
 
+  const refreshSignedUrls = async (urls: string[]): Promise<string[]> => {
+    console.log(`[REFRESH] Regenerando ${urls.length} signed URL(s)...`);
+    const refreshed: string[] = [];
+    
+    for (const url of urls) {
+      try {
+        // Extrair o filePath da URL
+        // Exemplo: https://.../storage/v1/object/sign/tickets/uuid/quotes/123.png?token=...
+        const urlObj = new URL(url);
+        const pathParts = urlObj.pathname.split('/');
+        const bucketIndex = pathParts.indexOf('tickets');
+        
+        if (bucketIndex === -1) {
+          console.warn('[REFRESH] URL não é do bucket tickets:', url);
+          refreshed.push(url);
+          continue;
+        }
+        
+        const filePath = pathParts.slice(bucketIndex + 1).join('/');
+        
+        // Gerar nova signed URL
+        const { data, error } = await supabase.storage
+          .from("tickets")
+          .createSignedUrl(filePath, 31536000);
+        
+        if (error) {
+          console.error('[REFRESH] Erro ao regenerar URL:', error);
+          refreshed.push(url); // Mantém URL antiga em caso de erro
+        } else {
+          console.log('[REFRESH] URL regenerada:', data.signedUrl);
+          refreshed.push(data.signedUrl);
+        }
+      } catch (err) {
+        console.error('[REFRESH] Erro ao processar URL:', err);
+        refreshed.push(url);
+      }
+    }
+    
+    return refreshed;
+  };
+
   return {
     uploading,
     uploadTicketFile,
     deleteTicketFile,
+    refreshSignedUrls,
   };
 };
