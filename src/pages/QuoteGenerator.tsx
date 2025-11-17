@@ -106,95 +106,115 @@ useEffect(() => {
 }, [clientName, roundTripData.destination, roundTripData.departureDate, quoteTitle]);
 
   // ========== CARREGAR ORÇAMENTO EXISTENTE ==========
-  const loadExistingQuote = async (id: string) => {
-    try {
-      setLoadingQuote(true);
-      const { data, error } = await supabase
-        .from("quotes")
-        .select("*")
-        .eq("id", id)
-        .single();
+const loadExistingQuote = async (id: string) => {
+  try {
+    setLoadingQuote(true);
+    const { data, error } = await supabase
+      .from("quotes")
+      .select("*")
+      .eq("id", id)
+      .single();
 
-      if (error) throw error;
+    if (error) throw error;
 
-      if (data) {
-        console.log("📦 [QuoteGenerator] Carregando orçamento existente:", data);
-        
-        setClientName(data.client_name || "");
-        setClientPhone(data.client_phone || "");
-        setAirline(data.route?.split(" → ")[0] || "");
-        
-        setTripType((data.trip_type || "round_trip") as TripType);
-        setPassengers(data.passengers?.toString() || "1");
-        
-        setMilesUsed(data.miles_needed?.toString() || "0");
-        setBoardingFee(data.boarding_fee?.toString() || "0");
-        
-        const costPerMileCalc = data.miles_needed > 0 
-          ? ((data.total_price - (data.boarding_fee * data.passengers)) / (data.miles_needed / 1000)).toFixed(2)
+    if (data) {
+      console.log("📦 [QuoteGenerator] Carregando orçamento existente:", data);
+      
+      setClientName(data.client_name || "");
+      setClientPhone(data.client_phone || "");
+      setAirline(data.route?.split(" → ")[0] || "");
+      
+      setTripType((data.trip_type || "round_trip") as TripType);
+      setPassengers(data.passengers?.toString() || "1");
+      
+      // milhas/pax que você salvou
+      setMilesUsed(data.miles_needed?.toString() || "0");
+      setBoardingFee(data.boarding_fee?.toString() || "0");
+
+      // ✅ recalcula o milheiro usando TOTAL DE MILHAS (milhas/pax * passageiros)
+      const milesPerPassenger = data.miles_needed || 0;
+      const passengersNum = data.passengers || 1;
+      const totalMiles = milesPerPassenger * passengersNum;
+      const boardingFeeNum = data.boarding_fee || 0;
+      const totalBoardingFees = boardingFeeNum * passengersNum;
+
+      const costPerMileCalc =
+        totalMiles > 0
+          ? (
+              (data.total_price - totalBoardingFees) /
+              (totalMiles / 1000)
+            ).toFixed(2)
           : "0";
-        setCostPerMile(costPerMileCalc.replace(".", ","));
-        
-        if (data.trip_type === "round_trip" && data.flight_segments?.[0]) {
-          const segment = data.flight_segments[0] as any;
-          setRoundTripData({
-            origin: segment.origin || "",
-            destination: segment.destination || "",
-            departureDate: segment.departureDate || "",
-            returnDate: segment.returnDate || "",
-            miles: data.miles_needed || 0
-          });
-        } else if (data.trip_type === "multi_city" && Array.isArray(data.flight_segments)) {
-          setFlightSegments(data.flight_segments as unknown as FlightSegment[]);
-        }
-        
-        if (Array.isArray(data.attachments) && data.attachments.length > 0) {
-          toast({
-            title: "Carregando anexos...",
-            description: "Validando imagens do orçamento"
-          });
-          
-          // Regenerar signed URLs para garantir que não expiraram
-          const refreshedUrls = await refreshSignedUrls(data.attachments as string[]);
-          setAttachments(refreshedUrls);
-          
-          // Atualizar no banco com as novas URLs se mudaram
-          if (JSON.stringify(refreshedUrls) !== JSON.stringify(data.attachments)) {
-            await supabase
-              .from("quotes")
-              .update({ attachments: refreshedUrls })
-              .eq("id", quoteId);
-            console.log('[LOAD] URLs atualizadas no banco');
-          }
-        }
-        
-        setNotes(data.notes || "");
-        setQuoteTitle(data.quote_title || "");
-        setIsEditMode(true);
-        
-        toast({
-          title: "Orçamento carregado",
-          description: "Dados carregados com sucesso"
-        });
-      }
-    } catch (error: any) {
-      console.error("❌ [QuoteGenerator] Erro ao carregar:", error);
-      toast({
-        title: "Erro ao carregar orçamento",
-        description: error.message,
-        variant: "destructive"
-      });
-      navigate("/quotes");
-    } finally {
-      setLoadingQuote(false);
-    }
-  };
 
-  useEffect(() => {
-    if (quoteId) {
-      loadExistingQuote(quoteId);
+      setCostPerMile(costPerMileCalc.replace(".", ","));
+      
+      if (data.trip_type === "round_trip" && data.flight_segments?.[0]) {
+        const segment = data.flight_segments[0] as any;
+        setRoundTripData({
+          origin: segment.origin || "",
+          destination: segment.destination || "",
+          departureDate: segment.departureDate || "",
+          returnDate: segment.returnDate || "",
+          // aqui continua usando milhas/pax
+          miles: data.miles_needed || 0,
+        });
+      } else if (
+        data.trip_type === "multi_city" &&
+        Array.isArray(data.flight_segments)
+      ) {
+        setFlightSegments(data.flight_segments as unknown as FlightSegment[]);
+      }
+      
+      if (Array.isArray(data.attachments) && data.attachments.length > 0) {
+        toast({
+          title: "Carregando anexos...",
+          description: "Validando imagens do orçamento",
+        });
+        
+        // Regenerar signed URLs para garantir que não expiraram
+        const refreshedUrls = await refreshSignedUrls(
+          data.attachments as string[]
+        );
+        setAttachments(refreshedUrls);
+        
+        // Atualizar no banco com as novas URLs se mudaram
+        if (JSON.stringify(refreshedUrls) !== JSON.stringify(data.attachments)) {
+          await supabase
+            .from("quotes")
+            .update({ attachments: refreshedUrls })
+            .eq("id", quoteId);
+          console.log("[LOAD] URLs atualizadas no banco");
+        }
+      }
+      
+      setNotes(data.notes || "");
+      setQuoteTitle(data.quote_title || "");
+      setIsEditMode(true);
+      
+      toast({
+        title: "Orçamento carregado",
+        description: "Dados carregados com sucesso",
+      });
     }
-  }, [quoteId]);
+  } catch (error: any) {
+    console.error("❌ [QuoteGenerator] Erro ao carregar:", error);
+    toast({
+      title: "Erro ao carregar orçamento",
+      description: error.message,
+      variant: "destructive",
+    });
+    navigate("/quotes");
+  } finally {
+    setLoadingQuote(false);
+  }
+};
+
+useEffect(() => {
+  if (quoteId) {
+    loadExistingQuote(quoteId);
+  }
+}, [quoteId]);
+
 
   // ========== SINCRONIZAÇÃO FORMULÁRIO ↔ CALCULADORA ==========
   useEffect(() => {
