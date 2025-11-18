@@ -349,71 +349,70 @@ export default function QuoteGenerator() {
     return labels.join(" | ");
   }, [activeMethods]);
 
- const calculatedValues = useMemo(() => {
-  const milesPerPassenger = parseMiles(milesUsed); // milhas/pax
-  const costPerMileNum = parseCurrency(costPerMile); // valor do milheiro
-  const boardingFeeNum = parseCurrency(boardingFee);
-  const passengersNum = parseInt(passengers) || 1;
-  const marginNum = parseCurrency(targetMargin);
+  const calculatedValues = useMemo(() => {
+    const milesPerPassenger = parseMiles(milesUsed); // milhas/pax
+    const costPerMileNum = parseCurrency(costPerMile); // valor do milheiro
+    const boardingFeeNum = parseCurrency(boardingFee);
+    const passengersNum = parseInt(passengers) || 1;
+    const marginNum = parseCurrency(targetMargin);
 
-  const totalMiles = milesPerPassenger * passengersNum;
+    const totalMiles = milesPerPassenger * passengersNum;
 
-  const costMilesPerPassenger = (milesPerPassenger / 1000) * costPerMileNum;
-  const totalMilesCost = costMilesPerPassenger * passengersNum;
+    const costMilesPerPassenger = (milesPerPassenger / 1000) * costPerMileNum;
+    const totalMilesCost = costMilesPerPassenger * passengersNum;
 
-  const costPerPassenger = costMilesPerPassenger + boardingFeeNum;
-  const totalCost = costPerPassenger * passengersNum;
+    const costPerPassenger = costMilesPerPassenger + boardingFeeNum;
+    const totalCost = costPerPassenger * passengersNum;
 
-  // 💡 preço sugerido por passageiro (usando markup)
-  const suggestedPricePerPassenger =
-    costMilesPerPassenger * (1 + marginNum / 100) + boardingFeeNum;
-  const suggestedPrice = suggestedPricePerPassenger * passengersNum;
+    // 💡 preço sugerido por passageiro (usando markup)
+    const suggestedPricePerPassenger =
+      costMilesPerPassenger * (1 + marginNum / 100) + boardingFeeNum;
+    const suggestedPrice = suggestedPricePerPassenger * passengersNum;
 
-  // 🔹 AGORA: manualPrice é valor *por passageiro*
-  let finalPricePerPassenger = suggestedPricePerPassenger;
+    // 🔹 AGORA: manualPrice é valor *por passageiro*
+    let finalPricePerPassenger = suggestedPricePerPassenger;
 
-  if (manualPrice) {
-    const manualPerPassenger = parseCurrency(manualPrice);
-    if (manualPerPassenger > 0) {
-      finalPricePerPassenger = manualPerPassenger;
+    if (manualPrice) {
+      const manualPerPassenger = parseCurrency(manualPrice);
+      if (manualPerPassenger > 0) {
+        finalPricePerPassenger = manualPerPassenger;
+      }
     }
-  }
 
-  const finalPrice = finalPricePerPassenger * passengersNum;
+    const finalPrice = finalPricePerPassenger * passengersNum;
 
-  const profit = finalPrice - totalCost;
-  const profitMargin = finalPrice > 0 ? (profit / finalPrice) * 100 : 0;
+    const profit = finalPrice - totalCost;
+    const profitMargin = finalPrice > 0 ? (profit / finalPrice) * 100 : 0;
 
-  const effectiveMilesPricePerPassenger = Math.max(
-    finalPricePerPassenger - boardingFeeNum,
-    0
-  );
+    const effectiveMilesPricePerPassenger = Math.max(
+      finalPricePerPassenger - boardingFeeNum,
+      0
+    );
 
-  let milesMarkup = 0;
-  if (costMilesPerPassenger > 0) {
-    milesMarkup =
-      ((effectiveMilesPricePerPassenger - costMilesPerPassenger) /
-        costMilesPerPassenger) *
-      100;
-  }
+    let milesMarkup = 0;
+    if (costMilesPerPassenger > 0) {
+      milesMarkup =
+        ((effectiveMilesPricePerPassenger - costMilesPerPassenger) /
+          costMilesPerPassenger) *
+        100;
+    }
 
-  return {
-    totalCost,
-    price: finalPrice, // TOTAL
-    profit,
-    profitMargin,
-    milesPerPassenger,
-    totalMiles,
-    costMilesPerPassenger,
-    totalMilesCost,
-    costPerPassenger,
-    finalPricePerPassenger,       // 💰 preço POR PASSAGEIRO
-    suggestedPrice,
-    suggestedPricePerPassenger,
-    milesMarkup,
-  };
-}, [milesUsed, costPerMile, boardingFee, passengers, targetMargin, manualPrice]);
-
+    return {
+      totalCost,
+      price: finalPrice, // TOTAL
+      profit,
+      profitMargin,
+      milesPerPassenger,
+      totalMiles,
+      costMilesPerPassenger,
+      totalMilesCost,
+      costPerPassenger,
+      finalPricePerPassenger, // 💰 preço POR PASSAGEIRO
+      suggestedPrice,
+      suggestedPricePerPassenger,
+      milesMarkup,
+    };
+  }, [milesUsed, costPerMile, boardingFee, passengers, targetMargin, manualPrice]);
 
   // ========== UPLOAD DE IMAGENS ==========
   const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -559,6 +558,10 @@ export default function QuoteGenerator() {
     const paymentText =
       paymentOptionsDescription || "Pix, Cartão de Crédito e Cartão de Débito";
 
+    const pricePerPassengerFormatted =
+      calculatedValues.finalPricePerPassenger.toFixed(2).replace(".", ",");
+    const totalPriceFormatted = calculatedValues.price.toFixed(2).replace(".", ",");
+
     return `🎫 *Orçamento de Passagem Aérea*
 
 Olá *${clientName || "Cliente"}*! 👋
@@ -568,7 +571,8 @@ Olá *${clientName || "Cliente"}*! 👋
 ${datesBlock}
 👥 *Passageiros:* ${passengers}
 
-💰 *Valor Total:* R$ ${calculatedValues.price.toFixed(2).replace(".", ",")}
+💰 *Valor por pessoa:* R$ ${pricePerPassengerFormatted}
+💰 *Valor Total:* R$ ${totalPriceFormatted}
 
 ✅ Milhas incluídas
 ✅ Taxas de embarque incluídas
@@ -703,7 +707,8 @@ R$ ${costPerMileFormatted} o milheiro`;
           ? `${roundTripData.origin} → ${roundTripData.destination}`
           : "Multi-city";
 
-      const totalMiles = parseInt(milesUsed) || 0;
+      // milhas/pax (parseando corretamente 50.000 -> 50000)
+      const totalMiles = parseMiles(milesUsed);
       const costPerMileNum = parseCurrency(costPerMile);
 
       console.log("[SAVE QUOTE] Dados a serem salvos:", {
@@ -1193,12 +1198,36 @@ R$ ${costPerMileFormatted} o milheiro`;
                     R$ {calculatedValues.totalCost.toFixed(2).replace(".", ",")}
                   </span>
                 </div>
+
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Preço Sugerido:</span>
+                  <span className="text-muted-foreground">Preço por passageiro:</span>
+                  <span className="font-semibold text-primary">
+                    R$ {calculatedValues.finalPricePerPassenger
+                      .toFixed(2)
+                      .replace(".", ",")}
+                  </span>
+                </div>
+
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Preço Total:</span>
                   <span className="font-semibold text-primary">
                     R$ {calculatedValues.price.toFixed(2).replace(".", ",")}
                   </span>
                 </div>
+
+                {manualPrice && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">
+                      Preço sugerido/pax (referência):
+                    </span>
+                    <span className="font-semibold">
+                      R$ {calculatedValues.suggestedPricePerPassenger
+                        .toFixed(2)
+                        .replace(".", ",")}
+                    </span>
+                  </div>
+                )}
+
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Lucro:</span>
                   <span className="font-semibold text-green-600">
@@ -1310,6 +1339,14 @@ R$ ${costPerMileFormatted} o milheiro`;
                 </span>
               </div>
               <Separator />
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Preço por passageiro:</span>
+                <span className="font-semibold">
+                  R$ {calculatedValues.finalPricePerPassenger
+                    .toFixed(2)
+                    .replace(".", ",")}
+                </span>
+              </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Preço de Venda:</span>
                 <span className="text-xl font-bold text-primary">
