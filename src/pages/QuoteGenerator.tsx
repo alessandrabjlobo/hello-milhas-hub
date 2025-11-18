@@ -1159,7 +1159,7 @@ R$ ${costPerMileFormatted} o milheiro`;
                   />
                 </div>
                 <div>
-                  <Label htmlFor="manualPrice">Preço Manual (R$)</Label>
+                  <Label htmlFor="manualPrice">Preço Manual/pax (R$)</Label>
                   <Input
                     id="manualPrice"
                     value={manualPrice}
