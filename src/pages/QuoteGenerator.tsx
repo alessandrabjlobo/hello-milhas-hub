@@ -349,62 +349,71 @@ export default function QuoteGenerator() {
     return labels.join(" | ");
   }, [activeMethods]);
 
-  // ========== CÁLCULOS FINANCEIROS ==========
-  const calculatedValues = useMemo(() => {
-    const milesPerPassenger = parseMiles(milesUsed); // milhas/pax
-    const costPerMileNum = parseCurrency(costPerMile); // valor do milheiro
-    const boardingFeeNum = parseCurrency(boardingFee);
-    const passengersNum = parseInt(passengers) || 1;
-    const marginNum = parseCurrency(targetMargin);
+ const calculatedValues = useMemo(() => {
+  const milesPerPassenger = parseMiles(milesUsed); // milhas/pax
+  const costPerMileNum = parseCurrency(costPerMile); // valor do milheiro
+  const boardingFeeNum = parseCurrency(boardingFee);
+  const passengersNum = parseInt(passengers) || 1;
+  const marginNum = parseCurrency(targetMargin);
 
-    const totalMiles = milesPerPassenger * passengersNum;
+  const totalMiles = milesPerPassenger * passengersNum;
 
-    const costMilesPerPassenger = (milesPerPassenger / 1000) * costPerMileNum;
-    const totalMilesCost = costMilesPerPassenger * passengersNum;
+  const costMilesPerPassenger = (milesPerPassenger / 1000) * costPerMileNum;
+  const totalMilesCost = costMilesPerPassenger * passengersNum;
 
-    const costPerPassenger = costMilesPerPassenger + boardingFeeNum;
-    const totalCost = costPerPassenger * passengersNum;
+  const costPerPassenger = costMilesPerPassenger + boardingFeeNum;
+  const totalCost = costPerPassenger * passengersNum;
 
-    const suggestedPricePerPassenger =
-      costMilesPerPassenger * (1 + marginNum / 100) + boardingFeeNum;
-    const suggestedPrice = suggestedPricePerPassenger * passengersNum;
+  // 💡 preço sugerido por passageiro (usando markup)
+  const suggestedPricePerPassenger =
+    costMilesPerPassenger * (1 + marginNum / 100) + boardingFeeNum;
+  const suggestedPrice = suggestedPricePerPassenger * passengersNum;
 
-    let finalPrice = suggestedPrice;
-    if (manualPrice) {
-      finalPrice = parseCurrency(manualPrice) || suggestedPrice;
+  // 🔹 AGORA: manualPrice é valor *por passageiro*
+  let finalPricePerPassenger = suggestedPricePerPassenger;
+
+  if (manualPrice) {
+    const manualPerPassenger = parseCurrency(manualPrice);
+    if (manualPerPassenger > 0) {
+      finalPricePerPassenger = manualPerPassenger;
     }
+  }
 
-    const profit = finalPrice - totalCost;
-    const profitMargin = finalPrice > 0 ? (profit / finalPrice) * 100 : 0;
+  const finalPrice = finalPricePerPassenger * passengersNum;
 
-    const finalPricePerPassenger = passengersNum > 0 ? finalPrice / passengersNum : 0;
-    const effectiveMilesPricePerPassenger = Math.max(
-      finalPricePerPassenger - boardingFeeNum,
-      0
-    );
+  const profit = finalPrice - totalCost;
+  const profitMargin = finalPrice > 0 ? (profit / finalPrice) * 100 : 0;
 
-    let milesMarkup = 0;
-    if (costMilesPerPassenger > 0) {
-      milesMarkup =
-        ((effectiveMilesPricePerPassenger - costMilesPerPassenger) /
-          costMilesPerPassenger) *
-        100;
-    }
+  const effectiveMilesPricePerPassenger = Math.max(
+    finalPricePerPassenger - boardingFeeNum,
+    0
+  );
 
-    return {
-      totalCost,
-      price: finalPrice,
-      profit,
-      profitMargin,
-      milesPerPassenger,
-      totalMiles,
-      costMilesPerPassenger,
-      totalMilesCost,
-      costPerPassenger,
-      finalPricePerPassenger,
-      milesMarkup,
-    };
-  }, [milesUsed, costPerMile, boardingFee, passengers, targetMargin, manualPrice]);
+  let milesMarkup = 0;
+  if (costMilesPerPassenger > 0) {
+    milesMarkup =
+      ((effectiveMilesPricePerPassenger - costMilesPerPassenger) /
+        costMilesPerPassenger) *
+      100;
+  }
+
+  return {
+    totalCost,
+    price: finalPrice, // TOTAL
+    profit,
+    profitMargin,
+    milesPerPassenger,
+    totalMiles,
+    costMilesPerPassenger,
+    totalMilesCost,
+    costPerPassenger,
+    finalPricePerPassenger,       // 💰 preço POR PASSAGEIRO
+    suggestedPrice,
+    suggestedPricePerPassenger,
+    milesMarkup,
+  };
+}, [milesUsed, costPerMile, boardingFee, passengers, targetMargin, manualPrice]);
+
 
   // ========== UPLOAD DE IMAGENS ==========
   const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
