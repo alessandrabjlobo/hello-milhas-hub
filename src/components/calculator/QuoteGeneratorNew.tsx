@@ -38,7 +38,9 @@ export function QuoteGeneratorNew() {
     destination: "",
     departureDate: "",
     returnDate: "",
-    miles: 0
+    miles: 0,
+    milesOutbound: 0,
+    milesReturn: 0
   });
   const [costPerMile, setCostPerMile] = useState("");
   const [desiredMarkup, setDesiredMarkup] = useState("");
@@ -68,7 +70,9 @@ export function QuoteGeneratorNew() {
         destination: "",
         departureDate: "",
         returnDate: "",
-        miles: 0
+        miles: 0,
+        milesOutbound: 0,
+        milesReturn: 0
       });
     }
   }, [quoteId]);
@@ -112,7 +116,9 @@ export function QuoteGeneratorNew() {
                 destination: seg0?.to || "",
                 departureDate: seg0?.date || "",
                 returnDate: seg1?.date || "",
-                miles: data.miles_needed || 0
+                miles: data.miles_needed || 0,
+                milesOutbound: seg0?.miles || 0,
+                milesReturn: seg1?.miles || 0
               });
             } else {
               setFlightSegments(segments as any);

@@ -35,7 +35,9 @@ export function QuoteGenerator() {
     destination: "",
     departureDate: "",
     returnDate: "",
-    miles: 0
+    miles: 0,
+    milesOutbound: 0,
+    milesReturn: 0
   });
   const [costPerMile, setCostPerMile] = useState("");
   const [desiredMarkup, setDesiredMarkup] = useState("");
