@@ -177,10 +177,15 @@ const QuoteHistory = () => {
     return <Badge variant="outline">Pendente</Badge>;
   };
 
- // 🧮 Sempre usar DATA DE CRIAÇÃO para filtros e ordenação
-const getQuoteDate = (quote: Quote) => {
-  return new Date(quote.created_at);
-};
+  // 🧮 Função auxiliar para extrair apenas YYYY-MM-DD (sem timezone)
+  const getDateOnly = (isoString: string): string => {
+    return isoString.split('T')[0];
+  };
+
+  // 🧮 Sempre usar DATA DE CRIAÇÃO para filtros e ordenação (como string)
+  const getQuoteDate = (quote: Quote): string => {
+    return getDateOnly(quote.created_at);
+  };
 
 
   // 🔎 + 🔃 Aplicar filtros e ordenação
@@ -203,21 +208,16 @@ const getQuoteDate = (quote: Quote) => {
     }
 
     if (dateFrom) {
-      const from = new Date(dateFrom);
-      from.setHours(0, 0, 0, 0);
       result = result.filter((q) => {
-        const d = getQuoteDate(q);
-        d.setHours(0, 0, 0, 0);
-        return d >= from;
+        const quoteDate = getQuoteDate(q); // "2025-11-18"
+        return quoteDate >= dateFrom; // comparação de strings YYYY-MM-DD
       });
     }
 
     if (dateTo) {
-      const to = new Date(dateTo);
-      to.setHours(23, 59, 59, 999);
       result = result.filter((q) => {
-        const d = getQuoteDate(q);
-        return d <= to;
+        const quoteDate = getQuoteDate(q);
+        return quoteDate <= dateTo; // comparação de strings YYYY-MM-DD
       });
     }
 
@@ -227,8 +227,8 @@ const getQuoteDate = (quote: Quote) => {
       let bVal: string | number = "";
 
       if (sortField === "created_at") {
-        aVal = getQuoteDate(a).getTime();
-        bVal = getQuoteDate(b).getTime();
+        aVal = getQuoteDate(a); // string YYYY-MM-DD
+        bVal = getQuoteDate(b); // string YYYY-MM-DD
       } else if (sortField === "client_name") {
         aVal = (a.client_name || "").toLowerCase();
         bVal = (b.client_name || "").toLowerCase();

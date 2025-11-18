@@ -32,6 +32,10 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useAuth } from "@/hooks/useAuth";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const mainNavItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -122,10 +126,51 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
 
   const { isAdmin } = useUserRole();
+  
+  // Buscar dados do usuário
+  const { user } = useAuth();
+  const userName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Usuário';
+  const userEmail = user?.email || '';
+  const initials = userName
+    .split(' ')
+    .map(n => n[0])
+    .join('')
+    .toUpperCase()
+    .substring(0, 2);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    toast.success("Sessão encerrada com sucesso");
+  };
 
   return (
     <Sidebar className={collapsed ? "w-14" : "w-60"}>
-      <SidebarTrigger className="m-2 self-end" />
+      {/* Trigger sempre visível e grande o suficiente */}
+      <div className="flex justify-end p-2 border-b bg-muted/30">
+        <SidebarTrigger className="h-10 w-10 hover:bg-accent" />
+      </div>
+
+      {/* Perfil do usuário */}
+      <div className="p-3 border-b bg-gradient-to-br from-primary/5 to-primary/10">
+        <div className="flex items-center gap-3">
+          <Avatar className="h-10 w-10 ring-2 ring-primary/20">
+            <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+          
+          {!collapsed && (
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold truncate text-foreground">
+                {userName}
+              </p>
+              <p className="text-xs text-muted-foreground truncate">
+                {userEmail}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
 
       <SidebarContent>
         {/* Principal */}
@@ -284,18 +329,11 @@ export function AppSidebar() {
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  asChild
-                  onClick={async () => {
-                    const { supabase } = await import("@/integrations/supabase/client");
-                    await supabase.auth.signOut();
-                    window.location.href = "/auth";
-                  }}
-                  className={collapsed ? "justify-center" : ""}
+                  className={`${linkBase} ${linkInactive}`}
+                  onClick={handleLogout}
                 >
-                  <button type="button" className="w-full flex items-center">
-                    <LogOut className="h-5 w-5" />
-                    {!collapsed && <span className="ml-3">Sair</span>}
-                  </button>
+                  <LogOut className="h-4 w-4" />
+                  {!collapsed && <span>Sair</span>}
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
