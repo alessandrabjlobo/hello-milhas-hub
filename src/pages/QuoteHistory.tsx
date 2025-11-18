@@ -177,13 +177,11 @@ const QuoteHistory = () => {
     return <Badge variant="outline">Pendente</Badge>;
   };
 
-  // 🧮 Data usada para filtros (prioriza data viagem, cai para criação)
-  const getQuoteDate = (quote: Quote) => {
-    if (quote.departure_date) {
-      return new Date(quote.departure_date);
-    }
-    return new Date(quote.created_at);
-  };
+ // 🧮 Sempre usar DATA DE CRIAÇÃO para filtros e ordenação
+const getQuoteDate = (quote: Quote) => {
+  return new Date(quote.created_at);
+};
+
 
   // 🔎 + 🔃 Aplicar filtros e ordenação
   const filteredQuotes = useMemo(() => {
