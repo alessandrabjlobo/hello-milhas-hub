@@ -845,23 +845,23 @@ R$ ${costPerMileFormatted} o milheiro`;
     );
   }
 
-return (
-  <div id="quote-workspace" className="container max-w-7xl mx-auto p-6 space-y-6">
-    {/* HEADER */}
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold">Gerador de Orçamentos</h1>
-          <p className="text-muted-foreground">
-            Sistema integrado para criar orçamentos profissionais
-          </p>
+  return (
+    <div id="quote-workspace" className="container max-w-7xl mx-auto p-6 space-y-6">
+      {/* HEADER */}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold">Gerador de Orçamentos</h1>
+            <p className="text-muted-foreground">
+              Sistema integrado para criar orçamentos profissionais
+            </p>
+          </div>
         </div>
       </div>
-    </div> {/* ⬅ fecha o header aqui */}
-      
+
       {/* GRID PRINCIPAL */}
       <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-6">
         {/* COLUNA ESQUERDA */}
