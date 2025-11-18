@@ -32,7 +32,6 @@ const parseLocalDateFromInput = (value: string) => {
   return new Date(Number(year), Number(month) - 1, Number(day));
 };
 
-
 export default function QuoteGenerator() {
   const navigate = useNavigate();
   const { quoteId } = useParams();
@@ -56,7 +55,9 @@ export default function QuoteGenerator() {
     destination: "",
     departureDate: "",
     returnDate: "",
-    miles: 0,
+    miles: 0, // usado só para “Só Ida”
+    milesOutbound: 0, // ida / pax
+    milesReturn: 0, // volta / pax
   });
 
   // Multi-city segments
@@ -84,134 +85,158 @@ export default function QuoteGenerator() {
   const [activeMessageTab, setActiveMessageTab] = useState("client");
 
   // ========== AUTO-GERAÇÃO DO NOME DO ORÇAMENTO ==========
-useEffect(() => {
-  if (
-    clientName &&
-    roundTripData.destination &&
-    roundTripData.departureDate &&
-    !quoteTitle
-  ) {
-    try {
-      const date = parseLocalDateFromInput(roundTripData.departureDate);
+  useEffect(() => {
+    if (
+      clientName &&
+      roundTripData.destination &&
+      roundTripData.departureDate &&
+      !quoteTitle
+    ) {
+      try {
+        const date = parseLocalDateFromInput(roundTripData.departureDate);
 
-      if (date) {
-        const monthYear = format(date, "MMM/yyyy", { locale: ptBR });
-        const autoTitle = `Viagem ${clientName} - ${roundTripData.destination} ${monthYear}`;
-        setQuoteTitle(autoTitle);
+        if (date) {
+          const monthYear = format(date, "MMM/yyyy", { locale: ptBR });
+          const autoTitle = `Viagem ${clientName} - ${roundTripData.destination} ${monthYear}`;
+          setQuoteTitle(autoTitle);
+        }
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore
     }
-  }
-}, [clientName, roundTripData.destination, roundTripData.departureDate, quoteTitle]);
+  }, [clientName, roundTripData.destination, roundTripData.departureDate, quoteTitle]);
 
   // ========== CARREGAR ORÇAMENTO EXISTENTE ==========
-const loadExistingQuote = async (id: string) => {
-  try {
-    setLoadingQuote(true);
-    const { data, error } = await supabase
-      .from("quotes")
-      .select("*")
-      .eq("id", id)
-      .single();
+  const loadExistingQuote = async (id: string) => {
+    try {
+      setLoadingQuote(true);
+      const { data, error } = await supabase
+        .from("quotes")
+        .select("*")
+        .eq("id", id)
+        .single();
 
-    if (error) throw error;
+      if (error) throw error;
 
-    if (data) {
-      console.log("📦 [QuoteGenerator] Carregando orçamento existente:", data);
-      
-      setClientName(data.client_name || "");
-      setClientPhone(data.client_phone || "");
-      setAirline(data.company_name || "");
-      
-      setTripType((data.trip_type || "round_trip") as TripType);
-      setPassengers(data.passengers?.toString() || "1");
-      
-      // milhas/pax que você salvou
-      setMilesUsed(data.miles_needed?.toString() || "0");
-      setBoardingFee(data.boarding_fee?.toString() || "0");
+      if (data) {
+        console.log("📦 [QuoteGenerator] Carregando orçamento existente:", data);
 
-      // ✅ Carregar cost_per_mile salvo (em vez de recalcular)
-      if (data.cost_per_mile != null) {
-        // Formatar com 2 casas decimais e substituir ponto por vírgula
-        const formatted = Number(data.cost_per_mile)
-          .toFixed(2)
-          .replace(".", ",");
-        setCostPerMile(formatted);
-        console.log(`✅ [LOAD] Valor do milheiro carregado: R$ ${formatted}`);
-      } else {
-        // Fallback para orçamentos antigos sem cost_per_mile
-        setCostPerMile("29,00");
-        console.warn("⚠️ [LOAD] cost_per_mile não encontrado, usando padrão: R$ 29,00");
-      }
-      
-      if (data.trip_type === "round_trip" && data.flight_segments?.[0]) {
-        const segment = data.flight_segments[0] as any;
-        setRoundTripData({
-          origin: segment.origin || "",
-          destination: segment.destination || "",
-          departureDate: segment.departureDate || "",
-          returnDate: segment.returnDate || "",
-          // aqui continua usando milhas/pax
-          miles: data.miles_needed || 0,
-        });
-      } else if (
-        data.trip_type === "multi_city" &&
-        Array.isArray(data.flight_segments)
-      ) {
-        setFlightSegments(data.flight_segments as unknown as FlightSegment[]);
-      }
-      
-      if (Array.isArray(data.attachments) && data.attachments.length > 0) {
-        toast({
-          title: "Carregando anexos...",
-          description: "Validando imagens do orçamento",
-        });
-        
-        // Regenerar signed URLs para garantir que não expiraram
-        const refreshedUrls = await refreshSignedUrls(
-          data.attachments as string[]
-        );
-        setAttachments(refreshedUrls);
-        
-        // Atualizar no banco com as novas URLs se mudaram
-        if (JSON.stringify(refreshedUrls) !== JSON.stringify(data.attachments)) {
-          await supabase
-            .from("quotes")
-            .update({ attachments: refreshedUrls })
-            .eq("id", quoteId);
-          console.log("[LOAD] URLs atualizadas no banco");
+        setClientName(data.client_name || "");
+        setClientPhone(data.client_phone || "");
+        setAirline(data.company_name || "");
+
+        setTripType((data.trip_type || "round_trip") as TripType);
+        setPassengers(data.passengers?.toString() || "1");
+
+        // milhas/pax salvas no orçamento
+        setMilesUsed(data.miles_needed?.toString() || "0");
+        setBoardingFee(data.boarding_fee?.toString() || "0");
+
+        // 🔢 Valor do milheiro salvo
+        if (data.cost_per_mile != null) {
+          const formatted = Number(data.cost_per_mile).toFixed(2).replace(".", ",");
+          setCostPerMile(formatted);
+          console.log(`✅ [LOAD] Valor do milheiro carregado: R$ ${formatted}`);
+        } else {
+          setCostPerMile("29,00");
+          console.warn("⚠️ [LOAD] cost_per_mile não encontrado, usando padrão: R$ 29,00");
         }
+
+        // 🔁 Montar roundTripData de acordo com o tipo
+        if (data.trip_type === "round_trip") {
+          const segment = (data.flight_segments?.[0] as any) || {};
+
+          const totalMilesPerPassenger = data.miles_needed || 0;
+          const defaultPerLeg = totalMilesPerPassenger > 0 ? totalMilesPerPassenger / 2 : 0;
+
+          const milesOutbound = segment.milesOutbound ?? segment.miles_ida ?? defaultPerLeg;
+          const milesReturn = segment.milesReturn ?? segment.miles_volta ?? defaultPerLeg;
+
+          setRoundTripData({
+            origin: segment.origin || "",
+            destination: segment.destination || "",
+            departureDate: segment.departureDate || segment.departure_date || "",
+            returnDate: segment.returnDate || segment.return_date || "",
+            miles: 0,
+            milesOutbound,
+            milesReturn,
+          });
+
+          const milesPerPassenger = (milesOutbound || 0) + (milesReturn || 0);
+          if (milesPerPassenger > 0) {
+            const v = milesPerPassenger.toString();
+            setMilesUsed(v);
+            setTripMiles(v);
+          }
+        } else if (data.trip_type === "one_way") {
+          const segment = (data.flight_segments?.[0] as any) || {};
+
+          const milesPerPassenger = data.miles_needed || segment.miles || 0;
+
+          setRoundTripData({
+            origin: segment.origin || "",
+            destination: segment.destination || "",
+            departureDate: segment.departureDate || segment.departure_date || "",
+            returnDate: "",
+            miles: milesPerPassenger,
+            milesOutbound: 0,
+            milesReturn: 0,
+          });
+
+          if (milesPerPassenger > 0) {
+            const v = milesPerPassenger.toString();
+            setMilesUsed(v);
+            setTripMiles(v);
+          }
+        } else if (data.trip_type === "multi_city" && Array.isArray(data.flight_segments)) {
+          setFlightSegments(data.flight_segments as unknown as FlightSegment[]);
+        }
+
+        if (Array.isArray(data.attachments) && data.attachments.length > 0) {
+          toast({
+            title: "Carregando anexos...",
+            description: "Validando imagens do orçamento",
+          });
+
+          const refreshedUrls = await refreshSignedUrls(data.attachments as string[]);
+          setAttachments(refreshedUrls);
+
+          if (JSON.stringify(refreshedUrls) !== JSON.stringify(data.attachments)) {
+            await supabase
+              .from("quotes")
+              .update({ attachments: refreshedUrls })
+              .eq("id", quoteId);
+            console.log("[LOAD] URLs atualizadas no banco");
+          }
+        }
+
+        setNotes(data.notes || "");
+        setQuoteTitle(data.quote_title || "");
+        setIsEditMode(true);
+
+        toast({
+          title: "Orçamento carregado",
+          description: "Dados carregados com sucesso",
+        });
       }
-      
-      setNotes(data.notes || "");
-      setQuoteTitle(data.quote_title || "");
-      setIsEditMode(true);
-      
+    } catch (error: any) {
+      console.error("❌ [QuoteGenerator] Erro ao carregar:", error);
       toast({
-        title: "Orçamento carregado",
-        description: "Dados carregados com sucesso",
+        title: "Erro ao carregar orçamento",
+        description: error.message,
+        variant: "destructive",
       });
+      navigate("/quotes");
+    } finally {
+      setLoadingQuote(false);
     }
-  } catch (error: any) {
-    console.error("❌ [QuoteGenerator] Erro ao carregar:", error);
-    toast({
-      title: "Erro ao carregar orçamento",
-      description: error.message,
-      variant: "destructive",
-    });
-    navigate("/quotes");
-  } finally {
-    setLoadingQuote(false);
-  }
-};
+  };
 
-useEffect(() => {
-  if (quoteId) {
-    loadExistingQuote(quoteId);
-  }
-}, [quoteId]);
-
+  useEffect(() => {
+    if (quoteId) {
+      loadExistingQuote(quoteId);
+    }
+  }, [quoteId]);
 
   // ========== SINCRONIZAÇÃO FORMULÁRIO ↔ CALCULADORA ==========
   useEffect(() => {
@@ -226,14 +251,30 @@ useEffect(() => {
     }
   }, [milesUsed]);
 
-  // Para ida / ida e volta: usar roundTripData.miles como milhas/pax
+  // Para ida / ida e volta: usar soma ida+volta como milhas/pax
   useEffect(() => {
-    if (tripType !== "multi_city" && roundTripData.miles && roundTripData.miles > 0) {
+    if (tripType === "round_trip") {
+      const milesPerPassenger =
+        (roundTripData.milesOutbound || 0) + (roundTripData.milesReturn || 0);
+
+      if (milesPerPassenger > 0) {
+        const v = milesPerPassenger.toString();
+        if (milesUsed !== v) setMilesUsed(v);
+        if (tripMiles !== v) setTripMiles(v);
+      }
+    } else if (tripType === "one_way" && roundTripData.miles && roundTripData.miles > 0) {
       const v = roundTripData.miles.toString();
-      setMilesUsed(v);
-      setTripMiles(v);
+      if (milesUsed !== v) setMilesUsed(v);
+      if (tripMiles !== v) setTripMiles(v);
     }
-  }, [tripType, roundTripData.miles]);
+  }, [
+    tripType,
+    roundTripData.miles,
+    roundTripData.milesOutbound,
+    roundTripData.milesReturn,
+    milesUsed,
+    tripMiles,
+  ]);
 
   // ========== MULTI-TRECHOS: CALCULAR TOTAL DE MILHAS ==========
   const totalMilesFromSegments = useMemo(
@@ -274,7 +315,7 @@ useEffect(() => {
   const parseMiles = (value: string) =>
     parseFloat(value.replace(/\./g, "").replace(",", ".")) || 0;
 
-  // >>> NOVO parseCurrency, aceitanto BR e US e distintos milhares <<<
+  // >>> parseCurrency, aceitanto BR e US e distintos milhares <<<
   const parseCurrency = (value: string) => {
     if (!value) return 0;
     const cleaned = value.replace(/\s/g, "");
@@ -295,21 +336,16 @@ useEffect(() => {
   };
 
   // ========== DESCRIÇÃO DE PAGAMENTO ==========
-  // Busca as formas de pagamento ativas configuradas pelo fornecedor
-  // e gera uma string formatada para a mensagem ao cliente
   const paymentOptionsDescription = useMemo(() => {
     if (!activeMethods || activeMethods.length === 0) {
       return "Pix, Cartão de Crédito e Cartão de Débito";
     }
-    const labels = activeMethods
-      .map((m) => m.method_name) // Campo correto: method_name
-      .filter(Boolean);
-    
-    // Fallback secundário caso nenhum método tenha method_name
+    const labels = activeMethods.map((m) => m.method_name).filter(Boolean);
+
     if (labels.length === 0) {
       return "Pix, Cartão de Crédito e Cartão de Débito";
     }
-    
+
     return labels.join(" | ");
   }, [activeMethods]);
 
@@ -323,7 +359,6 @@ useEffect(() => {
 
     const totalMiles = milesPerPassenger * passengersNum;
 
-    // AQUI está o /1000 correto
     const costMilesPerPassenger = (milesPerPassenger / 1000) * costPerMileNum;
     const totalMilesCost = costMilesPerPassenger * passengersNum;
 
@@ -372,51 +407,50 @@ useEffect(() => {
   }, [milesUsed, costPerMile, boardingFee, passengers, targetMargin, manualPrice]);
 
   // ========== UPLOAD DE IMAGENS ==========
- const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
+  const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    toast({
-      title: "Erro de autenticação",
-      description: "Faça login para fazer upload de imagens",
-      variant: "destructive",
-    });
-    return;
-  }
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      toast({
+        title: "Erro de autenticação",
+        description: "Faça login para fazer upload de imagens",
+        variant: "destructive",
+      });
+      return;
+    }
 
-  // Carregar supplier_id do perfil para RLS
-  const { data: profileData } = await supabase
-    .from('profiles')
-    .select('supplier_id')
-    .eq('id', user.id)
-    .single();
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select("supplier_id")
+      .eq("id", user.id)
+      .single();
 
-  if (!profileData?.supplier_id) {
-    toast({
-      title: "Erro",
-      description: "Perfil de fornecedor não encontrado",
-      variant: "destructive"
-    });
-    return;
-  }
+    if (!profileData?.supplier_id) {
+      toast({
+        title: "Erro",
+        description: "Perfil de fornecedor não encontrado",
+        variant: "destructive",
+      });
+      return;
+    }
 
-  const tempQuoteId = `quote-${Date.now()}`;
-  const url = await uploadTicketFile(profileData.supplier_id, tempQuoteId, file);
+    const tempQuoteId = `quote-${Date.now()}`;
+    const url = await uploadTicketFile(profileData.supplier_id, tempQuoteId, file);
 
-  if (url) {
-    setAttachments([...attachments, url]);
-    toast({
-      title: "Print adicionado!",
-      description: "Imagem salva com sucesso",
-    });
-  }
+    if (url) {
+      setAttachments([...attachments, url]);
+      toast({
+        title: "Print adicionado!",
+        description: "Imagem salva com sucesso",
+      });
+    }
 
-  e.target.value = "";
-};
+    e.target.value = "";
+  };
 
   const handleRemoveAttachment = (index: number) => {
     setAttachments(attachments.filter((_, i) => i !== index));
@@ -433,74 +467,51 @@ useEffect(() => {
     const lines: string[] = [];
 
     // 1) Crédito - COM TABELA DE PARCELAS
-    const creditConfigs = interestConfigs.filter(c => c.payment_type === 'credit' && c.is_active);
+    const creditConfigs = interestConfigs.filter(
+      (c) => c.payment_type === "credit" && c.is_active
+    );
     if (creditConfigs.length > 0) {
-      const maxInstallments = Math.max(...creditConfigs.map(c => c.installments));
-      
+      const maxInstallments = Math.max(...creditConfigs.map((c) => c.installments));
+
       lines.push(`💳 *Cartão de Crédito:*`);
-      
-      // Gerar linha para cada parcela de 1x até maxInstallments
+
       for (let i = 1; i <= maxInstallments; i++) {
-        const result = calculateInstallmentValue(calculatedValues.price, i, 'credit');
-        
+        const result = calculateInstallmentValue(calculatedValues.price, i, "credit");
+
         const installmentValueFormatted = result.installmentValue
           .toFixed(2)
           .replace(".", ",");
-        
-        // Sempre mostrar apenas o valor da parcela (sem total e juros)
+
         lines.push(`  ${i}x de R$ ${installmentValueFormatted}`);
       }
     }
 
-    // 2) Débito - verificar se tem juros configurados
-    const debitConfigs = interestConfigs.filter(c => c.payment_type === 'debit' && c.is_active);
+    // 2) Débito - sempre 1x, mas respeitando juros configurados
+    const debitConfigs = interestConfigs.filter(
+      (c) => c.payment_type === "debit" && c.is_active
+    );
+
     if (debitConfigs.length > 0) {
-      const maxDebitInstallments = Math.max(...debitConfigs.map(c => c.installments));
-      
-      // Verificar se alguma taxa é maior que 0
-      let hasDebitInterest = false;
-      if (debitConfigs[0].config_type === 'per_installment' && debitConfigs[0].per_installment_rates) {
-        hasDebitInterest = Object.values(debitConfigs[0].per_installment_rates).some(rate => rate > 0);
-      } else {
-        hasDebitInterest = (debitConfigs[0].interest_rate || 0) > 0;
-      }
-      
-      if (hasDebitInterest && maxDebitInstallments > 1) {
-        // Débito COM JUROS - mostrar tabela de parcelas
-        lines.push(`\n💳 *Débito:*`);
-        
-        for (let i = 1; i <= maxDebitInstallments; i++) {
-          const result = calculateInstallmentValue(calculatedValues.price, i, 'debit');
-          
-          const installmentValueFormatted = result.installmentValue
-            .toFixed(2)
-            .replace(".", ",");
-          
-          lines.push(`  ${i}x de R$ ${installmentValueFormatted}`);
-        }
-      } else {
-        // Débito SEM JUROS - à vista
-        const debitValueFormatted = calculatedValues.price
-          .toFixed(2)
-          .replace(".", ",");
-        
-        lines.push(`\n💳 *Débito à vista:* R$ ${debitValueFormatted}`);
-      }
+      const result = calculateInstallmentValue(calculatedValues.price, 1, "debit");
+
+      const debitValueFormatted = result.installmentValue
+        .toFixed(2)
+        .replace(".", ",");
+
+      lines.push(`\n💳 *Débito à vista:* R$ ${debitValueFormatted}`);
     }
 
     // 3) Pix à vista
-    const hasPix = activeMethods?.some(m => 
-      m.method_name?.toLowerCase().includes('pix')
+    const hasPix = activeMethods?.some((m) =>
+      m.method_name?.toLowerCase().includes("pix")
     );
-    if (hasPix && !interestConfigs.some(c => c.payment_type === 'pix' as any)) {
-      const pixValueFormatted = calculatedValues.price
-        .toFixed(2)
-        .replace(".", ",");
-      
+    if (hasPix && !interestConfigs.some((c) => c.payment_type === ("pix" as any))) {
+      const pixValueFormatted = calculatedValues.price.toFixed(2).replace(".", ",");
+
       lines.push(`\n🔁 *Pix à vista:* R$ ${pixValueFormatted}`);
     }
 
-    return lines.length > 0 ? lines.join('\n') : "";
+    return lines.length > 0 ? lines.join("\n") : "";
   };
 
   // ========== MENSAGEM CLIENTE ==========
@@ -512,9 +523,7 @@ useEffect(() => {
 
     const departureDateObj = parseLocalDateFromInput(roundTripData.departureDate);
     const returnDateObj =
-      tripType === "round_trip"
-        ? parseLocalDateFromInput(roundTripData.returnDate)
-        : null;
+      tripType === "round_trip" ? parseLocalDateFromInput(roundTripData.returnDate) : null;
 
     const departureFormatted = departureDateObj
       ? format(departureDateObj, "dd/MM/yyyy", { locale: ptBR })
@@ -525,7 +534,6 @@ useEffect(() => {
         ? format(returnDateObj, "dd/MM/yyyy", { locale: ptBR })
         : null;
 
-    // Bloco de datas formatado
     const datesBlock =
       tripType === "round_trip" && returnFormatted
         ? `📅 *Data Ida:* ${departureFormatted}\n📅 *Data Volta:* ${returnFormatted}`
@@ -538,9 +546,9 @@ useEffect(() => {
         ? "Somente Ida"
         : "Múltiplos Trechos";
 
-    // Descrição de parcelamento
     const installmentsText = buildInstallmentsDescription();
-    const paymentText = paymentOptionsDescription || "Pix, Cartão de Crédito e Cartão de Débito";
+    const paymentText =
+      paymentOptionsDescription || "Pix, Cartão de Crédito e Cartão de Débito";
 
     return `🎫 *Orçamento de Passagem Aérea*
 
@@ -561,21 +569,21 @@ ${installmentsText ? `\n${installmentsText}` : ""}
 Para confirmar sua viagem, basta enviar uma mensagem! 😊`;
   };
 
-// ========== MENSAGEM BALCÃO ==========
-const generateSupplierMessage = () => {
-  const milesPerPassenger = parseMiles(milesUsed);
-  const passengersNum = parseInt(passengers) || 1;
-  const totalMiles = milesPerPassenger * passengersNum;
+  // ========== MENSAGEM BALCÃO ==========
+  const generateSupplierMessage = () => {
+    const milesPerPassenger = parseMiles(milesUsed);
+    const passengersNum = parseInt(passengers) || 1;
+    const totalMiles = milesPerPassenger * passengersNum;
 
-  const costPerMileNum = parseCurrency(costPerMile);
-  const costPerMileFormatted = costPerMileNum.toFixed(2).replace(".", ",");
+    const costPerMileNum = parseCurrency(costPerMile);
+    const costPerMileFormatted = costPerMileNum.toFixed(2).replace(".", ",");
 
-  return `Compro *${airline || "cia aérea a definir"}*
+    return `Compro *${airline || "cia aérea a definir"}*
 
 ${formatNumber(totalMiles)} milhas
 ${passengersNum} CPF(s)
 R$ ${costPerMileFormatted} o milheiro`;
-};
+  };
 
   // ========== COPIAR MENSAGENS ==========
   const handleCopyMessage = async (message: string, type: string) => {
@@ -608,7 +616,6 @@ R$ ${costPerMileFormatted} o milheiro`;
       });
     }
   };
-
 
   // ========== EXPORTAR COMO JPG ==========
   const handleExportAsJPG = async () => {
@@ -654,15 +661,14 @@ R$ ${costPerMileFormatted} o milheiro`;
 
   // ========== SALVAR ORÇAMENTO ==========
   const handleSaveQuote = async () => {
-    // Validação de campos obrigatórios
     const errors: string[] = [];
-    
+
     if (!clientName.trim()) errors.push("Nome do cliente");
-    if (!roundTripData.destination && flightSegments.every(s => !s.to)) {
+    if (!roundTripData.destination && flightSegments.every((s) => !s.to)) {
       errors.push("Destino da viagem");
     }
     if (calculatedValues.price <= 0) errors.push("Valores calculados");
-    
+
     if (errors.length > 0) {
       toast({
         title: "Campos obrigatórios faltando",
@@ -674,7 +680,7 @@ R$ ${costPerMileFormatted} o milheiro`;
 
     try {
       setSaving(true);
-      
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -684,13 +690,14 @@ R$ ${costPerMileFormatted} o milheiro`;
       const route =
         tripType === "round_trip"
           ? `${roundTripData.origin} → ${roundTripData.destination}`
+          : tripType === "one_way"
+          ? `${roundTripData.origin} → ${roundTripData.destination}`
           : "Multi-city";
-      const totalMiles = parseInt(milesUsed) || 0;
 
-      // ✅ Converter valor do milheiro para número
+      const totalMiles = parseInt(milesUsed) || 0;
       const costPerMileNum = parseCurrency(costPerMile);
 
-      console.log('[SAVE QUOTE] Dados a serem salvos:', {
+      console.log("[SAVE QUOTE] Dados a serem salvos:", {
         user_id: user.id,
         client_name: clientName,
         miles_needed: totalMiles,
@@ -701,6 +708,21 @@ R$ ${costPerMileFormatted} o milheiro`;
         attachments_count: attachments.length,
         flight_segments_count: tripType === "multi_city" ? flightSegments.length : 1,
       });
+
+      const flightSegmentsToSave =
+        tripType === "multi_city"
+          ? flightSegments
+          : [
+              {
+                origin: roundTripData.origin,
+                destination: roundTripData.destination,
+                departureDate: roundTripData.departureDate,
+                returnDate: roundTripData.returnDate,
+                miles: roundTripData.miles || 0,
+                milesOutbound: roundTripData.milesOutbound || 0,
+                milesReturn: roundTripData.milesReturn || 0,
+              },
+            ];
 
       const quoteData = {
         user_id: user.id,
@@ -718,23 +740,17 @@ R$ ${costPerMileFormatted} o milheiro`;
         cost_per_mile: costPerMileNum,
         notes: notes || null,
         attachments: attachments.length > 0 ? attachments : null,
-        flight_segments: tripType === "multi_city" 
-          ? flightSegments 
-          : [roundTripData] as any,
+        flight_segments: flightSegmentsToSave as any,
         status: "pending" as const,
       };
 
       let savedQuoteId: string;
 
       if (isEditMode && quoteId) {
-        // UPDATE - Edição de orçamento existente
-        const { error } = await supabase
-          .from("quotes")
-          .update(quoteData)
-          .eq("id", quoteId);
+        const { error } = await supabase.from("quotes").update(quoteData).eq("id", quoteId);
 
         if (error) {
-          console.error('[SAVE QUOTE] Erro detalhado:', {
+          console.error("[SAVE QUOTE] Erro detalhado:", {
             message: error.message,
             details: error.details,
             hint: error.hint,
@@ -742,17 +758,16 @@ R$ ${costPerMileFormatted} o milheiro`;
           });
           throw error;
         }
-        
+
         savedQuoteId = quoteId;
-        
-        console.log('[SAVE QUOTE] Orçamento atualizado com sucesso!');
-        
+
+        console.log("[SAVE QUOTE] Orçamento atualizado com sucesso!");
+
         toast({
           title: "Orçamento atualizado!",
-          description: "As alterações foram salvas com sucesso"
+          description: "As alterações foram salvas com sucesso",
         });
       } else {
-        // INSERT - Novo orçamento
         const { data, error } = await supabase
           .from("quotes")
           .insert([quoteData])
@@ -760,7 +775,7 @@ R$ ${costPerMileFormatted} o milheiro`;
           .single();
 
         if (error) {
-          console.error('[SAVE QUOTE] Erro detalhado:', {
+          console.error("[SAVE QUOTE] Erro detalhado:", {
             message: error.message,
             details: error.details,
             hint: error.hint,
@@ -768,14 +783,14 @@ R$ ${costPerMileFormatted} o milheiro`;
           });
           throw error;
         }
-        
+
         savedQuoteId = data.id;
-        
-        console.log('[SAVE QUOTE] Orçamento salvo com sucesso!');
-        
+
+        console.log("[SAVE QUOTE] Orçamento salvo com sucesso!");
+
         toast({
           title: "Orçamento salvo!",
-          description: "O orçamento foi criado com sucesso"
+          description: "O orçamento foi criado com sucesso",
         });
       }
 
@@ -1191,12 +1206,8 @@ R$ ${costPerMileFormatted} o milheiro`;
                 </div>
 
                 <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">
-                    Markup das milhas (interno):
-                  </span>
-                  <Badge variant="outline">
-                    {calculatedValues.milesMarkup.toFixed(1)}%
-                  </Badge>
+                  <span className="text-muted-foreground">Markup das milhas (interno):</span>
+                  <Badge variant="outline">{calculatedValues.milesMarkup.toFixed(1)}%</Badge>
                 </div>
               </div>
             </CardContent>
@@ -1387,18 +1398,18 @@ R$ ${costPerMileFormatted} o milheiro`;
         </div>
       </div>
 
-        {/* PREVIEW IMAGEM */}
-        <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
-            <DialogTitle className="sr-only">Pré-visualização do anexo</DialogTitle>
-            <DialogDescription className="sr-only">
-              Visualização ampliada do print/anexo do orçamento.
-            </DialogDescription>
-            {previewImage && (
-              <img src={previewImage} alt="Preview do anexo" className="w-full h-auto rounded" />
-            )}
-          </DialogContent>
-        </Dialog>
+      {/* PREVIEW IMAGEM */}
+      <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+          <DialogTitle className="sr-only">Pré-visualização do anexo</DialogTitle>
+          <DialogDescription className="sr-only">
+            Visualização ampliada do print/anexo do orçamento.
+          </DialogDescription>
+          {previewImage && (
+            <img src={previewImage} alt="Preview do anexo" className="w-full h-auto rounded" />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
