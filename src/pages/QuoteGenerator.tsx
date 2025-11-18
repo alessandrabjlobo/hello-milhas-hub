@@ -860,21 +860,7 @@ R$ ${costPerMileFormatted} o milheiro`;
             </p>
           </div>
         </div>
-
-        <div className="max-w-md">
-          <Label htmlFor="quoteTitleTop" className="text-xs text-muted-foreground">
-            Nome do Orçamento
-          </Label>
-          <Input
-            id="quoteTitleTop"
-            value={quoteTitle}
-            onChange={(e) => setQuoteTitle(e.target.value)}
-            placeholder="Será gerado automaticamente, você pode editar"
-            className="mt-1"
-          />
-        </div>
-      </div>
-
+        
       {/* GRID PRINCIPAL */}
       <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-6">
         {/* COLUNA ESQUERDA */}
