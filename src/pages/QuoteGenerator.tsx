@@ -631,205 +631,292 @@ R$ ${costPerMileFormatted} o milheiro`;
   };
 
   // ========== EXPORTAR COMO PDF PARA CLIENTE ==========
-  const handleExportAsPDF = () => {
-    try {
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4",
-      });
+ // ========== EXPORTAR COMO PDF PARA CLIENTE (LAYOUT NOVO LARANJA) ==========
+const handleExportAsPDF = () => {
+  try {
+    const pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
 
-      const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const margin = 14;
 
-      // Cabeçalho
+    // Paleta laranja
+    const orangeDark = { r: 154, g: 52, b: 18 };   // orange-700
+    const orange = { r: 249, g: 115, b: 22 };      // orange-500
+    const orangeLight = { r: 255, g: 237, b: 213 }; // orange-100
+    const grayText = { r: 55, g: 65, b: 81 };
+    const grayMuted = { r: 107, g: 114, b: 128 };
+    const border = { r: 209, g: 213, b: 219 };
+
+    // ========== HEADER COLORIDO ==========
+    pdf.setFillColor(orangeDark.r, orangeDark.g, orangeDark.b);
+    pdf.rect(0, 0, pageWidth, 26, "F");
+
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(18);
+    pdf.text("Orçamento de Passagens Aéreas", margin, 16);
+
+    const todayStr = format(new Date(), "dd/MM/yyyy");
+    pdf.setFontSize(10);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(`Emitido em: ${todayStr}`, pageWidth - margin, 11, { align: "right" });
+
+    let cursorY = 32;
+
+    const drawSectionTitle = (title: string) => {
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(11);
+      pdf.setTextColor(orangeDark.r, orangeDark.g, orangeDark.b);
+      pdf.text(title, margin, cursorY);
+      cursorY += 5;
+    };
+
+    const drawCard = (height: number, body: (innerX: number, innerY: number) => void) => {
+      pdf.setFillColor(orangeLight.r, orangeLight.g, orangeLight.b);
+      pdf.setDrawColor(border.r, border.g, border.b);
+      pdf.roundedRect(margin, cursorY, pageWidth - margin * 2, height, 2, 2, "FD");
+      const innerX = margin + 4;
+      const innerY = cursorY + 7;
+      body(innerX, innerY);
+      cursorY += height + 6;
+    };
+
+    // Datas
+    const departureDateObj = parseLocalDateFromInput(roundTripData.departureDate);
+    const returnDateObj =
+      tripType === "round_trip"
+        ? parseLocalDateFromInput(roundTripData.returnDate)
+        : null;
+
+    const departureFormatted = departureDateObj
+      ? format(departureDateObj, "dd/MM/yyyy", { locale: ptBR })
+      : "A definir";
+
+    const returnFormatted =
+      tripType === "round_trip" && returnDateObj
+        ? format(returnDateObj, "dd/MM/yyyy", { locale: ptBR })
+        : undefined;
+
+    // ========= BLOCO: DADOS DO CLIENTE =========
+    drawSectionTitle("Dados do Cliente");
+    drawCard(24, (innerX, innerY) => {
+      pdf.setTextColor(grayText.r, grayText.g, grayText.b);
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(10);
-      pdf.setTextColor(120, 120, 120);
-      pdf.text("HELLO MILHAS HUB", 10, 15);
 
-      pdf.setFontSize(16);
-      pdf.setTextColor(20, 20, 20);
-      pdf.text("Orçamento de Passagens Aéreas", 10, 25);
+      // Esquerda
+      pdf.text(`Nome: ${clientName || "Cliente não informado"}`, innerX, innerY);
+      pdf.text(
+        `Contato: ${clientPhone || "Telefone/WhatsApp não informado"}`,
+        innerX,
+        innerY + 5
+      );
 
-      const todayStr = format(new Date(), "dd/MM/yyyy");
-      pdf.setFontSize(9);
-      pdf.setTextColor(100, 100, 100);
-      pdf.text(`Data: ${todayStr}`, pageWidth - 10, 20, { align: "right" });
+      // Direita (alinhado ao meio da página)
+      const rightX = pageWidth / 2 + 4;
+      pdf.setTextColor(grayMuted.r, grayMuted.g, grayMuted.b);
+      pdf.text("Período da viagem:", rightX, innerY);
+      pdf.setTextColor(grayText.r, grayText.g, grayText.b);
+      if (tripType === "round_trip" && returnFormatted) {
+        pdf.text(`${departureFormatted}  -  ${returnFormatted}`, rightX, innerY + 5);
+      } else {
+        pdf.text(`${departureFormatted}`, rightX, innerY + 5);
+      }
+    });
 
-      let cursorY = 35;
+    // ========= BLOCO: DETALHES DA VIAGEM =========
+    drawSectionTitle("Detalhes da Viagem");
 
-      // Dados da viagem
-      const routeText =
-        roundTripData.origin && roundTripData.destination
-          ? `${roundTripData.origin} → ${roundTripData.destination}`
+    const tableTop = cursorY;
+
+    // Cabeçalho da tabela
+    const colNo = margin;
+    const colOrigem = colNo + 10;
+    const colDestino = colOrigem + 35;
+    const colDataIda = colDestino + 35;
+    const colDataVolta = colDataIda + 28;
+    const colTipo = colDataVolta + 28;
+
+    pdf.setFillColor(orange.r, orange.g, orange.b);
+    pdf.setDrawColor(orange.r, orange.g, orange.b);
+    pdf.rect(margin, tableTop, pageWidth - margin * 2, 8, "FD");
+
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(9);
+    pdf.text("No", colNo + 2, tableTop + 5);
+    pdf.text("Origem", colOrigem + 2, tableTop + 5);
+    pdf.text("Destino", colDestino + 2, tableTop + 5);
+    pdf.text("Data Ida", colDataIda + 2, tableTop + 5);
+    pdf.text("Data Volta", colDataVolta + 2, tableTop + 5);
+    pdf.text("Tipo", colTipo + 2, tableTop + 5);
+
+    // Linhas
+    let rowY = tableTop + 8;
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(9);
+    pdf.setTextColor(grayText.r, grayText.g, grayText.b);
+    pdf.setDrawColor(border.r, border.g, border.b);
+
+    type TravelRow = {
+      no: string;
+      origem: string;
+      destino: string;
+      dataIda: string;
+      dataVolta: string;
+      tipo: string;
+    };
+
+    const travelRows: TravelRow[] = [];
+
+    if (tripType === "round_trip") {
+      travelRows.push({
+        no: "01",
+        origem: roundTripData.origin || "-",
+        destino: roundTripData.destination || "-",
+        dataIda: departureFormatted,
+        dataVolta: returnFormatted ?? "-",
+        tipo: "Ida e Volta",
+      });
+    } else if (tripType === "one_way") {
+      travelRows.push({
+        no: "01",
+        origem: roundTripData.origin || "-",
+        destino: roundTripData.destination || "-",
+        dataIda: departureFormatted,
+        dataVolta: "-",
+        tipo: "Só Ida",
+      });
+    } else if (tripType === "multi_city") {
+      flightSegments.forEach((seg, index) => {
+        const segDate = seg.date
+          ? format(parseLocalDateFromInput(seg.date) ?? new Date(), "dd/MM/yyyy", {
+              locale: ptBR,
+            })
           : "A definir";
 
-      const departureDateObj = parseLocalDateFromInput(roundTripData.departureDate);
-      const returnDateObj =
-        tripType === "round_trip"
-          ? parseLocalDateFromInput(roundTripData.returnDate)
-          : null;
-
-      const departureFormatted = departureDateObj
-        ? format(departureDateObj, "dd/MM/yyyy", { locale: ptBR })
-        : "A definir";
-
-      const returnFormatted =
-        tripType === "round_trip" && returnDateObj
-          ? format(returnDateObj, "dd/MM/yyyy", { locale: ptBR })
-          : null;
-
-      const tripTypeText =
-        tripType === "round_trip"
-          ? "Ida e Volta"
-          : tripType === "one_way"
-          ? "Somente Ida"
-          : "Múltiplos Trechos";
-
-      const totalPriceFormatted = calculatedValues.price.toFixed(2).replace(".", ",");
-      const pricePerPassengerFormatted =
-        calculatedValues.finalPricePerPassenger.toFixed(2).replace(".", ",");
-
-      // ========= BLOCO: DADOS DO CLIENTE =========
-      pdf.setFontSize(11);
-      pdf.setTextColor(80, 80, 80);
-      pdf.text("Dados do Cliente", 10, cursorY);
-      cursorY += 5;
-
-      pdf.setFontSize(10);
-      pdf.setTextColor(30, 30, 30);
-      pdf.text(`Nome: ${clientName || "Cliente não informado"}`, 10, cursorY);
-      cursorY += 5;
-      pdf.text(
-        `Telefone/WhatsApp: ${clientPhone || "Não informado"}`,
-        10,
-        cursorY
-      );
-      cursorY += 8;
-
-      // ========= BLOCO: DADOS DA VIAGEM =========
-      pdf.setFontSize(11);
-      pdf.setTextColor(80, 80, 80);
-      pdf.text("Dados da Viagem", 10, cursorY);
-      cursorY += 5;
-
-      pdf.setFontSize(10);
-      pdf.setTextColor(30, 30, 30);
-      pdf.text(`Rota: ${routeText}`, 10, cursorY);
-      cursorY += 5;
-      pdf.text(`Tipo: ${tripTypeText}`, 10, cursorY);
-      cursorY += 5;
-      pdf.text(`Data ida: ${departureFormatted}`, 10, cursorY);
-      cursorY += 5;
-      if (tripType === "round_trip") {
-        pdf.text(`Data volta: ${returnFormatted ?? "A definir"}`, 10, cursorY);
-        cursorY += 5;
-      }
-      pdf.text(`Passageiros: ${passengers || "1"}`, 10, cursorY);
-      cursorY += 5;
-      if (airline) {
-        pdf.text(`Cia aérea preferencial: ${airline}`, 10, cursorY);
-        cursorY += 8;
-      } else {
-        cursorY += 5;
-      }
-
-      pdf.setDrawColor(220, 220, 220);
-      pdf.line(10, cursorY, pageWidth - 10, cursorY);
-      cursorY += 8;
-
-      // ========= BLOCO: RESUMO DO ORÇAMENTO (CLIENTE) =========
-      pdf.setFontSize(11);
-      pdf.setTextColor(80, 80, 80);
-      pdf.text("Resumo do Orçamento", 10, cursorY);
-      cursorY += 6;
-
-      pdf.setFontSize(10);
-      pdf.setTextColor(30, 30, 30);
-      pdf.text(
-        `Valor por passageiro: R$ ${pricePerPassengerFormatted}`,
-        10,
-        cursorY
-      );
-      cursorY += 5;
-      pdf.text(`Valor total do orçamento: R$ ${totalPriceFormatted}`, 10, cursorY);
-      cursorY += 8;
-
-      const resumoExtra =
-        "Valores incluem emissão com milhas e taxas de embarque. " +
-        "Os valores estão sujeitos à disponibilidade e podem sofrer alteração até a emissão das passagens.";
-      const resumoLines = pdf.splitTextToSize(resumoExtra, pageWidth - 20);
-      pdf.setFontSize(9);
-      pdf.setTextColor(70, 70, 70);
-      pdf.text(resumoLines, 10, cursorY);
-      cursorY += resumoLines.length * 4 + 8;
-
-      // ========= BLOCO: FORMAS DE PAGAMENTO =========
-      const paymentDescription =
-        buildInstallmentsDescription() ||
-        `Pix, Cartão de Crédito e Cartão de Débito.\n\nConsulte condições especiais para pagamento à vista.`;
-
-      pdf.setFontSize(11);
-      pdf.setTextColor(80, 80, 80);
-      pdf.text("Formas de Pagamento", 10, cursorY);
-      cursorY += 6;
-
-      pdf.setFontSize(9);
-      pdf.setTextColor(40, 40, 40);
-      const paymentLines = pdf.splitTextToSize(paymentDescription, pageWidth - 20);
-      pdf.text(paymentLines, 10, cursorY);
-      cursorY += paymentLines.length * 4 + 8;
-
-      // ========= BLOCO: OBSERVAÇÕES =========
-      pdf.setFontSize(11);
-      pdf.setTextColor(80, 80, 80);
-      pdf.text("Observações", 10, cursorY);
-      cursorY += 6;
-
-      pdf.setFontSize(9);
-      pdf.setTextColor(40, 40, 40);
-      const notesText =
-        notes ||
-        "Após a confirmação do pagamento, realizaremos a emissão das passagens e enviaremos todos os bilhetes por e-mail ou WhatsApp.";
-      const notesLines = pdf.splitTextToSize(notesText, pageWidth - 20);
-      pdf.text(notesLines, 10, cursorY);
-      cursorY += notesLines.length * 4 + 8;
-
-      // ========= RODAPÉ =========
-      pdf.setFontSize(8);
-      pdf.setTextColor(140, 140, 140);
-      pdf.text(
-        "Orçamento válido por 24 horas a partir da data de emissão ou até alteração de tarifa pela companhia aérea.",
-        pageWidth - 10,
-        290,
-        { align: "right" }
-      );
-      pdf.text(
-        "Hello Milhas Hub - Emissão de passagens com milhas para uso próprio e viagens em família.",
-        pageWidth - 10,
-        295,
-        { align: "right" }
-      );
-
-      const filename = clientName
-        ? `orcamento-${clientName.replace(/\s+/g, "-").toLowerCase()}.pdf`
-        : "orcamento-cliente.pdf";
-
-      pdf.save(filename);
-
-      toast({
-        title: "Orçamento exportado!",
-        description: "PDF para o cliente gerado com sucesso",
-      });
-    } catch (error) {
-      console.error("Erro ao exportar PDF (cliente):", error);
-      toast({
-        title: "Erro ao exportar PDF",
-        description: "Não foi possível gerar o PDF do cliente",
-        variant: "destructive",
+        travelRows.push({
+          no: String(index + 1).padStart(2, "0"),
+          origem: seg.from || "-",
+          destino: seg.to || "-",
+          dataIda: segDate,
+          dataVolta: "-",
+          tipo: "Trecho",
+        });
       });
     }
-  };
+
+    if (travelRows.length === 0) {
+      travelRows.push({
+        no: "01",
+        origem: roundTripData.origin || "-",
+        destino: roundTripData.destination || "-",
+        dataIda: departureFormatted,
+        dataVolta: returnFormatted ?? "-",
+        tipo:
+          tripType === "one_way" ? "Só Ida" : tripType === "multi_city" ? "Multi-trechos" : "Ida e Volta",
+      });
+    }
+
+    travelRows.forEach((row) => {
+      rowY += 6;
+      pdf.line(margin, rowY + 1.5, pageWidth - margin, rowY + 1.5);
+
+      pdf.text(row.no, colNo + 2, rowY);
+      pdf.text(row.origem, colOrigem + 2, rowY);
+      pdf.text(row.destino, colDestino + 2, rowY);
+      pdf.text(row.dataIda, colDataIda + 2, rowY);
+      pdf.text(row.dataVolta, colDataVolta + 2, rowY);
+      pdf.text(row.tipo, colTipo + 2, rowY);
+    });
+
+    cursorY = rowY + 10;
+
+    // ========= BLOCO: RESUMO FINANCEIRO =========
+    drawSectionTitle("Resumo Financeiro");
+
+    const passengersNum = parseInt(passengers) || 1;
+    const totalPriceFormatted = calculatedValues.price.toFixed(2).replace(".", ",");
+    const pricePerPassengerFormatted =
+      calculatedValues.finalPricePerPassenger.toFixed(2).replace(".", ",");
+    const milesPerPassenger = calculatedValues.milesPerPassenger || 0;
+    const totalMiles = calculatedValues.totalMiles || 0;
+
+    drawCard(32, (innerX, innerY) => {
+      // Título
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(10);
+      pdf.setTextColor(grayText.r, grayText.g, grayText.b);
+      pdf.text("Custos Estimados", innerX, innerY);
+
+      const lineY = innerY + 3;
+      pdf.setDrawColor(border.r, border.g, border.b);
+      pdf.line(innerX, lineY, pageWidth - margin - 4, lineY);
+
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(10);
+      pdf.setTextColor(grayText.r, grayText.g, grayText.b);
+
+      let y = innerY + 9;
+      const labelX = innerX;
+      const valueX = pageWidth - margin - 4;
+
+      const addRow = (label: string, value: string) => {
+        pdf.text(label, labelX, y);
+        pdf.text(value, valueX, y, { align: "right" });
+        y += 5;
+      };
+
+      addRow("Valor por passageiro", `R$ ${pricePerPassengerFormatted}`);
+      addRow("Quantidade de passageiros", `${passengersNum}`);
+      addRow("Valor total estimado", `R$ ${totalPriceFormatted}`);
+      addRow(
+        "Milhas utilizadas",
+        `${formatNumber(totalMiles)} (${formatNumber(milesPerPassenger)} / pax)`
+      );
+    });
+
+    // ========= BLOCO: OBSERVAÇÕES =========
+    drawSectionTitle("Notas e Observações");
+
+    const notesText =
+      notes ||
+      "Este orçamento foi elaborado com base nas informações fornecidas até o momento. " +
+        "Os valores estão sujeitos à disponibilidade e às regras das companhias aéreas no momento da emissão.";
+
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(9);
+    pdf.setTextColor(grayMuted.r, grayMuted.g, grayMuted.b);
+
+    const textWidth = pageWidth - margin * 2;
+    const wrapped = pdf.splitTextToSize(notesText, textWidth);
+    pdf.text(wrapped, margin, cursorY + 4);
+
+    // ========= SALVAR =========
+    const filename = clientName
+      ? `orcamento-${clientName.replace(/\s+/g, "-").toLowerCase()}.pdf`
+      : "orcamento-passagens.pdf";
+
+    pdf.save(filename);
+
+    toast({
+      title: "Orçamento exportado!",
+      description: "PDF gerado com layout laranja",
+    });
+  } catch (error) {
+    console.error("Erro ao exportar PDF (cliente):", error);
+    toast({
+      title: "Erro ao exportar PDF",
+      description: "Não foi possível gerar o PDF do cliente",
+      variant: "destructive",
+    });
+  }
+};
+
 
   // ========== EXPORTAR COMO PDF INTERNO (ANÁLISE) ==========
   const handleExportAsInternalPDF = () => {
