@@ -7,7 +7,9 @@ export interface RoundTripData {
   destination: string;
   departureDate: string;
   returnDate: string;
-  miles: number;
+  miles: number;          // usado para "Só Ida" em outros fluxos
+  milesOutbound: number;  // milhas ida / pax
+  milesReturn: number;    // milhas volta / pax
 }
 
 interface RoundTripFormProps {
@@ -18,6 +20,12 @@ interface RoundTripFormProps {
 export function RoundTripForm({ data, onChange }: RoundTripFormProps) {
   const updateField = (field: keyof RoundTripData, value: string | number) => {
     onChange({ ...data, [field]: value });
+  };
+
+  const handleMilesChange = (field: "milesOutbound" | "milesReturn", value: string) => {
+    const numeric = value.replace(/\D/g, "");
+    const num = numeric ? Number(numeric) : 0;
+    updateField(field, num);
   };
 
   return (
@@ -69,15 +77,27 @@ export function RoundTripForm({ data, onChange }: RoundTripFormProps) {
         </div>
       </div>
 
-      <div className="space-y-2 mt-2">
-        <Label htmlFor="miles">Milhas/pax (Ida + Volta) *</Label>
-        <Input
-          id="miles"
-          type="number"
-          placeholder="Ex: 3.0000"
-          value={data.miles || ""}
-          onChange={(e) => updateField("miles", parseInt(e.target.value) || 0)}
-        />
+      {/* 🔹 Campos separados de milhas: Ida e Volta */}
+      <div className="grid md:grid-cols-2 gap-4 mt-2">
+        <div className="space-y-2">
+          <Label htmlFor="milesOutbound">Milhas ida/pax *</Label>
+          <Input
+            id="milesOutbound"
+            placeholder="Ex: 30000"
+            value={data.milesOutbound ? data.milesOutbound.toString() : ""}
+            onChange={(e) => handleMilesChange("milesOutbound", e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="milesReturn">Milhas volta/pax *</Label>
+          <Input
+            id="milesReturn"
+            placeholder="Ex: 30000"
+            value={data.milesReturn ? data.milesReturn.toString() : ""}
+            onChange={(e) => handleMilesChange("milesReturn", e.target.value)}
+          />
+        </div>
       </div>
     </div>
   );
