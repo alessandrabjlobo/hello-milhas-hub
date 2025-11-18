@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useState, useEffect, useMemo, type ChangeEvent } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import html2canvas from "html2canvas";
+import { jsPDF } from "jspdf";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -630,43 +630,613 @@ R$ ${costPerMileFormatted} o milheiro`;
     }
   };
 
-  // ========== EXPORTAR COMO JPG ==========
-  const handleExportAsJPG = async () => {
-    const element = document.getElementById("quote-workspace");
-    if (!element) {
+  // ========== EXPORTAR COMO PDF PARA CLIENTE ==========
+  const handleExportAsPDF = () => {
+    try {
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+
+      // Cabeçalho
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(10);
+      pdf.setTextColor(120, 120, 120);
+      pdf.text("HELLO MILHAS HUB", 10, 15);
+
+      pdf.setFontSize(16);
+      pdf.setTextColor(20, 20, 20);
+      pdf.text("Orçamento de Passagens Aéreas", 10, 25);
+
+      const todayStr = format(new Date(), "dd/MM/yyyy");
+      pdf.setFontSize(9);
+      pdf.setTextColor(100, 100, 100);
+      pdf.text(`Data: ${todayStr}`, pageWidth - 10, 20, { align: "right" });
+
+      let cursorY = 35;
+
+      // Dados da viagem
+      const routeText =
+        roundTripData.origin && roundTripData.destination
+          ? `${roundTripData.origin} → ${roundTripData.destination}`
+          : "A definir";
+
+      const departureDateObj = parseLocalDateFromInput(roundTripData.departureDate);
+      const returnDateObj =
+        tripType === "round_trip"
+          ? parseLocalDateFromInput(roundTripData.returnDate)
+          : null;
+
+      const departureFormatted = departureDateObj
+        ? format(departureDateObj, "dd/MM/yyyy", { locale: ptBR })
+        : "A definir";
+
+      const returnFormatted =
+        tripType === "round_trip" && returnDateObj
+          ? format(returnDateObj, "dd/MM/yyyy", { locale: ptBR })
+          : null;
+
+      const tripTypeText =
+        tripType === "round_trip"
+          ? "Ida e Volta"
+          : tripType === "one_way"
+          ? "Somente Ida"
+          : "Múltiplos Trechos";
+
+      const totalPriceFormatted = calculatedValues.price.toFixed(2).replace(".", ",");
+      const pricePerPassengerFormatted =
+        calculatedValues.finalPricePerPassenger.toFixed(2).replace(".", ",");
+
+      // ========= BLOCO: DADOS DO CLIENTE =========
+      pdf.setFontSize(11);
+      pdf.setTextColor(80, 80, 80);
+      pdf.text("Dados do Cliente", 10, cursorY);
+      cursorY += 5;
+
+      pdf.setFontSize(10);
+      pdf.setTextColor(30, 30, 30);
+      pdf.text(`Nome: ${clientName || "Cliente não informado"}`, 10, cursorY);
+      cursorY += 5;
+      pdf.text(
+        `Telefone/WhatsApp: ${clientPhone || "Não informado"}`,
+        10,
+        cursorY
+      );
+      cursorY += 8;
+
+      // ========= BLOCO: DADOS DA VIAGEM =========
+      pdf.setFontSize(11);
+      pdf.setTextColor(80, 80, 80);
+      pdf.text("Dados da Viagem", 10, cursorY);
+      cursorY += 5;
+
+      pdf.setFontSize(10);
+      pdf.setTextColor(30, 30, 30);
+      pdf.text(`Rota: ${routeText}`, 10, cursorY);
+      cursorY += 5;
+      pdf.text(`Tipo: ${tripTypeText}`, 10, cursorY);
+      cursorY += 5;
+      pdf.text(`Data ida: ${departureFormatted}`, 10, cursorY);
+      cursorY += 5;
+      if (tripType === "round_trip") {
+        pdf.text(`Data volta: ${returnFormatted ?? "A definir"}`, 10, cursorY);
+        cursorY += 5;
+      }
+      pdf.text(`Passageiros: ${passengers || "1"}`, 10, cursorY);
+      cursorY += 5;
+      if (airline) {
+        pdf.text(`Cia aérea preferencial: ${airline}`, 10, cursorY);
+        cursorY += 8;
+      } else {
+        cursorY += 5;
+      }
+
+      pdf.setDrawColor(220, 220, 220);
+      pdf.line(10, cursorY, pageWidth - 10, cursorY);
+      cursorY += 8;
+
+      // ========= BLOCO: RESUMO DO ORÇAMENTO (CLIENTE) =========
+      pdf.setFontSize(11);
+      pdf.setTextColor(80, 80, 80);
+      pdf.text("Resumo do Orçamento", 10, cursorY);
+      cursorY += 6;
+
+      pdf.setFontSize(10);
+      pdf.setTextColor(30, 30, 30);
+      pdf.text(
+        `Valor por passageiro: R$ ${pricePerPassengerFormatted}`,
+        10,
+        cursorY
+      );
+      cursorY += 5;
+      pdf.text(`Valor total do orçamento: R$ ${totalPriceFormatted}`, 10, cursorY);
+      cursorY += 8;
+
+      const resumoExtra =
+        "Valores incluem emissão com milhas e taxas de embarque. " +
+        "Os valores estão sujeitos à disponibilidade e podem sofrer alteração até a emissão das passagens.";
+      const resumoLines = pdf.splitTextToSize(resumoExtra, pageWidth - 20);
+      pdf.setFontSize(9);
+      pdf.setTextColor(70, 70, 70);
+      pdf.text(resumoLines, 10, cursorY);
+      cursorY += resumoLines.length * 4 + 8;
+
+      // ========= BLOCO: FORMAS DE PAGAMENTO =========
+      const paymentDescription =
+        buildInstallmentsDescription() ||
+        `Pix, Cartão de Crédito e Cartão de Débito.\n\nConsulte condições especiais para pagamento à vista.`;
+
+      pdf.setFontSize(11);
+      pdf.setTextColor(80, 80, 80);
+      pdf.text("Formas de Pagamento", 10, cursorY);
+      cursorY += 6;
+
+      pdf.setFontSize(9);
+      pdf.setTextColor(40, 40, 40);
+      const paymentLines = pdf.splitTextToSize(paymentDescription, pageWidth - 20);
+      pdf.text(paymentLines, 10, cursorY);
+      cursorY += paymentLines.length * 4 + 8;
+
+      // ========= BLOCO: OBSERVAÇÕES =========
+      pdf.setFontSize(11);
+      pdf.setTextColor(80, 80, 80);
+      pdf.text("Observações", 10, cursorY);
+      cursorY += 6;
+
+      pdf.setFontSize(9);
+      pdf.setTextColor(40, 40, 40);
+      const notesText =
+        notes ||
+        "Após a confirmação do pagamento, realizaremos a emissão das passagens e enviaremos todos os bilhetes por e-mail ou WhatsApp.";
+      const notesLines = pdf.splitTextToSize(notesText, pageWidth - 20);
+      pdf.text(notesLines, 10, cursorY);
+      cursorY += notesLines.length * 4 + 8;
+
+      // ========= RODAPÉ =========
+      pdf.setFontSize(8);
+      pdf.setTextColor(140, 140, 140);
+      pdf.text(
+        "Orçamento válido por 24 horas a partir da data de emissão ou até alteração de tarifa pela companhia aérea.",
+        pageWidth - 10,
+        290,
+        { align: "right" }
+      );
+      pdf.text(
+        "Hello Milhas Hub - Emissão de passagens com milhas para uso próprio e viagens em família.",
+        pageWidth - 10,
+        295,
+        { align: "right" }
+      );
+
+      const filename = clientName
+        ? `orcamento-${clientName.replace(/\s+/g, "-").toLowerCase()}.pdf`
+        : "orcamento-cliente.pdf";
+
+      pdf.save(filename);
+
       toast({
-        title: "Erro ao exportar",
-        description: "Elemento não encontrado",
+        title: "Orçamento exportado!",
+        description: "PDF para o cliente gerado com sucesso",
+      });
+    } catch (error) {
+      console.error("Erro ao exportar PDF (cliente):", error);
+      toast({
+        title: "Erro ao exportar PDF",
+        description: "Não foi possível gerar o PDF do cliente",
         variant: "destructive",
       });
-      return;
     }
+  };
 
+  // ========== EXPORTAR COMO PDF INTERNO (ANÁLISE) ==========
+  const handleExportAsInternalPDF = () => {
     try {
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        backgroundColor: "#ffffff",
-        logging: false,
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
       });
 
-      const link = document.createElement("a");
+      const pageWidth = pdf.internal.pageSize.getWidth();
+
+      const routeText =
+        roundTripData.origin && roundTripData.destination
+          ? `${roundTripData.origin} → ${roundTripData.destination}`
+          : "A definir";
+
+      const departureDateObj = parseLocalDateFromInput(roundTripData.departureDate);
+      const returnDateObj =
+        tripType === "round_trip"
+          ? parseLocalDateFromInput(roundTripData.returnDate)
+          : null;
+
+      const departureFormatted = departureDateObj
+        ? format(departureDateObj, "dd/MM/yyyy", { locale: ptBR })
+        : "A definir";
+
+      const returnFormatted =
+        tripType === "round_trip" && returnDateObj
+          ? format(returnDateObj, "dd/MM/yyyy", { locale: ptBR })
+          : null;
+
+      const tripTypeText =
+        tripType === "round_trip"
+          ? "Ida e Volta"
+          : tripType === "one_way"
+          ? "Somente Ida"
+          : "Múltiplos Trechos";
+
+      const milesPerPassenger = calculatedValues.milesPerPassenger || 0;
+      const totalMiles = calculatedValues.totalMiles || 0;
+
+      const totalCostFormatted = calculatedValues.totalCost.toFixed(2).replace(".", ",");
+      const totalPriceFormatted = calculatedValues.price.toFixed(2).replace(".", ",");
+      const pricePerPassengerFormatted =
+        calculatedValues.finalPricePerPassenger.toFixed(2).replace(".", ",");
+      const profitFormatted = calculatedValues.profit.toFixed(2).replace(".", ",");
+      const profitMarginFormatted = calculatedValues.profitMargin.toFixed(1);
+      const milesMarkupFormatted = calculatedValues.milesMarkup.toFixed(1);
+
+      // Cabeçalho
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(10);
+      pdf.setTextColor(120, 120, 120);
+      pdf.text("HELLO MILHAS HUB", 10, 15);
+
+      pdf.setFontSize(16);
+      pdf.setTextColor(20, 20, 20);
+      pdf.text("Análise Interna do Orçamento", 10, 25);
+
+      const todayStr = format(new Date(), "dd/MM/yyyy");
+      pdf.setFontSize(9);
+      pdf.setTextColor(100, 100, 100);
+      pdf.text(`Data: ${todayStr}`, pageWidth - 10, 20, { align: "right" });
+
+      let cursorY = 35;
+
+      // Dados gerais
+      pdf.setFontSize(11);
+      pdf.setTextColor(80, 80, 80);
+      pdf.text("Resumo da Viagem", 10, cursorY);
+      cursorY += 6;
+
+      pdf.setFontSize(10);
+      pdf.setTextColor(30, 30, 30);
+      pdf.text(`Cliente: ${clientName || "Não informado"}`, 10, cursorY);
+      cursorY += 5;
+      pdf.text(`Rota: ${routeText}`, 10, cursorY);
+      cursorY += 5;
+      pdf.text(`Tipo: ${tripTypeText}`, 10, cursorY);
+      cursorY += 5;
+      pdf.text(`Data ida: ${departureFormatted}`, 10, cursorY);
+      cursorY += 5;
+      if (tripType === "round_trip") {
+        pdf.text(`Data volta: ${returnFormatted ?? "A definir"}`, 10, cursorY);
+        cursorY += 5;
+      }
+      pdf.text(`Passageiros: ${passengers || "1"}`, 10, cursorY);
+      cursorY += 5;
+      if (airline) {
+        pdf.text(`Cia aérea preferencial: ${airline}`, 10, cursorY);
+        cursorY += 8;
+      } else {
+        cursorY += 6;
+      }
+
+      pdf.setDrawColor(220, 220, 220);
+      pdf.line(10, cursorY, pageWidth - 10, cursorY);
+      cursorY += 8;
+
+      // Bloco financeiro interno
+      pdf.setFontSize(11);
+      pdf.setTextColor(80, 80, 80);
+      pdf.text("Resumo Financeiro Interno", 10, cursorY);
+      cursorY += 6;
+
+      pdf.setFontSize(10);
+      pdf.setTextColor(30, 30, 30);
+      pdf.text(
+        `Milhas por passageiro: ${formatNumber(milesPerPassenger || 0)} milhas`,
+        10,
+        cursorY
+      );
+      cursorY += 5;
+      pdf.text(
+        `Total de milhas: ${formatNumber(totalMiles || 0)} milhas`,
+        10,
+        cursorY
+      );
+      cursorY += 5;
+      pdf.text(
+        `Custo total (milhas + taxas): R$ ${totalCostFormatted}`,
+        10,
+        cursorY
+      );
+      cursorY += 5;
+      pdf.text(
+        `Valor de venda por passageiro: R$ ${pricePerPassengerFormatted}`,
+        10,
+        cursorY
+      );
+      cursorY += 5;
+      pdf.text(`Valor de venda total: R$ ${totalPriceFormatted}`, 10, cursorY);
+      cursorY += 5;
+      pdf.text(`Lucro estimado: R$ ${profitFormatted}`, 10, cursorY);
+      cursorY += 5;
+      pdf.text(
+        `Margem sobre o preço: ${profitMarginFormatted}%`,
+        10,
+        cursorY
+      );
+      cursorY += 5;
+      pdf.text(
+        `Markup das milhas (interno): ${milesMarkupFormatted}%`,
+        10,
+        cursorY
+      );
+      cursorY += 8;
+
+      // Observações internas
+      pdf.setFontSize(11);
+      pdf.setTextColor(80, 80, 80);
+      pdf.text("Observações Internas", 10, cursorY);
+      cursorY += 6;
+
+      pdf.setFontSize(9);
+      pdf.setTextColor(50, 50, 50);
+      const internalNotes =
+        notes ||
+        "Use este espaço para anotações internas sobre a negociação, limites mínimos de preço e estratégias de desconto.";
+      const notesLines = pdf.splitTextToSize(internalNotes, pageWidth - 20);
+      pdf.text(notesLines, 10, cursorY);
+      cursorY += notesLines.length * 4 + 8;
+
+      // Rodapé interno
+      pdf.setFontSize(8);
+      pdf.setTextColor(140, 140, 140);
+      pdf.text(
+        "Documento de uso interno. Não enviar para o cliente.",
+        pageWidth - 10,
+        290,
+        { align: "right" }
+      );
+      pdf.text(
+        "Hello Milhas Hub - Controle interno de margem e lucratividade.",
+        pageWidth - 10,
+        295,
+        { align: "right" }
+      );
+
+      const filename = clientName
+        ? `analise-interna-${clientName.replace(/\s+/g, "-").toLowerCase()}.pdf`
+        : "analise-interna.pdf";
+
+      pdf.save(filename);
+
+      toast({
+        title: "Análise interna exportada!",
+        description: "PDF interno gerado com sucesso",
+      });
+    } catch (error) {
+      console.error("Erro ao exportar PDF interno:", error);
+      toast({
+        title: "Erro ao exportar PDF interno",
+        description: "Não foi possível gerar o PDF interno",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // ========== EXPORTAR COMO JPG (CLIENTE) ==========
+  const handleExportAsJPG = () => {
+    try {
+      const canvas = document.createElement("canvas");
+      // Proporção aproximada A4 em pixels
+      const width = 1240;
+      const height = 1754;
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        toast({
+          title: "Erro ao exportar",
+          description: "Não foi possível inicializar o canvas",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Fundo
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, width, height);
+
+      const routeText =
+        roundTripData.origin && roundTripData.destination
+          ? `${roundTripData.origin} → ${roundTripData.destination}`
+          : "A definir";
+
+      const departureDateObj = parseLocalDateFromInput(roundTripData.departureDate);
+      const returnDateObj =
+        tripType === "round_trip"
+          ? parseLocalDateFromInput(roundTripData.returnDate)
+          : null;
+
+      const departureFormatted = departureDateObj
+        ? format(departureDateObj, "dd/MM/yyyy", { locale: ptBR })
+        : "A definir";
+
+      const returnFormatted =
+        tripType === "round_trip" && returnDateObj
+          ? format(returnDateObj, "dd/MM/yyyy", { locale: ptBR })
+          : null;
+
+      const tripTypeText =
+        tripType === "round_trip"
+          ? "Ida e Volta"
+          : tripType === "one_way"
+          ? "Somente Ida"
+          : "Múltiplos Trechos";
+
+      const totalPriceFormatted = calculatedValues.price.toFixed(2).replace(".", ",");
+      const pricePerPassengerFormatted =
+        calculatedValues.finalPricePerPassenger.toFixed(2).replace(".", ",");
+
+      // Cabeçalho
+      let y = 100;
+      ctx.fillStyle = "#64748b";
+      ctx.font = "bold 26px Arial";
+      ctx.fillText("HELLO MILHAS HUB", 80, y);
+      y += 36;
+
+      ctx.fillStyle = "#0f172a";
+      ctx.font = "bold 34px Arial";
+      ctx.fillText("Orçamento de Passagens Aéreas", 80, y);
+      y += 40;
+
+      ctx.strokeStyle = "#e5e7eb";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(80, y);
+      ctx.lineTo(width - 80, y);
+      ctx.stroke();
+      y += 30;
+
+      // Dados do cliente
+      ctx.fillStyle = "#6b7280";
+      ctx.font = "bold 18px Arial";
+      ctx.fillText("Dados do Cliente", 80, y);
+      y += 26;
+
+      ctx.fillStyle = "#111827";
+      ctx.font = "16px Arial";
+      ctx.fillText(`Nome: ${clientName || "Cliente não informado"}`, 80, y);
+      y += 24;
+      ctx.fillText(
+        `Telefone/WhatsApp: ${clientPhone || "Não informado"}`,
+        80,
+        y
+      );
+      y += 36;
+
+      // Dados da viagem
+      ctx.fillStyle = "#6b7280";
+      ctx.font = "bold 18px Arial";
+      ctx.fillText("Dados da Viagem", 80, y);
+      y += 26;
+
+      ctx.fillStyle = "#111827";
+      ctx.font = "16px Arial";
+      ctx.fillText(`Rota: ${routeText}`, 80, y);
+      y += 24;
+      ctx.fillText(`Tipo: ${tripTypeText}`, 80, y);
+      y += 24;
+      ctx.fillText(`Data ida: ${departureFormatted}`, 80, y);
+      y += 24;
+      if (tripType === "round_trip") {
+        ctx.fillText(`Data volta: ${returnFormatted ?? "A definir"}`, 80, y);
+        y += 24;
+      }
+      ctx.fillText(`Passageiros: ${passengers || "1"}`, 80, y);
+      y += 24;
+      if (airline) {
+        ctx.fillText(`Cia aérea preferencial: ${airline}`, 80, y);
+        y += 30;
+      } else {
+        y += 10;
+      }
+
+      // Linha
+      ctx.strokeStyle = "#e5e7eb";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(80, y);
+      ctx.lineTo(width - 80, y);
+      ctx.stroke();
+      y += 30;
+
+      // Resumo do orçamento (sem custos/lucro internos)
+      ctx.fillStyle = "#6b7280";
+      ctx.font = "bold 18px Arial";
+      ctx.fillText("Resumo do Orçamento", 80, y);
+      y += 26;
+
+      ctx.fillStyle = "#111827";
+      ctx.font = "16px Arial";
+      ctx.fillText(
+        `Valor por passageiro: R$ ${pricePerPassengerFormatted}`,
+        80,
+        y
+      );
+      y += 24;
+      ctx.fillText(
+        `Valor total do orçamento: R$ ${totalPriceFormatted}`,
+        80,
+        y
+      );
+      y += 32;
+
+      ctx.fillStyle = "#4b5563";
+      ctx.font = "14px Arial";
+      const textResumo =
+        "Valores incluem emissão com milhas e taxas de embarque. " +
+        "Os valores estão sujeitos à disponibilidade e podem sofrer alteração até a emissão das passagens.";
+      const wrapText = (text: string, x: number, maxWidth: number) => {
+        const words = text.split(" ");
+        let line = "";
+        const lines: string[] = [];
+
+        for (let n = 0; n < words.length; n++) {
+          const testLine = line + words[n] + " ";
+          const metrics = ctx.measureText(testLine);
+          const testWidth = metrics.width;
+          if (testWidth > maxWidth && n > 0) {
+            lines.push(line);
+            line = words[n] + " ";
+          } else {
+            line = testLine;
+          }
+        }
+        lines.push(line);
+        return lines;
+      };
+
+      const resumoLines = wrapText(textResumo, 80, width - 160);
+      resumoLines.forEach((line) => {
+        ctx.fillText(line, 80, y);
+        y += 22;
+      });
+
+      // Rodapé simples
+      ctx.fillStyle = "#9ca3af";
+      ctx.font = "14px Arial";
+      ctx.fillText(
+        "Orçamento gerado pelo Hello Milhas Hub. Válido por 24 horas a partir da data de emissão.",
+        80,
+        height - 120
+      );
+
       const filename = clientName
         ? `orcamento-${clientName.replace(/\s+/g, "-").toLowerCase()}.jpg`
         : "orcamento.jpg";
 
-      link.download = filename;
+      const link = document.createElement("a");
       link.href = canvas.toDataURL("image/jpeg", 0.9);
+      link.download = filename;
       link.click();
 
       toast({
         title: "Orçamento exportado!",
-        description: "Imagem salva com sucesso",
+        description: "Imagem JPG gerada com sucesso",
       });
     } catch (error) {
-      console.error("Erro ao exportar:", error);
+      console.error("Erro ao exportar JPG:", error);
       toast({
         title: "Erro ao exportar",
-        description: "Não foi possível gerar a imagem",
+        description: "Não foi possível gerar a imagem JPG",
         variant: "destructive",
       });
     }
@@ -1412,12 +1982,49 @@ R$ ${costPerMileFormatted} o milheiro`;
             </CardContent>
           </Card>
 
-          {/* AÇÕES */}
-          <div className="space-y-2">
-            <Button variant="outline" className="w-full" onClick={handleExportAsJPG}>
-              <Download className="mr-2 h-4 w-4" />
-              Baixar Orçamento como JPG
-            </Button>
+          {/* AÇÕES - ENXUTO */}
+          <div className="space-y-3">
+            {/* Grupo: Orçamento Cliente */}
+            <div className="rounded-lg border bg-card p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-sm">Orçamento para Cliente</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 mt-1">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleExportAsPDF}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  PDF
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleExportAsJPG}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  JPG
+                </Button>
+              </div>
+            </div>
+
+            {/* Grupo: Análise interna */}
+            <div className="rounded-lg border bg-card p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-sm">Análise interna</span>
+              </div>
+              <Button
+                variant="outline"
+                className="w-full mt-1"
+                onClick={handleExportAsInternalPDF}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                PDF (uso interno)
+              </Button>
+            </div>
+
+            {/* Salvar orçamento */}
             <Button
               className="w-full"
               size="lg"
