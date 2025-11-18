@@ -651,6 +651,13 @@ const handleExportAsPDF = () => {
     const grayMuted = { r: 107, g: 114, b: 128 };
     const border = { r: 209, g: 213, b: 219 };
 
+    // Espaçamentos
+    const spacing = {
+      sectionGap: 8,
+      cardPadding: 6,
+      rowHeight: 6,
+    };
+
     // ========== HEADER COLORIDO ==========
     pdf.setFillColor(orangeDark.r, orangeDark.g, orangeDark.b);
     pdf.rect(0, 0, pageWidth, 26, "F");
@@ -668,21 +675,32 @@ const handleExportAsPDF = () => {
     let cursorY = 32;
 
     const drawSectionTitle = (title: string) => {
+      // Fundo colorido atrás do título
+      pdf.setFillColor(orangeLight.r, orangeLight.g, orangeLight.b);
+      pdf.rect(margin - 2, cursorY - 3, pageWidth - (margin - 2) * 2, 8, "F");
+      
       pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(11);
+      pdf.setFontSize(12);
       pdf.setTextColor(orangeDark.r, orangeDark.g, orangeDark.b);
-      pdf.text(title, margin, cursorY);
-      cursorY += 5;
+      pdf.text(title, margin, cursorY + 2);
+      cursorY += 8;
     };
 
     const drawCard = (height: number, body: (innerX: number, innerY: number) => void) => {
-      pdf.setFillColor(orangeLight.r, orangeLight.g, orangeLight.b);
+      // Sombra sutil
+      pdf.setFillColor(200, 200, 200);
+      pdf.roundedRect(margin + 1, cursorY + 1, pageWidth - margin * 2, height, 2, 2, "F");
+      
+      // Card branco
+      pdf.setFillColor(255, 255, 255);
       pdf.setDrawColor(border.r, border.g, border.b);
+      pdf.setLineWidth(0.5);
       pdf.roundedRect(margin, cursorY, pageWidth - margin * 2, height, 2, 2, "FD");
-      const innerX = margin + 4;
-      const innerY = cursorY + 7;
+      
+      const innerX = margin + spacing.cardPadding;
+      const innerY = cursorY + spacing.cardPadding + 3;
       body(innerX, innerY);
-      cursorY += height + 6;
+      cursorY += height + spacing.sectionGap;
     };
 
     // Datas
@@ -822,8 +840,16 @@ const handleExportAsPDF = () => {
       });
     }
 
-    travelRows.forEach((row) => {
+    travelRows.forEach((row, idx) => {
       rowY += 6;
+      
+      // Zebra striping - fundo alternado
+      if (idx % 2 === 0) {
+        pdf.setFillColor(250, 250, 250);
+        pdf.rect(margin, rowY - 4, pageWidth - margin * 2, 6, "F");
+      }
+      
+      pdf.setDrawColor(border.r, border.g, border.b);
       pdf.line(margin, rowY + 1.5, pageWidth - margin, rowY + 1.5);
 
       pdf.text(row.no, colNo + 2, rowY);
@@ -880,6 +906,38 @@ const handleExportAsPDF = () => {
       );
     });
 
+    // ========= BLOCO: FORMAS DE PAGAMENTO =========
+    drawSectionTitle("Formas de Pagamento");
+
+    const paymentText = buildInstallmentsDescription();
+
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(9);
+    pdf.setTextColor(grayText.r, grayText.g, grayText.b);
+
+    // Quebrar texto de pagamento em linhas
+    const paymentLines = paymentText.split('\n').filter(line => line.trim());
+    let paymentY = cursorY;
+
+    paymentLines.forEach(line => {
+      // Identificar títulos (linhas com *)
+      if (line.includes('*')) {
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(10);
+        pdf.setTextColor(orangeDark.r, orangeDark.g, orangeDark.b);
+      } else {
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(9);
+        pdf.setTextColor(grayText.r, grayText.g, grayText.b);
+      }
+      
+      const cleanLine = line.replace(/\*/g, ''); // remover asteriscos
+      pdf.text(cleanLine, margin + 2, paymentY);
+      paymentY += 5;
+    });
+
+    cursorY = paymentY + 4;
+
     // ========= BLOCO: OBSERVAÇÕES =========
     drawSectionTitle("Notas e Observações");
 
@@ -895,6 +953,26 @@ const handleExportAsPDF = () => {
     const textWidth = pageWidth - margin * 2;
     const wrapped = pdf.splitTextToSize(notesText, textWidth);
     pdf.text(wrapped, margin, cursorY + 4);
+
+    // ========= RODAPÉ PROFISSIONAL =========
+    const footerY = pdf.internal.pageSize.getHeight() - 20;
+
+    // Linha separadora
+    pdf.setDrawColor(border.r, border.g, border.b);
+    pdf.line(margin, footerY - 5, pageWidth - margin, footerY - 5);
+
+    // Texto do rodapé
+    pdf.setFont("helvetica", "italic");
+    pdf.setFontSize(8);
+    pdf.setTextColor(grayMuted.r, grayMuted.g, grayMuted.b);
+
+    const footerLine1 = "Este orçamento tem validade de 48 horas e está sujeito à disponibilidade.";
+    const footerLine2 = "Valores e condições podem sofrer alterações sem aviso prévio.";
+    const footerLine3 = `Gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`;
+
+    pdf.text(footerLine1, pageWidth / 2, footerY, { align: "center" });
+    pdf.text(footerLine2, pageWidth / 2, footerY + 4, { align: "center" });
+    pdf.text(footerLine3, pageWidth / 2, footerY + 8, { align: "center" });
 
     // ========= SALVAR =========
     const filename = clientName
