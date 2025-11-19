@@ -292,27 +292,20 @@ export default function NewSaleWizard() {
         setSourceQuote(data);
         setIsConvertingQuote(true);
 
+        // 🔁 AJUSTE CONVERSÃO DE ORÇAMENTO – campos básicos
         setCustomerName(data.client_name || "");
         setCustomerPhone(data.client_phone || "");
+        setAirline(data.company_name || "");
         setPriceTotal(data.total_price?.toString() || "");
 
-        if (data.flight_segments && Array.isArray(data.flight_segments)) {
-          const segments = data.flight_segments.map((seg: any) => ({
-            from: seg.from || "",
-            to: seg.to || "",
-            date: seg.date || "",
-            miles: seg.miles || 0,
-            boardingFee: seg.boardingFee,
-          }));
-          setFlightSegments(segments);
+        const paxCount =
+          (typeof data.passengers === "number" && data.passengers > 0
+            ? data.passengers
+            : 1) as number;
 
-          if (segments.length === 1) {
-            setTripType("one_way");
-          } else if (segments.length === 2) {
-            setTripType("round_trip");
-          } else {
-            setTripType("multi_city");
-          }
+        if (data.total_price && paxCount) {
+          const per = data.total_price / paxCount;
+          setPricePerPassenger(per.toFixed(2));
         }
 
         if (data.passengers) {
@@ -320,12 +313,123 @@ export default function NewSaleWizard() {
         }
 
         if (data.boarding_fee) {
+          // boarding_fee no orçamento é por passageiro
           setTotalBoardingFee(data.boarding_fee.toString());
           setBoardingFeeMode("total");
         }
 
+        // 🔁 AJUSTE CONVERSÃO DE ORÇAMENTO – tripType
         if (data.trip_type) {
           setTripType(data.trip_type as typeof tripType);
+        }
+
+        // 🔁 AJUSTE CONVERSÃO DE ORÇAMENTO – flight_segments
+        if (data.flight_segments && Array.isArray(data.flight_segments)) {
+          const rawSegments = data.flight_segments as any[];
+
+          let segments: FlightSegment[] = [];
+
+          // round_trip salvo no orçamento como UM objeto com origin/destination + milesOutbound/milesReturn
+          if (data.trip_type === "round_trip" && rawSegments.length > 0) {
+            const seg = rawSegments[0];
+
+            const origin = seg.origin || seg.from || "";
+            const destination = seg.destination || seg.to || "";
+            const departureDate =
+              seg.departureDate || seg.departure_date || seg.date || "";
+            const returnDate =
+              seg.returnDate || seg.return_date || "";
+
+            const milesOutboundPerPax =
+              seg.milesOutbound ?? seg.miles_ida ?? 0;
+            const milesReturnPerPax =
+              seg.milesReturn ?? seg.miles_volta ?? 0;
+
+            const milesOutboundTotal = milesOutboundPerPax * paxCount;
+            const milesReturnTotal = milesReturnPerPax * paxCount;
+
+            segments = [
+              {
+                from: origin,
+                to: destination,
+                date: departureDate,
+                miles: milesOutboundTotal,
+              },
+              {
+                from: destination,
+                to: origin,
+                date: returnDate,
+                miles: milesReturnTotal,
+              },
+            ];
+
+            setTripType("round_trip");
+          } else if (data.trip_type === "one_way" && rawSegments.length > 0) {
+            // one_way salvo como um objeto com origin/destination + miles (pax)
+            const seg = rawSegments[0];
+
+            const origin = seg.origin || seg.from || "";
+            const destination = seg.destination || seg.to || "";
+            const departureDate =
+              seg.departureDate || seg.departure_date || seg.date || "";
+
+            const milesPerPax =
+              seg.miles ??
+              seg.milesOutbound ??
+              seg.miles_ida ??
+              data.miles_needed ??
+              0;
+
+            const milesTotal = milesPerPax * paxCount;
+
+            segments = [
+              {
+                from: origin,
+                to: destination,
+                date: departureDate,
+                miles: milesTotal,
+              },
+            ];
+
+            setTripType("one_way");
+          } else if (data.trip_type === "multi_city") {
+            // multi_city: cada trecho no orçamento é milhas/pax, aqui convertemos para milhas totais
+            segments = rawSegments.map((seg: any) => {
+              const milesPerPax = seg.miles || 0;
+              return {
+                from: seg.from || seg.origin || "",
+                to: seg.to || seg.destination || "",
+                date:
+                  seg.date ||
+                  seg.departureDate ||
+                  seg.departure_date ||
+                  "",
+                miles: milesPerPax * paxCount,
+                boardingFee: seg.boardingFee,
+              };
+            });
+
+            setTripType("multi_city");
+          } else {
+            // Fallback genérico (caso venha em formato inesperado)
+            const fallbackSegments = rawSegments.map((seg: any) => ({
+              from: seg.from || seg.origin || "",
+              to: seg.to || seg.destination || "",
+              date:
+                seg.date ||
+                seg.departureDate ||
+                seg.departure_date ||
+                "",
+              miles: seg.miles || 0,
+              boardingFee: seg.boardingFee,
+            }));
+
+            segments = fallbackSegments;
+          }
+
+          if (segments.length > 0) {
+            setFlightSegments(segments);
+          }
         }
 
         toast({
@@ -342,7 +446,7 @@ export default function NewSaleWizard() {
         });
       }
     },
-    [toast]
+    [toast, tripType]
   );
 
   // --- useEffect: carregar orçamento quando tiver quoteId ---
@@ -550,10 +654,10 @@ export default function NewSaleWizard() {
         customerPhone: customerPhone || null,
         passengers,
         tripType,
-        paymentMethod: selectedMethod?.method_type || null, // ✅ Envia method_type (pix, credit_card, etc)
+        paymentMethod: selectedMethod?.method_type || null, // ✅ method_type (pix, credit_card, etc)
         notes: notes || null,
         flightSegments,
-        passengerCpfs, // ✅ Enviar CPFs dos passageiros
+        passengerCpfs, // ✅ CPFs dos passageiros
 
         // financeiros
         priceTotal: revenueTotal, // número já parseado
