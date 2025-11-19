@@ -149,25 +149,7 @@ export default function NewSaleWizard() {
   } = usePaymentInterestConfig();
   const { activeMethods, loading: methodsLoading } = usePaymentMethods();
 
-  // Mostrar loading até que tudo esteja pronto
-  if (!isInitialized || accountsLoading || roleLoading || airlinesLoading || configsLoading || methodsLoading) {
-    return (
-      <div className="container py-8">
-        <Card className="p-8">
-          <div className="flex flex-col items-center gap-4">
-            <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-            <p className="text-muted-foreground">Carregando formulário...</p>
-          </div>
-        </Card>
-      </div>
-    );
-  }
-
-  const selectedPaymentMethod =
-    activeMethods?.find((m) => m.id === paymentMethod) || null;
-
-  // --- HOOKS ---
-
+  // --- TODOS OS useEffect JUNTOS (antes de qualquer return) ---
   useEffect(() => {
     if (customerName && customerCpf) {
       const firstPassenger: PassengerCPF = {
@@ -199,24 +181,23 @@ export default function NewSaleWizard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quoteId]);
 
-  // --- LOADING STATE ---
-  if (accountsLoading || airlinesLoading || configsLoading || methodsLoading) {
+  // --- LOADING CHECK ÚNICO (após todos os hooks) ---
+  if (!isInitialized || accountsLoading || roleLoading || airlinesLoading || configsLoading || methodsLoading) {
     return (
-      <div className="container mx-auto py-8 px-4">
-        <div className="max-w-7xl mx-auto">
-          <Card className="p-8 text-center">
-            <div className="animate-pulse space-y-4">
-              <div className="h-8 bg-muted rounded w-1/3 mx-auto" />
-              <div className="h-4 bg-muted rounded w-2/3 mx-auto" />
-            </div>
-            <p className="mt-4 text-muted-foreground">
-              Carregando dados da venda...
-            </p>
-          </Card>
-        </div>
+      <div className="container py-8">
+        <Card className="p-8">
+          <div className="flex flex-col items-center gap-4">
+            <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+            <p className="text-muted-foreground">Carregando formulário...</p>
+          </div>
+        </Card>
       </div>
     );
   }
+
+  // --- VARIÁVEIS DERIVADAS ---
+  const selectedPaymentMethod =
+    activeMethods?.find((m) => m.id === paymentMethod) || null;
 
   // --- LÓGICA ---
 
