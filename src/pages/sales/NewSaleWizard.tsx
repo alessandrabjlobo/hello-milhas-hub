@@ -677,12 +677,15 @@ export default function NewSaleWizard() {
         saleFormData.programId = programId;
         saleFormData.accountId = accountId;
       } else {
-        saleFormData.sellerName = counterSellerName;
-        saleFormData.sellerContact = counterSellerContact;
+        // 🔹 Venda via Balcão de Milhas (fornecedor externo)
+        saleFormData.sellerName = counterSellerName.trim();
+        saleFormData.sellerContact = counterSellerContact.trim();
+        saleFormData.counterAirlineProgram = counterAirlineProgram.trim(); // << ADICIONADO
         saleFormData.counterCostPerThousand = counterCostPerThousand
           ? parseFloat(counterCostPerThousand)
           : null;
       }
+
 
       console.log(
         "[QuoteToSale] Creating sale from quoteId:",
