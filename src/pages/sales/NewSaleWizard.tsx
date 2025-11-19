@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -67,7 +67,7 @@ export default function NewSaleWizard() {
 
   // Loading guard para prevenir erros de inicialização
   const [isInitialized, setIsInitialized] = useState(false);
-  
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsInitialized(true);
@@ -149,7 +149,107 @@ export default function NewSaleWizard() {
   } = usePaymentInterestConfig();
   const { activeMethods, loading: methodsLoading } = usePaymentMethods();
 
-  // --- TODOS OS useEffect JUNTOS (antes de qualquer return) ---
+  const selectedAccount =
+    accounts.find((acc) => acc.id === accountId) || undefined;
+
+  const filteredAccounts = accounts.filter((acc) => acc.status === "active");
+
+  const updateTripType = (type: typeof tripType) => {
+    setTripType(type);
+    if (type === "one_way") {
+      setFlightSegments([{ from: "", to: "", date: "", miles: 0 }]);
+    } else if (type === "round_trip") {
+      setFlightSegments([
+        { from: "", to: "", date: "", miles: 0 },
+        { from: "", to: "", date: "", miles: 0 },
+      ]);
+    } else if (type === "multi_city") {
+      if (flightSegments.length < 2) {
+        setFlightSegments([
+          { from: "", to: "", date: "", miles: 0 },
+          { from: "", to: "", date: "", miles: 0 },
+        ]);
+      }
+    }
+  };
+
+  // --- CÁLCULOS FINANCEIROS MEMOIZADOS ---
+  const financialData = useMemo(() => {
+    const totalMiles = flightSegments.reduce(
+      (sum, seg) => sum + (seg.miles || 0),
+      0
+    );
+
+    const boardingFeePerPassenger =
+      boardingFeeMode === "total"
+        ? parseFloat(totalBoardingFee || "0")
+        : flightSegments.reduce(
+            (sum, seg) => sum + (seg.boardingFee || 0),
+            0
+          );
+
+    const boardingFeeTotal =
+      boardingFeePerPassenger * (passengers || 1);
+
+    let costPerThousand: number | null = null;
+
+    if (saleSource === "internal_account" && selectedAccount) {
+      if (selectedAccount.cost_per_mile) {
+        costPerThousand = (selectedAccount.cost_per_mile || 0) * 1000;
+      }
+    } else if (saleSource === "mileage_counter" && counterCostPerThousand) {
+      costPerThousand = parseFloat(counterCostPerThousand) || 0;
+    }
+
+    const costPerMile =
+      costPerThousand && costPerThousand > 0
+        ? costPerThousand / 1000
+        : 0;
+
+    const milesCostTotal = totalMiles * costPerMile;
+
+    const revenueTotal = parseFloat(priceTotal || "0") || 0;
+
+    const estimatedTotalCost = milesCostTotal + boardingFeeTotal;
+
+    const estimatedProfit = revenueTotal - estimatedTotalCost;
+
+    const profitMarginPct =
+      revenueTotal > 0 ? (estimatedProfit / revenueTotal) * 100 : 0;
+
+    return {
+      totalMiles,
+      boardingFeePerPassenger,
+      boardingFeeTotal,
+      milesCostTotal,
+      revenueTotal,
+      estimatedTotalCost,
+      estimatedProfit,
+      profitMarginPct,
+    };
+  }, [
+    flightSegments,
+    boardingFeeMode,
+    totalBoardingFee,
+    passengers,
+    saleSource,
+    selectedAccount,
+    counterCostPerThousand,
+    priceTotal,
+  ]);
+
+  const {
+    totalMiles,
+    boardingFeePerPassenger,
+    boardingFeeTotal,
+    milesCostTotal,
+    revenueTotal,
+    estimatedTotalCost,
+    estimatedProfit,
+    profitMarginPct,
+  } = financialData;
+
+  // --- useEffect: sincronizar passageiro principal com cliente ---
   useEffect(() => {
     if (customerName && customerCpf) {
       const firstPassenger: PassengerCPF = {
@@ -174,15 +274,97 @@ export default function NewSaleWizard() {
     }
   }, [customerName, customerCpf, passengers]);
 
+  // --- Buscar e preencher orçamento, com useCallback ---
+  const fetchAndPrefillQuote = useCallback(
+    async (qId: string) => {
+      console.log("[QuoteToSale] Loading quote:", qId);
+      try {
+        const { data, error } = await supabase
+          .from("quotes")
+          .select("*")
+          .eq("id", qId)
+          .single();
+
+        if (error) throw error;
+
+        console.log("[QuoteToSale] Loaded quote:", data);
+
+        setSourceQuote(data);
+        setIsConvertingQuote(true);
+
+        setCustomerName(data.client_name || "");
+        setCustomerPhone(data.client_phone || "");
+        setPriceTotal(data.total_price?.toString() || "");
+
+        if (data.flight_segments && Array.isArray(data.flight_segments)) {
+          const segments = data.flight_segments.map((seg: any) => ({
+            from: seg.from || "",
+            to: seg.to || "",
+            date: seg.date || "",
+            miles: seg.miles || 0,
+            boardingFee: seg.boardingFee,
+          }));
+          setFlightSegments(segments);
+
+          if (segments.length === 1) {
+            setTripType("one_way");
+          } else if (segments.length === 2) {
+            setTripType("round_trip");
+          } else {
+            setTripType("multi_city");
+          }
+        }
+
+        if (data.passengers) {
+          setPassengers(data.passengers);
+        }
+
+        if (data.boarding_fee) {
+          setTotalBoardingFee(data.boarding_fee.toString());
+          setBoardingFeeMode("total");
+        }
+
+        if (data.trip_type) {
+          setTripType(data.trip_type as typeof tripType);
+        }
+
+        toast({
+          title: "Orçamento carregado",
+          description:
+            "Dados do orçamento foram importados. Revise antes de salvar.",
+        });
+      } catch (error: any) {
+        console.error("[QuoteToSale] Error loading quote:", error);
+        toast({
+          title: "Erro ao carregar orçamento",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
+    },
+    [toast]
+  );
+
+  // --- useEffect: carregar orçamento quando tiver quoteId ---
   useEffect(() => {
     if (quoteId) {
+      console.log(
+        "[QuoteToSale] Opening NewSaleWizard with quoteId:",
+        quoteId
+      );
       fetchAndPrefillQuote(quoteId);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quoteId]);
+  }, [quoteId, fetchAndPrefillQuote]);
 
   // --- LOADING CHECK ÚNICO (após todos os hooks) ---
-  if (!isInitialized || accountsLoading || roleLoading || airlinesLoading || configsLoading || methodsLoading) {
+  if (
+    !isInitialized ||
+    accountsLoading ||
+    roleLoading ||
+    airlinesLoading ||
+    configsLoading ||
+    methodsLoading
+  ) {
     return (
       <div className="container py-8">
         <Card className="p-8">
@@ -244,135 +426,6 @@ export default function NewSaleWizard() {
       title: "Dados extraídos!",
       description: `${newAutoFilledFields.size} campo(s) preenchido(s) automaticamente.`,
     });
-  };
-
-  const selectedAccount = accounts.find((acc) => acc.id === accountId);
-
-  const filteredAccounts = accounts.filter((acc) => acc.status === "active");
-
-  const updateTripType = (type: typeof tripType) => {
-    setTripType(type);
-    if (type === "one_way") {
-      setFlightSegments([{ from: "", to: "", date: "", miles: 0 }]);
-    } else if (type === "round_trip") {
-      setFlightSegments([
-        { from: "", to: "", date: "", miles: 0 },
-        { from: "", to: "", date: "", miles: 0 },
-      ]);
-    } else if (type === "multi_city") {
-      if (flightSegments.length < 2) {
-        setFlightSegments([
-          { from: "", to: "", date: "", miles: 0 },
-          { from: "", to: "", date: "", miles: 0 },
-        ]);
-      }
-    }
-  };
-
-  const totalMiles = flightSegments.reduce(
-    (sum, seg) => sum + (seg.miles || 0),
-    0
-  );
-
-  const boardingFeePerPassenger =
-    boardingFeeMode === "total"
-      ? parseFloat(totalBoardingFee || "0")
-      : flightSegments.reduce(
-          (sum, seg) => sum + (seg.boardingFee || 0),
-          0
-        );
-
-  const boardingFeeTotal =
-    boardingFeePerPassenger * (passengers || 1);
-
-  // 🔹 Cálculo de custo / lucro
-  let costPerThousand: number | null = null;
-
-  if (saleSource === "internal_account" && selectedAccount) {
-    if (selectedAccount.cost_per_mile) {
-      costPerThousand = (selectedAccount.cost_per_mile || 0) * 1000;
-    }
-  } else if (saleSource === "mileage_counter" && counterCostPerThousand) {
-    costPerThousand = parseFloat(counterCostPerThousand) || 0;
-  }
-
-  const costPerMile =
-    costPerThousand && costPerThousand > 0
-      ? costPerThousand / 1000
-      : 0;
-
-  const milesCostTotal = totalMiles * costPerMile;
-
-  const revenueTotal = parseFloat(priceTotal || "0") || 0;
-
-  const estimatedTotalCost = milesCostTotal + boardingFeeTotal;
-
-  const estimatedProfit = revenueTotal - estimatedTotalCost;
-
-  const profitMarginPct =
-    revenueTotal > 0 ? (estimatedProfit / revenueTotal) * 100 : 0;
-
-  const fetchAndPrefillQuote = async (qId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("quotes")
-        .select("*")
-        .eq("id", qId)
-        .single();
-
-      if (error) throw error;
-
-      setSourceQuote(data);
-      setIsConvertingQuote(true);
-
-      setCustomerName(data.client_name || "");
-      setCustomerPhone(data.client_phone || "");
-      setPriceTotal(data.total_price?.toString() || "");
-
-      if (data.flight_segments && Array.isArray(data.flight_segments)) {
-        const segments = data.flight_segments.map((seg: any) => ({
-          from: seg.from || "",
-          to: seg.to || "",
-          date: seg.date || "",
-          miles: seg.miles || 0,
-          boardingFee: seg.boardingFee,
-        }));
-        setFlightSegments(segments);
-
-        if (segments.length === 1) {
-          setTripType("one_way");
-        } else if (segments.length === 2) {
-          setTripType("round_trip");
-        } else {
-          setTripType("multi_city");
-        }
-      }
-
-      if (data.passengers) {
-        setPassengers(data.passengers);
-      }
-
-      if (data.boarding_fee) {
-        setTotalBoardingFee(data.boarding_fee.toString());
-        setBoardingFeeMode("total");
-      }
-
-      if (data.trip_type) {
-        setTripType(data.trip_type as typeof tripType);
-      }
-
-      toast({
-        title: "Orçamento carregado",
-        description:
-          "Dados do orçamento foram importados. Revise antes de salvar.",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Erro ao carregar orçamento",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
   };
 
   const createTicketsForPassengers = async (saleId: string) => {
@@ -467,6 +520,17 @@ export default function NewSaleWizard() {
       return;
     }
 
+    // ✅ Garante que supplierId existe antes de salvar
+    if (!supplierId) {
+      toast({
+        title: "Erro de configuração",
+        description:
+          "Aguarde o carregamento dos dados da agência antes de salvar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -497,7 +561,7 @@ export default function NewSaleWizard() {
         totalBoardingFee: boardingFeeTotal,
         milesUsed: totalMiles,
         totalCost: estimatedTotalCost,
-        
+
         // ✅ Campos de lucro (obrigatórios no banco)
         profit: estimatedProfit || 0,
         profitMargin: profitMarginPct || 0,
@@ -515,6 +579,11 @@ export default function NewSaleWizard() {
           ? parseFloat(counterCostPerThousand)
           : null;
       }
+
+      console.log(
+        "[QuoteToSale] Creating sale from quoteId:",
+        quoteId || "new sale"
+      );
 
       const result = await createSaleWithSegments(saleFormData, supplierId);
 
