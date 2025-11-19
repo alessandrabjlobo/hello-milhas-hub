@@ -4,7 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HashRouter as BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/shared/AppSidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -67,7 +67,11 @@ const App = () => (
                 <SidebarProvider>
                   <div className="flex min-h-screen w-full">
                     <AppSidebar />
-                    <main className="flex-1">
+                    <main className="flex-1 relative">
+                      {/* Botão fixo para abrir/fechar sidebar - sempre visível */}
+                      <div className="fixed top-4 left-4 z-50">
+                        <SidebarTrigger className="h-10 w-10 rounded-md border bg-background hover:bg-accent hover:text-accent-foreground shadow-md" />
+                      </div>
                       <Routes>
                         <Route path="/dashboard" element={<DashboardKPIs />} />
                         <Route path="/onboarding" element={<Onboarding />} />

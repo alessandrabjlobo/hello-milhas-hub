@@ -146,11 +146,6 @@ export function AppSidebar() {
 
   return (
     <Sidebar className={collapsed ? "w-14" : "w-60"}>
-      {/* Trigger sempre visível e grande o suficiente */}
-      <div className="flex justify-end p-2 border-b bg-muted/30">
-        <SidebarTrigger className="h-10 w-10 hover:bg-accent" />
-      </div>
-
       {/* Perfil do usuário */}
       <div className="p-3 border-b bg-gradient-to-br from-primary/5 to-primary/10">
         <div className="flex items-center gap-3">
