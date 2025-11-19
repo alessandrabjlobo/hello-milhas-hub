@@ -59,86 +59,138 @@ export function SaleSuccessDialog({
   const [copiedFull, setCopiedFull] = useState(false);
   const [copiedShort, setCopiedShort] = useState(false);
   const [copiedSupplier, setCopiedSupplier] = useState(false);
-  const { configs, calculateInstallmentValue, getDebitRate, getCreditConfigs } = usePaymentInterestConfig();
+
+  const {
+    calculateInstallmentValue,
+    getDebitRate,
+    getCreditConfigs,
+  } = usePaymentInterestConfig();
   const { activeMethods } = usePaymentMethods();
 
-  const totalPrice = parseFloat(saleData.priceTotal);
+  const totalPrice = parseFloat(saleData.priceTotal || "0");
 
-  // Format route based on trip type
+  // 🧭 Rota formatada (ida/volta ou múltiplos trechos)
   const formatRoute = () => {
     if (!saleData.flightSegments || saleData.flightSegments.length === 0) {
       return saleData.routeText;
     }
 
-    if (saleData.tripType === "round_trip" && saleData.flightSegments.length === 2) {
-      return `📍 Ida: ${saleData.flightSegments[0].from} → ${saleData.flightSegments[0].to} (${new Date(saleData.flightSegments[0].date).toLocaleDateString('pt-BR')})\n📍 Volta: ${saleData.flightSegments[1].from} → ${saleData.flightSegments[1].to} (${new Date(saleData.flightSegments[1].date).toLocaleDateString('pt-BR')})`;
-    } else {
-      return saleData.flightSegments.map((seg, idx) => 
-        `📍 Trecho ${idx + 1}: ${seg.from} → ${seg.to} (${new Date(seg.date).toLocaleDateString('pt-BR')})`
-      ).join('\n');
+    if (
+      saleData.tripType === "round_trip" &&
+      saleData.flightSegments.length === 2
+    ) {
+      return (
+        `📍 Ida: ${saleData.flightSegments[0].from} → ${saleData.flightSegments[0].to} ` +
+        `(${new Date(
+          saleData.flightSegments[0].date
+        ).toLocaleDateString("pt-BR")})\n` +
+        `📍 Volta: ${saleData.flightSegments[1].from} → ${saleData.flightSegments[1].to} ` +
+        `(${new Date(
+          saleData.flightSegments[1].date
+        ).toLocaleDateString("pt-BR")})`
+      );
     }
+
+    return saleData.flightSegments
+      .map(
+        (seg, idx) =>
+          `📍 Trecho ${idx + 1}: ${seg.from} → ${seg.to} (${new Date(
+            seg.date
+          ).toLocaleDateString("pt-BR")})`
+      )
+      .join("\n");
   };
 
-  // Build payment methods sections
+  // 💳 Seção de formas de pagamento (baseada nas configs, igual quote)
   const buildPaymentMethodsSection = () => {
-    if (activeMethods.length === 0) {
-      return "\n⚠️ Configure formas de pagamento em Configurações > Formas de Pagamento";
+    if (!activeMethods || activeMethods.length === 0) {
+      return (
+        "\n⚠️ Configure formas de pagamento em Configurações > Formas de Pagamento"
+      );
     }
 
-    let sections: string[] = [];
+    const sections: string[] = [];
 
-    activeMethods.forEach((method) => {
+    (activeMethods || []).forEach((method) => {
+      // PIX
       if (method.method_type === "pix") {
         const pixKey = method.additional_info?.pix_key || "A configurar";
-        const holderName = method.additional_info?.holder_name || method.additional_info?.account_holder || "A configurar";
+        const holderName =
+          method.additional_info?.pix_holder ||
+          method.additional_info?.holder_name ||
+          method.additional_info?.account_holder ||
+          "A configurar";
+
         sections.push(
-          `📱 PIX (Aprovação Imediata)\n• Chave: ${pixKey}\n• Titular: ${holderName}`
+          `📱 PIX (Aprovação Imediata)\n` +
+            `• Chave: ${pixKey}\n` +
+            `• Titular: ${holderName}`
         );
       }
 
+      // Débito
       if (method.method_type === "debit") {
         const debitRate = getDebitRate();
         let debitSection = "💳 Cartão de Débito";
-        
+
         if (debitRate) {
           const result = calculateInstallmentValue(totalPrice, 1);
-          if (debitRate.interest_rate === 0) {
-            debitSection += `\n• À vista: R$ ${totalPrice.toFixed(2)}`;
-          } else {
-            debitSection += `\n• À vista com taxa: R$ ${result.finalPrice.toFixed(2)} (${debitRate.interest_rate}% de juros)`;
-          }
+          // sempre mostra só o valor à vista calculado, sem texto de juros
+          debitSection += `\n• À vista: R$ ${result.finalPrice.toFixed(2)}`;
         } else {
           debitSection += `\n• À vista: R$ ${totalPrice.toFixed(2)}`;
         }
+
         sections.push(debitSection);
       }
 
+      // Crédito
       if (method.method_type === "credit") {
         const creditConfigs = getCreditConfigs();
         let creditSection = "💳 Cartão de Crédito";
-        
+
         if (creditConfigs.length === 0) {
           creditSection += "\n• À vista: R$ " + totalPrice.toFixed(2);
         } else {
           creditConfigs.forEach((config) => {
-            const result = calculateInstallmentValue(totalPrice, config.installments);
-            if (config.interest_rate === 0) {
-              creditSection += `\n• ${config.installments}x de R$ ${result.installmentValue.toFixed(2)} (sem juros)`;
-            } else {
-              creditSection += `\n• ${config.installments}x de R$ ${result.installmentValue.toFixed(2)}`;
-            }
+            const result = calculateInstallmentValue(
+              totalPrice,
+              config.installments
+            );
+            // igual no orçamento: só "Nx de R$ X,XX"
+            creditSection += `\n• ${config.installments}x de R$ ${result.installmentValue.toFixed(
+              2
+            )}`;
           });
         }
+
         sections.push(creditSection);
       }
 
+      // Boleto
       if (method.method_type === "boleto") {
-        sections.push(`🎫 Boleto Bancário\n• ${method.description || "Pagamento via boleto"}`);
+        sections.push(
+          `🎫 Boleto Bancário\n• ${
+            method.description || "Pagamento via boleto"
+          }`
+        );
       }
 
+      // Transferência
       if (method.method_type === "transfer") {
+        const bankName = method.additional_info?.bank_name || "A configurar";
+        const agency = method.additional_info?.agency || "A configurar";
+        const accountNumber =
+          method.additional_info?.account_number || "A configurar";
+        const holderName =
+          method.additional_info?.holder_name || "A configurar";
+
         sections.push(
-          `🏦 Transferência Bancária\n• Banco: ${method.additional_info?.bank_name || "A configurar"}\n• Agência: ${method.additional_info?.agency || "A configurar"}\n• Conta: ${method.additional_info?.account_number || "A configurar"}\n• Titular: ${method.additional_info?.holder_name || "A configurar"}`
+          `🏦 Transferência Bancária\n` +
+            `• Banco: ${bankName}\n` +
+            `• Agência: ${agency}\n` +
+            `• Conta: ${accountNumber}\n` +
+            `• Titular: ${holderName}`
         );
       }
     });
@@ -148,9 +200,15 @@ export function SaleSuccessDialog({
 
   const fullMessage = `✅ Sua passagem está pronta!
 
-${saleData.pnr ? `Localizador (PNR): ${saleData.pnr}` : "⏳ Localizador será enviado em breve"}
+${
+  saleData.pnr
+    ? `Localizador (PNR): ${saleData.pnr}`
+    : "⏳ Localizador será enviado em breve"
+}
 Companhia: ${saleData.airline}
-Passageiro(s): ${saleData.customerName}${saleData.passengers > 1 ? ` +${saleData.passengers - 1}` : ""}
+Passageiro(s): ${saleData.customerName}${
+    saleData.passengers > 1 ? ` +${saleData.passengers - 1}` : ""
+  }
 
 ${formatRoute()}
 
@@ -164,8 +222,10 @@ ${formatRoute()}
 
 Qualquer dúvida, estamos à disposição! 😊`;
 
-  // Supplier message
-  const supplierMessage = saleData.saleSource === 'internal_account' && saleData.accountInfo ? `
+  // Mensagem para fornecedor (conta interna)
+  const supplierMessage =
+    saleData.saleSource === "internal_account" && saleData.accountInfo
+      ? `
 🔔 NOTIFICAÇÃO DE USO - ${saleData.accountInfo.supplierName}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
@@ -180,7 +240,7 @@ Nº Conta: ${saleData.accountInfo.accountNumber}
 
 ✈️ CONSUMO
 
-Milhas utilizadas: ${parseInt(saleData.milesNeeded).toLocaleString('pt-BR')}
+Milhas utilizadas: ${parseInt(saleData.milesNeeded).toLocaleString("pt-BR")}
 CPFs utilizados: ${saleData.accountInfo.cpfsUsed} CPF(s)
 
 Cliente: ${saleData.customerName}
@@ -191,21 +251,34 @@ Passageiros: ${saleData.passengers}
 💰 VALOR A DEPOSITAR
 
 Custo por milheiro: R$ ${saleData.accountInfo.costPerThousand.toFixed(2)}
-Total de milheiros: ${(parseInt(saleData.milesNeeded) / 1000).toFixed(1)}
-Valor total: R$ ${((parseInt(saleData.milesNeeded) / 1000) * saleData.accountInfo.costPerThousand).toFixed(2)}
+Total de milheiros: ${(
+          parseInt(saleData.milesNeeded) / 1000
+        ).toFixed(1)}
+Valor total: R$ ${(
+          (parseInt(saleData.milesNeeded) / 1000) *
+          saleData.accountInfo.costPerThousand
+        ).toFixed(2)}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
 
-📅 Data: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}
+📅 Data: ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString(
+          "pt-BR"
+        )}
 
 Por favor, confirme o recebimento desta notificação.
-` : null;
+`
+      : null;
 
   const shortMessage = saleData.pnr
     ? `PNR ${saleData.pnr} • Total R$ ${totalPrice.toFixed(2)}`
-    : `Venda confirmada • Total R$ ${totalPrice.toFixed(2)} • PNR em breve`;
+    : `Venda confirmada • Total R$ ${totalPrice.toFixed(
+        2
+      )} • PNR em breve`;
 
-  const copyToClipboard = async (text: string, type: "full" | "short" | "supplier") => {
+  const copyToClipboard = async (
+    text: string,
+    type: "full" | "short" | "supplier"
+  ) => {
     try {
       await navigator.clipboard.writeText(text);
       if (type === "full") {
@@ -245,7 +318,11 @@ Por favor, confirme o recebimento desta notificação.
         </DialogHeader>
 
         <Tabs defaultValue="full" className="w-full">
-          <TabsList className={`grid w-full ${supplierMessage ? 'grid-cols-3' : 'grid-cols-2'}`}>
+          <TabsList
+            className={`grid w-full ${
+              supplierMessage ? "grid-cols-3" : "grid-cols-2"
+            }`}
+          >
             <TabsTrigger value="full">Mensagem Completa</TabsTrigger>
             <TabsTrigger value="short">Versão Curta</TabsTrigger>
             {supplierMessage && (
@@ -305,7 +382,10 @@ Por favor, confirme o recebimento desta notificação.
                 {supplierMessage}
               </div>
               <Button
-                onClick={() => copyToClipboard(supplierMessage, "supplier")}
+                onClick={() =>
+                  supplierMessage &&
+                  copyToClipboard(supplierMessage, "supplier")
+                }
                 className="w-full"
                 variant={copiedSupplier ? "secondary" : "default"}
               >
@@ -327,9 +407,7 @@ Por favor, confirme o recebimento desta notificação.
 
         <div className="flex justify-end gap-2 pt-4">
           {onRegisterTicket && (
-            <Button onClick={onRegisterTicket}>
-              Registrar Passagem
-            </Button>
+            <Button onClick={onRegisterTicket}>Registrar Passagem</Button>
           )}
           <Button variant="outline" onClick={onClose}>
             Fechar
