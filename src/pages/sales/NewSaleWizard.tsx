@@ -293,6 +293,37 @@ export default function NewSaleWizard() {
     }
   }, [customerName, customerCpf, passengers]);
 
+  // --- Alerta quando milhas mudam após escolher conta ---
+  useEffect(() => {
+    if (
+      saleSource === "internal_account" &&
+      accountId &&
+      totalMiles > 0
+    ) {
+      const selectedAcc = accounts.find((a) => a.id === accountId);
+      if (selectedAcc) {
+        const accountBalance =
+          (selectedAcc as any).available_miles ??
+          (selectedAcc as any).balance_miles ??
+          (selectedAcc as any).total_miles ??
+          (selectedAcc as any).miles_balance ??
+          0;
+
+        if (accountBalance < totalMiles) {
+          toast({
+            title: "⚠️ Saldo insuficiente",
+            description: `A conta selecionada tem apenas ${(
+              accountBalance / 1000
+            ).toFixed(0)}k milhas. Total necessário: ${(
+              totalMiles / 1000
+            ).toFixed(0)}k milhas. Selecione outra conta.`,
+            variant: "destructive",
+          });
+        }
+      }
+    }
+  }, [totalMiles, accountId, saleSource, accounts, toast]);
+
   // --- Buscar e preencher orçamento, com useCallback ---
   const fetchAndPrefillQuote = useCallback(
     async (qId: string) => {

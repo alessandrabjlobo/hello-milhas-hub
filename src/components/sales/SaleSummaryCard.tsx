@@ -1,5 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { format, parseISO } from "date-fns";
 
 interface SaleSummaryCardProps {
   customerName: string;
@@ -53,11 +54,11 @@ export function SalesSummaryCard({
             <div>
               <p className="text-muted-foreground">Datas</p>
               <p className="font-medium">
-                Ida: {new Date(departureDate).toLocaleDateString("pt-BR")}
+                Ida: {format(parseISO(departureDate), "dd/MM/yyyy")}
               </p>
               {returnDate && (
                 <p className="font-medium">
-                  Volta: {new Date(returnDate).toLocaleDateString("pt-BR")}
+                  Volta: {format(parseISO(returnDate), "dd/MM/yyyy")}
                 </p>
               )}
             </div>
