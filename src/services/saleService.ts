@@ -11,6 +11,13 @@ export async function createSaleWithSegments(
   supplierId: string
 ): Promise<CreateSaleResult> {
   try {
+    // ✅ Validação explícita do supplierId
+    if (!supplierId || supplierId.trim() === "") {
+      throw new Error(
+        "ID do fornecedor (agency_id) não fornecido. Aguarde o carregamento dos dados da agência antes de salvar."
+      );
+    }
+
     const {
       data: { user },
       error: authError,
@@ -20,13 +27,17 @@ export async function createSaleWithSegments(
       throw new Error("Usuário não autenticado");
     }
 
-    // 🔍 Log para debug
+    // 🔍 Logs para debug
+    console.log("[createSaleWithSegments] supplierId:", supplierId);
     console.log("[createSaleWithSegments] formData recebido:", formData);
 
     // -------------------------------------------------
     // 1) Normalizar e validar canal (internal vs counter)
     // -------------------------------------------------
-    const channel = (formData as any).channel as "internal" | "counter" | undefined;
+    const channel = (formData as any).channel as
+      | "internal"
+      | "counter"
+      | undefined;
 
     if (!channel) {
       throw new Error("Canal da venda (channel) não informado.");
@@ -94,9 +105,7 @@ export async function createSaleWithSegments(
     // -------------------------------------------------
     // CUSTO TOTAL (obrigatório p/ coluna total_cost NOT NULL)
     const totalCostRaw =
-      (formData as any).totalCost ??
-      (formData as any).total_cost ??
-      0;
+      (formData as any).totalCost ?? (formData as any).total_cost ?? 0;
 
     const totalCost = Number(totalCostRaw) || 0;
 
@@ -121,25 +130,25 @@ export async function createSaleWithSegments(
       // 🔹 Campos exigidos pelo banco (NOT NULL)
       miles_used: totalMilesUsed,
       total_cost: totalCost,
-      
+
       // ✅ Campos de receita e lucro (NOT NULL)
       sale_price: Number((formData as any).priceTotal ?? 0) || 0,
       profit: Number((formData as any).profit ?? 0) || 0,
       profit_margin: Number((formData as any).profitMargin ?? 0) || 0,
-      
+
       // ✅ Campos para compatibilidade com telas existentes
       price_total: Number((formData as any).priceTotal ?? 0) || 0,
       margin_value: Number((formData as any).profit ?? 0) || 0,
       margin_percentage: Number((formData as any).profitMargin ?? 0) || 0,
-      
+
       // Campos opcionais relacionados a preço
-      price_per_passenger: (formData as any).pricePerPassenger 
-        ? Number((formData as any).pricePerPassenger) 
+      price_per_passenger: (formData as any).pricePerPassenger
+        ? Number((formData as any).pricePerPassenger)
         : null,
-      boarding_fee: (formData as any).boardingFee 
-        ? Number((formData as any).boardingFee) 
+      boarding_fee: (formData as any).boardingFee
+        ? Number((formData as any).boardingFee)
         : null,
-      
+
       // ✅ CPFs dos passageiros
       passenger_cpfs: (formData as any).passengerCpfs || [],
     };
@@ -194,12 +203,17 @@ export async function createSaleWithSegments(
     if (channel === "internal") {
       const accountId = (formData as any).accountId;
       if (accountId && totalMilesUsed > 0) {
-        console.log(`[createSaleWithSegments] Abatendo ${totalMilesUsed} milhas da conta ${accountId}`);
-        
-        const { error: balanceError } = await supabase.rpc("update_account_balance", {
-          account_id: accountId,
-          miles_delta: -totalMilesUsed,
-        });
+        console.log(
+          `[createSaleWithSegments] Abatendo ${totalMilesUsed} milhas da conta ${accountId}`
+        );
+
+        const { error: balanceError } = await supabase.rpc(
+          "update_account_balance",
+          {
+            account_id: accountId,
+            miles_delta: -totalMilesUsed,
+          }
+        );
 
         if (balanceError) {
           console.error("Erro ao abater milhas:", balanceError);
@@ -218,7 +232,9 @@ export async function createSaleWithSegments(
       const passengerCpfs = (formData as any).passengerCpfs || [];
 
       if (accountId && passengerCpfs.length > 0) {
-        console.log(`[createSaleWithSegments] Registrando ${passengerCpfs.length} CPFs`);
+        console.log(
+          `[createSaleWithSegments] Registrando ${passengerCpfs.length} CPFs`
+        );
 
         // Buscar airline_company_id da conta
         const { data: accountData, error: accountError } = await supabase
@@ -228,14 +244,17 @@ export async function createSaleWithSegments(
           .single();
 
         if (accountError || !accountData) {
-          console.error("Erro ao buscar airline_company_id:", accountError);
+          console.error(
+            "Erro ao buscar airline_company_id:",
+            accountError
+          );
         } else {
           const airlineCompanyId = accountData.airline_company_id;
 
           // Processar cada CPF
           for (const passengerCpf of passengerCpfs) {
             const cpfEncrypted = passengerCpf.cpf.replace(/\D/g, "");
-            
+
             // Verificar se CPF já existe
             const { data: existingCpf } = await supabase
               .from("cpf_registry")
@@ -251,39 +270,52 @@ export async function createSaleWithSegments(
                 .update({
                   usage_count: existingCpf.usage_count + 1,
                   last_used_at: new Date().toISOString(),
-                  first_use_date: existingCpf.first_use_date || new Date().toISOString(),
+                  first_use_date:
+                    existingCpf.first_use_date ||
+                    new Date().toISOString(),
                 })
                 .eq("id", existingCpf.id);
-              
-              console.log(`[createSaleWithSegments] CPF ${cpfEncrypted} atualizado (${existingCpf.usage_count + 1} usos)`);
+
+              console.log(
+                `[createSaleWithSegments] CPF ${cpfEncrypted} atualizado (` +
+                  `${existingCpf.usage_count + 1} usos)`
+              );
             } else {
               // Inserir novo CPF
-              await supabase
-                .from("cpf_registry")
-                .insert({
-                  user_id: user.id,
-                  airline_company_id: airlineCompanyId,
-                  full_name: passengerCpf.name,
-                  cpf_encrypted: cpfEncrypted,
-                  usage_count: 1,
-                  first_use_date: new Date().toISOString(),
-                  last_used_at: new Date().toISOString(),
-                  status: "available",
-                });
-              
-              console.log(`[createSaleWithSegments] CPF ${cpfEncrypted} registrado (1º uso)`);
+              await supabase.from("cpf_registry").insert({
+                user_id: user.id,
+                airline_company_id: airlineCompanyId,
+                full_name: passengerCpf.name,
+                cpf_encrypted: cpfEncrypted,
+                usage_count: 1,
+                first_use_date: new Date().toISOString(),
+                last_used_at: new Date().toISOString(),
+                status: "available",
+              });
+
+              console.log(
+                `[createSaleWithSegments] CPF ${cpfEncrypted} registrado (1º uso)`
+              );
             }
           }
 
           // Atualizar contador de CPFs da conta
-          const { error: countError } = await supabase.rpc("update_account_cpf_count", {
-            p_account_id: accountId,
-          });
+          const { error: countError } = await supabase.rpc(
+            "update_account_cpf_count",
+            {
+              p_account_id: accountId,
+            }
+          );
 
           if (countError) {
-            console.error("Erro ao atualizar contador de CPFs:", countError);
+            console.error(
+              "Erro ao atualizar contador de CPFs:",
+              countError
+            );
           } else {
-            console.log("[createSaleWithSegments] Contador de CPFs atualizado");
+            console.log(
+              "[createSaleWithSegments] Contador de CPFs atualizado"
+            );
           }
         }
       }
