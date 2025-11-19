@@ -79,25 +79,25 @@ export const useSales = () => {
         .eq("id", userData.user.id)
         .single();
 
-      const saleSource = (saleData as any).sale_source || 'internal_account';
-      
+      const saleSource = (saleData as any).sale_source || "internal_account";
+
       // Get account to fetch cost_per_mile (only for internal accounts)
       let costPerMileSnapshot = 0.029; // default
-      if (saleSource === 'internal_account' && saleData.mileage_account_id) {
+      if (saleSource === "internal_account" && saleData.mileage_account_id) {
         const { data: accountData } = await supabase
           .from("mileage_accounts")
           .select("cost_per_mile")
           .eq("id", saleData.mileage_account_id)
           .single();
-        
+
         if (accountData) {
           costPerMileSnapshot = Number(accountData.cost_per_mile);
         }
       }
 
-      const milesUsed = Number(saleData.miles_needed) || 0;
-      const priceTotal = Number(saleData.price_total) || 0; // Valor base SEM juros
-      
+      const milesUsed = Number((saleData as any).miles_needed) || 0;
+      const priceTotal = Number((saleData as any).price_total) || 0; // Valor base SEM juros
+
       // Calculate costs and margins (sempre usando valor base)
       let totalCost = 0;
       let marginValue = 0;
@@ -107,76 +107,94 @@ export const useSales = () => {
       const boardingFee = Number((saleData as any).boarding_fee) || 0;
       const boardingFeeTotal = boardingFee * passengers;
 
-      if (saleSource === 'internal_account') {
+      if (saleSource === "internal_account") {
         const costPerThousand = costPerMileSnapshot * 1000;
         const milesCost = (milesUsed / 1000) * costPerThousand;
         totalCost = milesCost + boardingFeeTotal;
         marginValue = priceTotal - totalCost;
         marginPercentage = priceTotal > 0 ? (marginValue / priceTotal) * 100 : 0;
-      } else if (saleSource === 'mileage_counter') {
+      } else if (saleSource === "mileage_counter") {
         // For mileage counter, calculate cost based on supplier price
-        const counterCostPerThousand = Number((saleData as any).counter_cost_per_thousand) || 0;
+        const counterCostPerThousand =
+          Number((saleData as any).counter_cost_per_thousand) || 0;
         const milesCost = (milesUsed / 1000) * counterCostPerThousand;
         totalCost = milesCost + boardingFeeTotal;
         marginValue = priceTotal - totalCost;
         marginPercentage = priceTotal > 0 ? (marginValue / priceTotal) * 100 : 0;
       }
 
-      // FASE 1: Garantir route_text
+      // route_text
       const routeText = (saleData as any).flight_segments
-        ? (saleData as any).flight_segments.map((s: any) => `${s.from} → ${s.to}`).join(" / ")
+        ? (saleData as any).flight_segments
+            .map((s: any) => `${s.from} → ${s.to}`)
+            .join(" / ")
         : "N/A";
 
-      const { data: newSale, error } = await supabase.from("sales").insert({
-        ...saleData,
-        user_id: userData.user.id,
-        supplier_id: profile?.supplier_id,
-        client_name: saleData.customer_name || "",
-        client_cpf_encrypted: saleData.customer_cpf || "",
-        client_contact: saleData.customer_phone || "",
-        route_text: routeText,
-        miles_used: milesUsed,
-        cost_per_mile_snapshot: saleSource === 'internal_account' ? costPerMileSnapshot : null,
-        counter_cost_per_thousand: saleSource === 'mileage_counter' ? Number((saleData as any).counter_cost_per_thousand) : null,
-        total_cost: totalCost,
-        sale_price: priceTotal, // Valor base que o vendedor recebe
-        final_price_with_interest: (saleData as any).final_price_with_interest || priceTotal,
-        margin_value: marginValue,
-        margin_percentage: marginPercentage,
-        profit: marginValue,
-        profit_margin: marginPercentage,
-      } as SaleInsert)
-      .select()
-      .single();
+      const { data: newSale, error } = await supabase
+        .from("sales")
+        .insert({
+          ...saleData,
+          user_id: userData.user.id,
+          supplier_id: profile?.supplier_id,
+          client_name: (saleData as any).customer_name || "",
+          client_cpf_encrypted: (saleData as any).customer_cpf || "",
+          client_contact: (saleData as any).customer_phone || "",
+          route_text: routeText,
+          miles_used: milesUsed,
+          cost_per_mile_snapshot:
+            saleSource === "internal_account" ? costPerMileSnapshot : null,
+          counter_cost_per_thousand:
+            saleSource === "mileage_counter"
+              ? Number((saleData as any).counter_cost_per_thousand)
+              : null,
+          total_cost: totalCost,
+          sale_price: priceTotal,
+          final_price_with_interest:
+            (saleData as any).final_price_with_interest || priceTotal,
+          margin_value: marginValue,
+          margin_percentage: marginPercentage,
+          profit: marginValue,
+          profit_margin: marginPercentage,
+        } as SaleInsert)
+        .select()
+        .single();
 
       if (error) throw error;
 
       // Update account balance (only for internal accounts)
-      if (saleSource === 'internal_account' && saleData.mileage_account_id && milesUsed > 0) {
-        const { error: balanceError } = await supabase.rpc("update_account_balance", {
-          account_id: saleData.mileage_account_id,
-          miles_delta: -milesUsed,
-        });
+      if (
+        saleSource === "internal_account" &&
+        saleData.mileage_account_id &&
+        milesUsed > 0
+      ) {
+        const { error: balanceError } = await supabase.rpc(
+          "update_account_balance",
+          {
+            account_id: saleData.mileage_account_id,
+            miles_delta: -milesUsed,
+          }
+        );
 
         if (balanceError) {
           console.error("Failed to update balance:", balanceError);
         }
-        
+
         // Registrar uso de CPFs e atualizar contador
-        const passengerCPFs = (saleData as any).passenger_cpfs as PassengerCPF[] || [];
-        
+        const passengerCPFs =
+          ((saleData as any).passenger_cpfs as PassengerCPF[]) || [];
+
         if (passengerCPFs.length > 0) {
           // Buscar airline_company_id da conta
           const { data: accountData } = await supabase
-            .from('mileage_accounts')
-            .select('airline_company_id')
-            .eq('id', saleData.mileage_account_id)
+            .from("mileage_accounts")
+            .select("airline_company_id")
+            .eq("id", saleData.mileage_account_id)
             .single();
-          
+
           if (accountData) {
             for (const passengerCPF of passengerCPFs) {
               if (!passengerCPF.cpf) continue;
-              
+
               // Verificar se CPF já existe no registro
               const { data: existingCPF } = await supabase
                 .from("cpf_registry")
@@ -184,7 +202,7 @@ export const useSales = () => {
                 .eq("cpf_encrypted", passengerCPF.cpf)
                 .eq("airline_company_id", accountData.airline_company_id)
                 .maybeSingle();
-              
+
               if (existingCPF) {
                 // Incrementar contador de uso
                 await supabase
@@ -192,7 +210,9 @@ export const useSales = () => {
                   .update({
                     usage_count: (existingCPF.usage_count || 0) + 1,
                     last_used_at: new Date().toISOString(),
-                    first_use_date: existingCPF.first_use_date || new Date().toISOString(),
+                    first_use_date:
+                      existingCPF.first_use_date ||
+                      new Date().toISOString(),
                   })
                   .eq("id", existingCPF.id);
               } else {
@@ -207,11 +227,11 @@ export const useSales = () => {
                     usage_count: 1,
                     first_use_date: new Date().toISOString(),
                     last_used_at: new Date().toISOString(),
-                    status: 'available',
+                    status: "available",
                   })
                   .select()
                   .single();
-                
+
                 if (cpfError) {
                   console.error("❌ Falha ao inserir CPF:", cpfError);
                   toast({
@@ -224,7 +244,7 @@ export const useSales = () => {
                 }
               }
             }
-            
+
             // Atualizar contador de CPFs na conta usando função RPC
             await supabase.rpc("update_account_cpf_count", {
               p_account_id: saleData.mileage_account_id,
@@ -278,9 +298,63 @@ export const useSales = () => {
 
   const deleteSale = async (id: string) => {
     try {
+      console.log("[deleteSale] Tentando excluir venda:", id);
+
+      // 🔎 Debug: ver dependências
+      const { data: segments, error: segmentsError } = await supabase
+        .from("sale_segments")
+        .select("id")
+        .eq("sale_id", id);
+
+      if (segmentsError) {
+        console.warn("[deleteSale] Erro ao listar segmentos:", segmentsError);
+      } else {
+        console.log(
+          "[deleteSale] Segmentos encontrados:",
+          segments?.length || 0
+        );
+      }
+
+      const { data: tickets, error: ticketsError } = await supabase
+        .from("tickets")
+        .select("id")
+        .eq("sale_id", id);
+
+      if (ticketsError) {
+        console.warn("[deleteSale] Erro ao listar tickets:", ticketsError);
+      } else {
+        console.log(
+          "[deleteSale] Tickets encontrados:",
+          tickets?.length || 0
+        );
+      }
+
+      const { data: transactions, error: transactionsError } = await supabase
+        .from("payment_transactions")
+        .select("id")
+        .eq("sale_id", id);
+
+      if (transactionsError) {
+        console.warn(
+          "[deleteSale] Erro ao listar transações:",
+          transactionsError
+        );
+      } else {
+        console.log(
+          "[deleteSale] Transações encontradas:",
+          transactions?.length || 0
+        );
+      }
+
+      // 🗑️ Tenta excluir a venda
       const { error } = await supabase.from("sales").delete().eq("id", id);
 
-      if (error) throw error;
+      if (error) {
+        console.error("[deleteSale] Erro ao excluir venda:", error);
+        throw error;
+      }
+
+      console.log("[deleteSale] ✅ Venda excluída com sucesso");
 
       toast({
         title: "Venda removida",
@@ -290,9 +364,10 @@ export const useSales = () => {
       await fetchSales();
       return true;
     } catch (error: any) {
+      console.error("[deleteSale] Erro capturado:", error);
       toast({
         title: "Erro ao remover venda",
-        description: error.message,
+        description: `${error.message} (código: ${error.code || "N/A"})`,
         variant: "destructive",
       });
       return false;
