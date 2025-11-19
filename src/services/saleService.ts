@@ -58,10 +58,16 @@ export async function createSaleWithSegments(
       const sellerName = (formData as any).sellerName;
       const sellerContact = (formData as any).sellerContact;
       const counterCostPerThousand = (formData as any).counterCostPerThousand;
+      const counterAirlineProgram = (formData as any).counterAirlineProgram; // ✅ NOVO
 
-      if (!sellerName || !sellerContact || !counterCostPerThousand) {
+      if (
+        !sellerName ||
+        !sellerContact ||
+        !counterCostPerThousand ||
+        !counterAirlineProgram
+      ) {
         throw new Error(
-          "Informações do vendedor e custo por mil milhas são obrigatórias para vendas de balcão."
+          "Informações do vendedor, programa e custo por mil milhas são obrigatórias para vendas de balcão."
         );
       }
     }
@@ -166,6 +172,10 @@ export async function createSaleWithSegments(
       salePayload.sale_source = "mileage_counter";
       salePayload.counter_seller_name = (formData as any).sellerName;
       salePayload.counter_seller_contact = (formData as any).sellerContact;
+
+      // ✅ PROGRAMA DO BALCÃO – ESSENCIAL PARA O TRIGGER
+      salePayload.counter_airline_program =
+        (formData as any).counterAirlineProgram ?? null;
     }
 
     // Guarda JSONB dos segmentos (compatibilidade)
@@ -178,6 +188,8 @@ export async function createSaleWithSegments(
             .map((s: any) => `${s.from ?? ""}-${s.to ?? ""}`)
             .join(", ")
         : null;
+
+    console.log("[createSaleWithSegments] Payload para sales:", salePayload);
 
     // -------------------------------------------------
     // 5) Inserir na tabela sales
