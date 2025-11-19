@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from './use-toast';
+import { getSupplierId } from '@/lib/getSupplierId';
 
 export interface Customer {
   id: string;
@@ -26,21 +27,12 @@ export function useCustomers() {
   const fetchCustomers = async () => {
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Não autenticado");
-
-      const { data: supplier } = await supabase
-        .from('suppliers')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!supplier) throw new Error("Fornecedor não encontrado");
+      const { supplierId } = await getSupplierId();
 
       const { data, error } = await supabase
         .from('customers')
         .select('*')
-        .eq('supplier_id', supplier.id)
+        .eq('supplier_id', supplierId)
         .order('name');
 
       if (error) throw error;
@@ -59,21 +51,12 @@ export function useCustomers() {
 
   const searchCustomers = async (searchTerm: string): Promise<Customer[]> => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return [];
-
-      const { data: supplier } = await supabase
-        .from('suppliers')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!supplier) return [];
+      const { supplierId } = await getSupplierId();
 
       const { data, error } = await supabase
         .from('customers')
         .select('*')
-        .eq('supplier_id', supplier.id)
+        .eq('supplier_id', supplierId)
         .or(`name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`)
         .limit(10);
 
@@ -94,22 +77,13 @@ export function useCustomers() {
     email?: string;
   }) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Não autenticado");
-
-      const { data: supplier } = await supabase
-        .from('suppliers')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!supplier) throw new Error("Fornecedor não encontrado");
+      const { supplierId } = await getSupplierId();
 
       // Verificar se cliente já existe
       const { data: existing } = await supabase
         .from('customers')
         .select('*')
-        .eq('supplier_id', supplier.id)
+        .eq('supplier_id', supplierId)
         .eq('cpf_encrypted', customerData.cpf)
         .maybeSingle();
 
@@ -137,7 +111,7 @@ export function useCustomers() {
         const { data, error } = await supabase
           .from('customers')
           .insert({
-            supplier_id: supplier.id,
+            supplier_id: supplierId,
             name: customerData.name,
             cpf_encrypted: customerData.cpf,
             rg: customerData.rg,

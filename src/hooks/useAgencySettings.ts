@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from './use-toast';
+import { getSupplierId } from '@/lib/getSupplierId';
 
 export interface AgencySettings {
   id: string;
@@ -22,21 +23,12 @@ export function useAgencySettings() {
   const fetchSettings = async () => {
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Não autenticado");
-
-      const { data: supplier } = await supabase
-        .from('suppliers')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!supplier) throw new Error("Fornecedor não encontrado");
+      const { supplierId } = await getSupplierId();
 
       const { data, error } = await supabase
         .from('agency_settings')
         .select('*')
-        .eq('supplier_id', supplier.id)
+        .eq('supplier_id', supplierId)
         .maybeSingle();
 
       if (error && error.code !== 'PGRST116') throw error;
@@ -56,22 +48,13 @@ export function useAgencySettings() {
 
   const updateSettings = async (updates: Partial<AgencySettings>) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Não autenticado");
-
-      const { data: supplier } = await supabase
-        .from('suppliers')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!supplier) throw new Error("Fornecedor não encontrado");
+      const { supplierId } = await getSupplierId();
 
       const { data, error } = await supabase
         .from('agency_settings')
         .upsert({
           ...updates,
-          supplier_id: supplier.id,
+          supplier_id: supplierId,
           updated_at: new Date().toISOString(),
         } as any)
         .select()

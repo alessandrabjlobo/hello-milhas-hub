@@ -65,6 +65,16 @@ export default function NewSaleWizard() {
   const quoteId = searchParams.get("quoteId");
   const { toast } = useToast();
 
+  // Loading guard para prevenir erros de inicialização
+  const [isInitialized, setIsInitialized] = useState(false);
+  
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsInitialized(true);
+    }, 50);
+    return () => clearTimeout(timer);
+  }, []);
+
   // --- STATES PRINCIPAIS ---
   const [extractedData, setExtractedData] = useState<any>(null);
   const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(
@@ -129,7 +139,7 @@ export default function NewSaleWizard() {
 
   // --- CUSTOM HOOKS ---
   const { accounts, loading: accountsLoading } = useMileageAccounts();
-  const { supplierId } = useUserRole();
+  const { supplierId, loading: roleLoading } = useUserRole();
   const { linkedAirlines, loading: airlinesLoading } =
     useSupplierAirlines(supplierId);
   const {
@@ -138,6 +148,20 @@ export default function NewSaleWizard() {
     calculateInstallmentValue,
   } = usePaymentInterestConfig();
   const { activeMethods, loading: methodsLoading } = usePaymentMethods();
+
+  // Mostrar loading até que tudo esteja pronto
+  if (!isInitialized || accountsLoading || roleLoading || airlinesLoading || configsLoading || methodsLoading) {
+    return (
+      <div className="container py-8">
+        <Card className="p-8">
+          <div className="flex flex-col items-center gap-4">
+            <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+            <p className="text-muted-foreground">Carregando formulário...</p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   const selectedPaymentMethod =
     activeMethods?.find((m) => m.id === paymentMethod) || null;

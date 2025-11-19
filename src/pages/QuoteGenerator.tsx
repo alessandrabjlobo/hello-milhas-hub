@@ -668,10 +668,11 @@ const handleExportAsPDF = () => {
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(18);
     
+    // Usar dados da agência com fallback seguro
     const agencyName = agencySettings?.agency_name || "Orçamento de Passagens Aéreas";
     pdf.text(agencyName, margin, 14);
 
-    // Dados de contato da agência
+    // Dados de contato da agência (com fallback)
     if (agencySettings) {
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(9);
