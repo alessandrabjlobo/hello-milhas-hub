@@ -74,7 +74,22 @@ export async function createSaleWithSegments(
     }
 
     // -------------------------------------------------
-    // 2) Normalizar segmentos de voo
+    // 2) Mapear channel para os valores aceitos pelo banco
+    //    - "internal" → "internal"
+    //    - "counter" → "balcao"
+    // -------------------------------------------------
+    const dbChannel =
+      channel === "internal"
+        ? "internal"
+        : channel === "counter"
+        ? "balcao"
+        : channel;
+
+    console.log("[createSaleWithSegments] channel (form):", channel);
+    console.log("[createSaleWithSegments] channel (db):", dbChannel);
+
+    // -------------------------------------------------
+    // 3) Normalizar segmentos de voo
     // -------------------------------------------------
     const rawSegments: any =
       (formData as any).flightSegments ??
@@ -121,7 +136,7 @@ export async function createSaleWithSegments(
     // -------------------------------------------------
     const salePayload: any = {
       supplier_id: supplierId,
-      channel: channel,
+      channel: dbChannel, // ✅ usando dbChannel mapeado para o banco
       client_name: formData.customerName,
       client_cpf_encrypted: formData.customerCpf,
       client_contact: formData.customerPhone || null,
