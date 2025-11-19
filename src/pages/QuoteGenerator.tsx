@@ -21,6 +21,7 @@ import { useStorage } from "@/hooks/useStorage";
 import { useToast } from "@/hooks/use-toast";
 import { usePaymentInterestConfig } from "@/hooks/usePaymentInterestConfig";
 import { usePaymentMethods } from "@/hooks/usePaymentMethods";
+import { useAgencySettings } from "@/hooks/useAgencySettings";
 import { supabase } from "@/integrations/supabase/client";
 import { formatNumber } from "@/lib/utils";
 
@@ -38,6 +39,7 @@ export default function QuoteGenerator() {
   const { toast } = useToast();
   const { uploading, uploadTicketFile, refreshSignedUrls } = useStorage();
   const { configs: interestConfigs, calculateInstallmentValue } = usePaymentInterestConfig();
+  const { settings: agencySettings } = useAgencySettings();
   const { activeMethods } = usePaymentMethods();
 
   // ========== ESTADOS ==========
@@ -658,21 +660,42 @@ const handleExportAsPDF = () => {
       rowHeight: 6,
     };
 
-    // ========== HEADER COLORIDO ==========
+    // ========== HEADER COLORIDO COM DADOS DA AGÊNCIA ==========
     pdf.setFillColor(orangeDark.r, orangeDark.g, orangeDark.b);
-    pdf.rect(0, 0, pageWidth, 26, "F");
+    pdf.rect(0, 0, pageWidth, 35, "F");
 
     pdf.setTextColor(255, 255, 255);
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(18);
-    pdf.text("Orçamento de Passagens Aéreas", margin, 16);
+    
+    const agencyName = agencySettings?.agency_name || "Orçamento de Passagens Aéreas";
+    pdf.text(agencyName, margin, 14);
+
+    // Dados de contato da agência
+    if (agencySettings) {
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(9);
+      let contactY = 20;
+      
+      if (agencySettings.phone) {
+        pdf.text(`📞 ${agencySettings.phone}`, margin, contactY);
+        contactY += 4;
+      }
+      if (agencySettings.instagram) {
+        pdf.text(`📷 ${agencySettings.instagram}`, margin, contactY);
+        contactY += 4;
+      }
+      if (agencySettings.email) {
+        pdf.text(`✉️ ${agencySettings.email}`, margin, contactY);
+      }
+    }
 
     const todayStr = format(new Date(), "dd/MM/yyyy");
     pdf.setFontSize(10);
     pdf.setFont("helvetica", "normal");
-    pdf.text(`Emitido em: ${todayStr}`, pageWidth - margin, 11, { align: "right" });
+    pdf.text(`Emitido em: ${todayStr}`, pageWidth - margin, 14, { align: "right" });
 
-    let cursorY = 32;
+    let cursorY = 42;
 
     const drawSectionTitle = (title: string) => {
       // Fundo colorido atrás do título
@@ -954,8 +977,8 @@ const handleExportAsPDF = () => {
     const wrapped = pdf.splitTextToSize(notesText, textWidth);
     pdf.text(wrapped, margin, cursorY + 4);
 
-    // ========= RODAPÉ PROFISSIONAL =========
-    const footerY = pdf.internal.pageSize.getHeight() - 20;
+    // ========= RODAPÉ PROFISSIONAL COM DADOS DA AGÊNCIA =========
+    const footerY = pdf.internal.pageSize.getHeight() - 25;
 
     // Linha separadora
     pdf.setDrawColor(border.r, border.g, border.b);
@@ -969,10 +992,25 @@ const handleExportAsPDF = () => {
     const footerLine1 = "Este orçamento tem validade de 48 horas e está sujeito à disponibilidade.";
     const footerLine2 = "Valores e condições podem sofrer alterações sem aviso prévio.";
     const footerLine3 = `Gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`;
+    
+    // Dados da agência no rodapé
+    let footerLine4 = "";
+    if (agencySettings) {
+      const parts = [];
+      if (agencySettings.agency_name) parts.push(agencySettings.agency_name);
+      if (agencySettings.website) parts.push(agencySettings.website);
+      if (agencySettings.address) parts.push(agencySettings.address);
+      footerLine4 = parts.join(" • ");
+    }
 
     pdf.text(footerLine1, pageWidth / 2, footerY, { align: "center" });
     pdf.text(footerLine2, pageWidth / 2, footerY + 4, { align: "center" });
     pdf.text(footerLine3, pageWidth / 2, footerY + 8, { align: "center" });
+    if (footerLine4) {
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(7);
+      pdf.text(footerLine4, pageWidth / 2, footerY + 12, { align: "center" });
+    }
 
     // ========= SALVAR =========
     const filename = clientName

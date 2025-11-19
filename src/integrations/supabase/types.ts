@@ -62,6 +62,56 @@ export type Database = {
           },
         ]
       }
+      agency_settings: {
+        Row: {
+          address: string | null
+          agency_name: string
+          created_at: string | null
+          email: string | null
+          id: string
+          instagram: string | null
+          logo_url: string | null
+          phone: string | null
+          supplier_id: string
+          updated_at: string | null
+          website: string | null
+        }
+        Insert: {
+          address?: string | null
+          agency_name: string
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          instagram?: string | null
+          logo_url?: string | null
+          phone?: string | null
+          supplier_id: string
+          updated_at?: string | null
+          website?: string | null
+        }
+        Update: {
+          address?: string | null
+          agency_name?: string
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          instagram?: string | null
+          logo_url?: string | null
+          phone?: string | null
+          supplier_id?: string
+          updated_at?: string | null
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_agency_settings_supplier"
+            columns: ["supplier_id"]
+            isOneToOne: true
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       airline_companies: {
         Row: {
           code: string
@@ -326,6 +376,7 @@ export type Database = {
       }
       customers: {
         Row: {
+          birth_date: string | null
           cpf_encrypted: string
           created_at: string | null
           email: string | null
@@ -333,12 +384,14 @@ export type Database = {
           last_purchase_at: string | null
           name: string
           phone: string | null
+          rg: string | null
           supplier_id: string
           total_purchases: number | null
           total_spent: number | null
           updated_at: string | null
         }
         Insert: {
+          birth_date?: string | null
           cpf_encrypted: string
           created_at?: string | null
           email?: string | null
@@ -346,12 +399,14 @@ export type Database = {
           last_purchase_at?: string | null
           name: string
           phone?: string | null
+          rg?: string | null
           supplier_id: string
           total_purchases?: number | null
           total_spent?: number | null
           updated_at?: string | null
         }
         Update: {
+          birth_date?: string | null
           cpf_encrypted?: string
           created_at?: string | null
           email?: string | null
@@ -359,6 +414,7 @@ export type Database = {
           last_purchase_at?: string | null
           name?: string
           phone?: string | null
+          rg?: string | null
           supplier_id?: string
           total_purchases?: number | null
           total_spent?: number | null

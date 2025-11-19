@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -5,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HashRouter as BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/shared/AppSidebar";
+import { Skeleton } from "@/components/ui/skeleton";
 
 import Index from "./pages/Index";
 import Login from "./pages/Login";
@@ -15,7 +17,6 @@ import AdminUsers from "./pages/AdminUsers";
 import Onboarding from "./pages/Onboarding";
 import Auth from "./pages/Auth";
 import { ProtectedRoute } from "./components/ProtectedRoute";
-import NewSaleWizard from "./pages/sales/NewSaleWizard";
 import SalesList from "./pages/sales/SalesList";
 import SaleDetail from "./pages/sales/SaleDetail";
 import AccountDetail from "./pages/AccountDetail";
@@ -36,6 +37,10 @@ import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import NotFound from "./pages/NotFound";
 import Demo from "./pages/Demo";
+
+// Lazy load para páginas pesadas
+const NewSaleWizard = lazy(() => import("./pages/sales/NewSaleWizard"));
+const AgencySettings = lazy(() => import("./pages/settings/AgencySettings"));
 
 const queryClient = new QueryClient();
 
@@ -67,7 +72,15 @@ const App = () => (
                         <Route path="/dashboard" element={<DashboardKPIs />} />
                         <Route path="/onboarding" element={<Onboarding />} />
                         <Route path="/admin/users" element={<AdminUsers />} />
-                        <Route path="/sales/new" element={<NewSaleWizard />} />
+                        <Route path="/sales/new" element={
+                          <Suspense fallback={
+                            <div className="flex h-screen items-center justify-center">
+                              <Skeleton className="h-96 w-full max-w-4xl" />
+                            </div>
+                          }>
+                            <NewSaleWizard />
+                          </Suspense>
+                        } />
                         <Route path="/sales/:id" element={<SaleDetail />} />
                         <Route path="/sales" element={<SalesList />} />
                         <Route path="/accounts/:id" element={<AccountDetail />} />
@@ -86,6 +99,16 @@ const App = () => (
                         <Route path="/settings/credit" element={<PaymentInterestSettings />} />
                         <Route path="/settings/payment-interest" element={<PaymentInterestSettings />} />
                         <Route path="/settings/payment-methods" element={<PaymentSettings />} />
+                        <Route path="/settings/agency" element={
+                          <Suspense fallback={
+                            <div className="container py-8">
+                              <Skeleton className="h-12 w-64 mb-4" />
+                              <Skeleton className="h-96 w-full" />
+                            </div>
+                          }>
+                            <AgencySettings />
+                          </Suspense>
+                        } />
                         <Route path="/my-airlines" element={<Navigate to="/settings/my-airlines" replace />} />
                         <Route path="/program-rules" element={<Navigate to="/settings/programs" replace />} />
                         <Route path="*" element={<NotFound />} />
