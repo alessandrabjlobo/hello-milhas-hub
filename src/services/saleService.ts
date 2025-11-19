@@ -33,6 +33,7 @@ export async function createSaleWithSegments(
 
     // -------------------------------------------------
     // 1) Normalizar e validar canal (internal vs counter)
+    //    👉 usado apenas na lógica do serviço, NÃO vai para o banco
     // -------------------------------------------------
     const channel = (formData as any).channel as
       | "internal"
@@ -58,7 +59,7 @@ export async function createSaleWithSegments(
       const sellerName = (formData as any).sellerName;
       const sellerContact = (formData as any).sellerContact;
       const counterCostPerThousand = (formData as any).counterCostPerThousand;
-      const counterAirlineProgram = (formData as any).counterAirlineProgram; // ✅ NOVO
+      const counterAirlineProgram = (formData as any).counterAirlineProgram;
 
       if (
         !sellerName ||
@@ -115,14 +116,12 @@ export async function createSaleWithSegments(
 
     const totalCost = Number(totalCostRaw) || 0;
 
-    // (RECEITA total_price NÃO será enviada, pois a coluna não existe no banco)
-
     // -------------------------------------------------
     // 4) Montar payload da venda (tabela sales)
     // -------------------------------------------------
     const salePayload: any = {
       supplier_id: supplierId,
-      channel, // "internal" ou "counter"
+      // ❌ NÃO mandamos mais `channel` pro banco para não violar o check
       client_name: formData.customerName,
       client_cpf_encrypted: formData.customerCpf,
       client_contact: formData.customerPhone || null,
@@ -159,7 +158,7 @@ export async function createSaleWithSegments(
       passenger_cpfs: (formData as any).passengerCpfs || [],
     };
 
-    // Campos específicos por canal
+    // Campos específicos por canal – agora só mexemos em sale_source e dados do balcão
     if (channel === "internal") {
       salePayload.program_id = (formData as any).programId;
       salePayload.mileage_account_id = (formData as any).accountId;
@@ -172,8 +171,6 @@ export async function createSaleWithSegments(
       salePayload.sale_source = "mileage_counter";
       salePayload.counter_seller_name = (formData as any).sellerName;
       salePayload.counter_seller_contact = (formData as any).sellerContact;
-
-      // ✅ PROGRAMA DO BALCÃO – ESSENCIAL PARA O TRIGGER
       salePayload.counter_airline_program =
         (formData as any).counterAirlineProgram ?? null;
     }
@@ -237,7 +234,7 @@ export async function createSaleWithSegments(
     }
 
     // -------------------------------------------------
-    // 7) Registrar CPFs dos passageiros no cpf_registry
+    // 7) Registrar CPFs dos passageiros no cpf_registry (só conta interna)
     // -------------------------------------------------
     if (channel === "internal") {
       const accountId = (formData as any).accountId;
