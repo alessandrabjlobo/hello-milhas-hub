@@ -65,7 +65,7 @@ export default function NewSaleWizard() {
   const quoteId = searchParams.get("quoteId");
   const { toast } = useToast();
 
-  // Loading guard para prevenir erros de inicialização
+  // Loading guard
   const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
@@ -152,7 +152,8 @@ export default function NewSaleWizard() {
   const selectedAccount =
     accounts.find((acc) => acc.id === accountId) || undefined;
 
-  const filteredAccounts = accounts.filter((acc) => acc.status === "active");
+  // 🔹 Cálculo de milhas totais já existe no financialData; mas precisamos dele
+  // para filtrar contas internas com saldo suficiente.
 
   const updateTripType = (type: typeof tripType) => {
     setTripType(type);
@@ -188,8 +189,7 @@ export default function NewSaleWizard() {
             0
           );
 
-    const boardingFeeTotal =
-      boardingFeePerPassenger * (passengers || 1);
+    const boardingFeeTotal = boardingFeePerPassenger * (passengers || 1);
 
     let costPerThousand: number | null = null;
 
@@ -202,9 +202,7 @@ export default function NewSaleWizard() {
     }
 
     const costPerMile =
-      costPerThousand && costPerThousand > 0
-        ? costPerThousand / 1000
-        : 0;
+      costPerThousand && costPerThousand > 0 ? costPerThousand / 1000 : 0;
 
     const milesCostTotal = totalMiles * costPerMile;
 
@@ -249,6 +247,27 @@ export default function NewSaleWizard() {
     profitMarginPct,
   } = financialData;
 
+  // 🔹 Contas internas filtradas por saldo (apenas ativas + saldo suficiente)
+  const filteredAccounts = useMemo(() => {
+    const activeAccounts = accounts.filter((acc) => acc.status === "active");
+
+    // Só aplica filtro de saldo quando for Conta Interna
+    if (!totalMiles || saleSource !== "internal_account") {
+      return activeAccounts;
+    }
+
+    return activeAccounts.filter((acc: any) => {
+      const balanceMiles =
+        acc.available_miles ??
+        acc.balance_miles ??
+        acc.total_miles ??
+        acc.miles_balance ??
+        0;
+
+      return balanceMiles >= totalMiles;
+    });
+  }, [accounts, totalMiles, saleSource]);
+
   // --- useEffect: sincronizar passageiro principal com cliente ---
   useEffect(() => {
     if (customerName && customerCpf) {
@@ -292,7 +311,7 @@ export default function NewSaleWizard() {
         setSourceQuote(data);
         setIsConvertingQuote(true);
 
-        // 🔁 AJUSTE CONVERSÃO DE ORÇAMENTO – campos básicos
+        // campos básicos
         setCustomerName(data.client_name || "");
         setCustomerPhone(data.client_phone || "");
         setAirline(data.company_name || "");
@@ -313,23 +332,19 @@ export default function NewSaleWizard() {
         }
 
         if (data.boarding_fee) {
-          // boarding_fee no orçamento é por passageiro
           setTotalBoardingFee(data.boarding_fee.toString());
           setBoardingFeeMode("total");
         }
 
-        // 🔁 AJUSTE CONVERSÃO DE ORÇAMENTO – tripType
         if (data.trip_type) {
           setTripType(data.trip_type as typeof tripType);
         }
 
-        // 🔁 AJUSTE CONVERSÃO DE ORÇAMENTO – flight_segments
         if (data.flight_segments && Array.isArray(data.flight_segments)) {
           const rawSegments = data.flight_segments as any[];
 
           let segments: FlightSegment[] = [];
 
-          // round_trip salvo no orçamento como UM objeto com origin/destination + milesOutbound/milesReturn
           if (data.trip_type === "round_trip" && rawSegments.length > 0) {
             const seg = rawSegments[0];
 
@@ -337,8 +352,7 @@ export default function NewSaleWizard() {
             const destination = seg.destination || seg.to || "";
             const departureDate =
               seg.departureDate || seg.departure_date || seg.date || "";
-            const returnDate =
-              seg.returnDate || seg.return_date || "";
+            const returnDate = seg.returnDate || seg.return_date || "";
 
             const milesOutboundPerPax =
               seg.milesOutbound ?? seg.miles_ida ?? 0;
@@ -365,7 +379,6 @@ export default function NewSaleWizard() {
 
             setTripType("round_trip");
           } else if (data.trip_type === "one_way" && rawSegments.length > 0) {
-            // one_way salvo como um objeto com origin/destination + miles (pax)
             const seg = rawSegments[0];
 
             const origin = seg.origin || seg.from || "";
@@ -393,7 +406,6 @@ export default function NewSaleWizard() {
 
             setTripType("one_way");
           } else if (data.trip_type === "multi_city") {
-            // multi_city: cada trecho no orçamento é milhas/pax, aqui convertemos para milhas totais
             segments = rawSegments.map((seg: any) => {
               const milesPerPax = seg.miles || 0;
               return {
@@ -411,7 +423,6 @@ export default function NewSaleWizard() {
 
             setTripType("multi_city");
           } else {
-            // Fallback genérico (caso venha em formato inesperado)
             const fallbackSegments = rawSegments.map((seg: any) => ({
               from: seg.from || seg.origin || "",
               to: seg.to || seg.destination || "",
@@ -460,7 +471,7 @@ export default function NewSaleWizard() {
     }
   }, [quoteId, fetchAndPrefillQuote]);
 
-  // --- LOADING CHECK ÚNICO (após todos os hooks) ---
+  // --- LOADING CHECK ÚNICO ---
   if (
     !isInitialized ||
     accountsLoading ||
@@ -481,7 +492,6 @@ export default function NewSaleWizard() {
     );
   }
 
-  // --- VARIÁVEIS DERIVADAS ---
   const selectedPaymentMethod =
     activeMethods?.find((m) => m.id === paymentMethod) || null;
 
@@ -624,7 +634,6 @@ export default function NewSaleWizard() {
       return;
     }
 
-    // ✅ Garante que supplierId existe antes de salvar
     if (!supplierId) {
       toast({
         title: "Erro de configuração",
@@ -638,35 +647,32 @@ export default function NewSaleWizard() {
     setSaving(true);
 
     try {
+      // 🔹 Canal SEMPRE definido (evita null na coluna channel)
       const channel =
         saleSource === "internal_account" ? "internal" : "counter";
 
-      // 🔹 Encontrar método de pagamento selecionado
       const selectedMethod = (activeMethods || []).find(
         (m) => m.id === paymentMethod
       );
 
-      // 🔹 Dados enviados para o backend (incluindo custo / milhas)
       const saleFormData: any = {
-        channel,
+        channel, // <- importante para não dar erro no insert
         customerName,
         customerCpf: customerCpf.replace(/\D/g, ""),
         customerPhone: customerPhone || null,
         passengers,
         tripType,
-        paymentMethod: selectedMethod?.method_type || null, // ✅ method_type (pix, credit_card, etc)
+        paymentMethod: selectedMethod?.method_type || null,
         notes: notes || null,
         flightSegments,
-        passengerCpfs, // ✅ CPFs dos passageiros
+        passengerCpfs,
 
-        // financeiros
-        priceTotal: revenueTotal, // número já parseado
+        priceTotal: revenueTotal,
         boardingFeePerPassenger,
         totalBoardingFee: boardingFeeTotal,
         milesUsed: totalMiles,
         totalCost: estimatedTotalCost,
 
-        // ✅ Campos de lucro (obrigatórios no banco)
         profit: estimatedProfit || 0,
         profitMargin: profitMarginPct || 0,
         pricePerPassenger: pricePerPassenger || null,
@@ -677,20 +683,19 @@ export default function NewSaleWizard() {
         saleFormData.programId = programId;
         saleFormData.accountId = accountId;
       } else {
-        // 🔹 Venda via Balcão de Milhas (fornecedor externo)
         saleFormData.sellerName = counterSellerName.trim();
         saleFormData.sellerContact = counterSellerContact.trim();
-        saleFormData.counterAirlineProgram = counterAirlineProgram.trim(); // << ADICIONADO
+        saleFormData.counterAirlineProgram = counterAirlineProgram.trim();
         saleFormData.counterCostPerThousand = counterCostPerThousand
           ? parseFloat(counterCostPerThousand)
           : null;
       }
 
-
       console.log(
         "[QuoteToSale] Creating sale from quoteId:",
         quoteId || "new sale"
       );
+      console.log("[QuoteToSale] saleFormData:", saleFormData);
 
       const result = await createSaleWithSegments(saleFormData, supplierId);
 
@@ -913,7 +918,11 @@ export default function NewSaleWizard() {
                             setProgramId(account.airline_company_id);
                           }
                         }}
-                        placeholder="Buscar conta..."
+                        placeholder={
+                          filteredAccounts.length === 0
+                            ? "Nenhuma conta com saldo suficiente"
+                            : "Buscar conta..."
+                        }
                       />
                     </div>
                   )}
