@@ -121,7 +121,7 @@ export async function createSaleWithSegments(
     // -------------------------------------------------
     const salePayload: any = {
       supplier_id: supplierId,
-      // ❌ NÃO mandamos mais `channel` pro banco para não violar o check
+      channel: channel,
       client_name: formData.customerName,
       client_cpf_encrypted: formData.customerCpf,
       client_contact: formData.customerPhone || null,

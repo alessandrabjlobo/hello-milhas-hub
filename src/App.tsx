@@ -69,7 +69,7 @@ const App = () => (
                     <AppSidebar />
                     <main className="flex-1 relative">
                       {/* Botão fixo para abrir/fechar sidebar - sempre visível */}
-                      <div className="fixed top-4 left-4 z-50">
+                      <div className="fixed top-4 right-4 z-50">
                         <SidebarTrigger className="h-10 w-10 rounded-md border bg-background hover:bg-accent hover:text-accent-foreground shadow-md" />
                       </div>
                       <Routes>
