@@ -386,9 +386,19 @@ export default function NewSaleWizard() {
             const returnDate = seg.returnDate || seg.return_date || "";
 
             const milesOutboundPerPax =
-              seg.milesOutbound ?? seg.miles_ida ?? 0;
+              seg.milesOutbound ??
+              seg.miles_ida ??
+              seg.miles_ida_pax ??      // campo que vem do formulário "Milhas ida/pax"
+              seg.miles_outbound_pax ?? // fallback extra, caso o nome esteja assim
+              0;
+            
             const milesReturnPerPax =
-              seg.milesReturn ?? seg.miles_volta ?? 0;
+              seg.milesReturn ??
+              seg.miles_volta ??
+              seg.miles_volta_pax ??    // campo que vem do formulário "Milhas volta/pax"
+              seg.miles_return_pax ??   // fallback extra
+              0;
+
 
             const milesOutboundTotal = milesOutboundPerPax * paxCount;
             const milesReturnTotal = milesReturnPerPax * paxCount;
@@ -417,12 +427,14 @@ export default function NewSaleWizard() {
             const departureDate =
               seg.departureDate || seg.departure_date || seg.date || "";
 
-            const milesPerPax =
-              seg.miles ??
-              seg.milesOutbound ??
-              seg.miles_ida ??
-              data.miles_needed ??
-              0;
+           const milesPerPax =
+            seg.miles ??
+            seg.milesOutbound ??
+            seg.miles_ida ??
+            seg.miles_ida_pax ??      // milhas ida/pax do orçamento
+            seg.miles_outbound_pax ?? // outro possível nome
+            data.miles_needed ??
+            0;
 
             const milesTotal = milesPerPax * paxCount;
 
