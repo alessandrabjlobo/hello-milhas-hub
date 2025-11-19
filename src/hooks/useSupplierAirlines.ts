@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -20,11 +20,11 @@ export const useSupplierAirlines = (supplierId: string | null) => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
 
-      // Fetch all airlines
+      // Buscar todas as companhias aéreas
       const { data: airlinesData, error: airlinesError } = await supabase
         .from("airline_companies")
         .select("*")
@@ -33,22 +33,27 @@ export const useSupplierAirlines = (supplierId: string | null) => {
       if (airlinesError) throw airlinesError;
       setAllAirlines(airlinesData || []);
 
-      // Fetch linked airlines if supplier_id exists
-      if (supplierId) {
-        const { data: linkedData, error: linkedError } = await supabase
-          .from("suppliers_airlines")
-          .select("airline_company_id, airline_companies(id, name, code)")
-          .eq("supplier_id", supplierId);
-
-        if (linkedError) throw linkedError;
-
-        const airlines = (linkedData || [])
-          .map((item: any) => item.airline_companies)
-          .filter(Boolean);
-
-        setLinkedAirlines(airlines);
+      // Se não tiver supplierId, limpa as vinculadas e encerra
+      if (!supplierId) {
+        setLinkedAirlines([]);
+        return;
       }
+
+      // Buscar companhias vinculadas ao fornecedor
+      const { data: linkedData, error: linkedError } = await supabase
+        .from("suppliers_airlines")
+        .select("airline_company_id, airline_companies(id, name, code)")
+        .eq("supplier_id", supplierId);
+
+      if (linkedError) throw linkedError;
+
+      const airlines = (linkedData || [])
+        .map((item: SupplierAirline) => item.airline_companies)
+        .filter(Boolean);
+
+      setLinkedAirlines(airlines);
     } catch (error: any) {
+      console.error("[useSupplierAirlines] Error fetching data:", error);
       toast({
         title: "Erro ao carregar companhias aéreas",
         description: error.message,
@@ -57,7 +62,7 @@ export const useSupplierAirlines = (supplierId: string | null) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [supplierId, toast]);
 
   const linkAirline = async (airlineId: string) => {
     if (!supplierId) return false;
@@ -78,6 +83,7 @@ export const useSupplierAirlines = (supplierId: string | null) => {
       await fetchData();
       return true;
     } catch (error: any) {
+      console.error("[useSupplierAirlines] Error linking airline:", error);
       toast({
         title: "Erro ao vincular companhia",
         description: error.message,
@@ -107,6 +113,7 @@ export const useSupplierAirlines = (supplierId: string | null) => {
       await fetchData();
       return true;
     } catch (error: any) {
+      console.error("[useSupplierAirlines] Error unlinking airline:", error);
       toast({
         title: "Erro ao desvincular companhia",
         description: error.message,
@@ -118,7 +125,7 @@ export const useSupplierAirlines = (supplierId: string | null) => {
 
   useEffect(() => {
     fetchData();
-  }, [supplierId]);
+  }, [fetchData]);
 
   return {
     linkedAirlines,
