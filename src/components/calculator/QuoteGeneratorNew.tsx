@@ -1,18 +1,47 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { FileText, Send, Copy, ArrowLeft, User, Plane, DollarSign, Plus, Info, Calculator, ChevronDown, Edit2 } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  FileText,
+  Send,
+  Copy,
+  ArrowLeft,
+  User,
+  Plane,
+  DollarSign,
+  Plus,
+  Info,
+  Calculator,
+  ChevronDown,
+  Edit2,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { FlightSegmentForm, type FlightSegment } from "@/components/sales/FlightSegmentForm";
-import { RoundTripForm, type RoundTripData } from "@/components/calculator/RoundTripForm";
+import {
+  FlightSegmentForm,
+  type FlightSegment,
+} from "@/components/sales/FlightSegmentForm";
+import {
+  RoundTripForm,
+  type RoundTripData,
+} from "@/components/calculator/RoundTripForm";
 import { usePaymentMethods } from "@/hooks/usePaymentMethods";
 import { formatMiles } from "@/lib/utils";
 
@@ -21,17 +50,19 @@ export function QuoteGeneratorNew() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { activeMethods } = usePaymentMethods();
-  
+
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [passengers, setPassengers] = useState("1");
   const [totalPrice, setTotalPrice] = useState("");
   const [boardingFee, setBoardingFee] = useState("");
-  
+
   // Trip type e flight segments
-  const [tripType, setTripType] = useState<"one_way" | "round_trip" | "multi_city">("round_trip");
+  const [tripType, setTripType] = useState<
+    "one_way" | "round_trip" | "multi_city"
+  >("round_trip");
   const [flightSegments, setFlightSegments] = useState<FlightSegment[]>([
-    { from: "", to: "", date: "" }
+    { from: "", to: "", date: "" },
   ]);
   const [roundTripData, setRoundTripData] = useState<RoundTripData>({
     origin: "",
@@ -40,12 +71,12 @@ export function QuoteGeneratorNew() {
     returnDate: "",
     miles: 0,
     milesOutbound: 0,
-    milesReturn: 0
+    milesReturn: 0,
   });
   const [costPerMile, setCostPerMile] = useState("");
   const [desiredMarkup, setDesiredMarkup] = useState("");
   const [showCalculator, setShowCalculator] = useState(true);
-  
+
   const [showPreview, setShowPreview] = useState(false);
   const [existingQuoteId, setExistingQuoteId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -72,7 +103,7 @@ export function QuoteGeneratorNew() {
         returnDate: "",
         miles: 0,
         milesOutbound: 0,
-        milesReturn: 0
+        milesReturn: 0,
       });
     }
   }, [quoteId]);
@@ -100,30 +131,75 @@ export function QuoteGeneratorNew() {
         setPassengers(data.passengers?.toString() || "1");
         setTotalPrice(data.total_price.toString());
         setBoardingFee(data.boarding_fee?.toString() || "");
-        
-        // Load flight segments if available
+
+        // Load flight segments se disponíveis
         if (data.flight_segments) {
-          const segments = Array.isArray(data.flight_segments) 
-            ? data.flight_segments 
+          const segments = Array.isArray(data.flight_segments)
+            ? data.flight_segments
             : [];
-          
+
           if (segments.length > 0) {
-            if (data.trip_type === "round_trip" && segments.length === 2) {
-              const seg0 = segments[0] as any;
-              const seg1 = segments[1] as any;
-              setRoundTripData({
-                origin: seg0?.from || "",
-                destination: seg0?.to || "",
-                departureDate: seg0?.date || "",
-                returnDate: seg1?.date || "",
-                miles: data.miles_needed || 0,
-                milesOutbound: seg0?.miles || 0,
-                milesReturn: seg1?.miles || 0
-              });
+            if (data.trip_type === "round_trip") {
+              // ✅ Suporte tanto para formato novo (1 segmento com milesOutbound/milesReturn)
+              // quanto para formato antigo (2 segmentos separados)
+              if (segments.length === 1) {
+                const seg0 = segments[0] as any;
+                const milesOutbound =
+                  seg0.milesOutbound ??
+                  seg0.miles_ida ??
+                  seg0.miles_ida_pax ??
+                  seg0.miles ??
+                  0;
+                const milesReturn =
+                  seg0.milesReturn ??
+                  seg0.miles_volta ??
+                  seg0.miles_volta_pax ??
+                  0;
+
+                const milesSum =
+                  (milesOutbound || 0) +
+                    (milesReturn || 0) ||
+                  data.miles_needed ||
+                  0;
+
+                setRoundTripData({
+                  origin: seg0.origin || seg0.from || "",
+                  destination: seg0.destination || seg0.to || "",
+                  departureDate: seg0.departureDate || seg0.date || "",
+                  returnDate: seg0.returnDate || "",
+                  miles: milesSum,
+                  milesOutbound,
+                  milesReturn,
+                });
+              } else if (segments.length === 2) {
+                const seg0 = segments[0] as any;
+                const seg1 = segments[1] as any;
+                const milesOutbound = seg0?.miles || 0;
+                const milesReturn = seg1?.miles || 0;
+                const milesSum =
+                  (milesOutbound || 0) +
+                    (milesReturn || 0) ||
+                  data.miles_needed ||
+                  0;
+
+                setRoundTripData({
+                  origin: seg0?.from || seg0?.origin || "",
+                  destination: seg0?.to || seg0?.destination || "",
+                  departureDate: seg0?.date || seg0?.departureDate || "",
+                  returnDate: seg1?.date || seg0?.returnDate || "",
+                  miles: milesSum,
+                  milesOutbound,
+                  milesReturn,
+                });
+              } else {
+                setFlightSegments(segments as any);
+              }
+              setTripType("round_trip");
             } else {
+              // one_way ou multi_city
               setFlightSegments(segments as any);
+              setTripType((data.trip_type as any) || "round_trip");
             }
-            setTripType((data.trip_type as any) || "round_trip");
           }
         }
 
@@ -155,16 +231,31 @@ export function QuoteGeneratorNew() {
     }
 
     if (tripType === "round_trip") {
-      if (!roundTripData.origin || !roundTripData.destination || !roundTripData.departureDate || !roundTripData.returnDate || !roundTripData.miles) {
+      const hasBasic =
+        roundTripData.origin &&
+        roundTripData.destination &&
+        roundTripData.departureDate &&
+        roundTripData.returnDate;
+
+      const milesPerPax =
+        (roundTripData.milesOutbound || 0) +
+          (roundTripData.milesReturn || 0) ||
+        roundTripData.miles ||
+        0;
+
+      if (!hasBasic || !milesPerPax) {
         toast({
           title: "Campos obrigatórios",
-          description: "Preencha todos os campos do voo de ida e volta, incluindo milhas.",
+          description:
+            "Preencha todos os campos do voo de ida e volta, incluindo milhas de ida e volta.",
           variant: "destructive",
         });
         return;
       }
     } else if (tripType === "one_way" || tripType === "multi_city") {
-      const hasValidSegment = flightSegments.some(seg => seg.from && seg.to && seg.date);
+      const hasValidSegment = flightSegments.some(
+        (seg) => seg.from && seg.to && seg.date
+      );
       if (!hasValidSegment) {
         toast({
           title: "Campos obrigatórios",
@@ -179,57 +270,86 @@ export function QuoteGeneratorNew() {
   };
 
   const generateQuoteText = () => {
-    const pricePerPassenger = passengers ? (parseFloat(totalPrice) / parseInt(passengers)).toFixed(2) : totalPrice;
-    const totalBoardingFee = boardingFee ? (parseFloat(boardingFee) * parseInt(passengers || "1")).toFixed(2) : "0.00";
-    
+    const passengersNum = parseInt(passengers || "1") || 1;
+    const pricePerPassenger = passengers
+      ? (parseFloat(totalPrice) / passengersNum).toFixed(2)
+      : totalPrice;
+    const totalBoardingFee = boardingFee
+      ? (parseFloat(boardingFee) * passengersNum).toFixed(2)
+      : "0.00";
+
     let text = `*✈️ ORÇAMENTO DE PASSAGEM AÉREA*\n\n`;
     text += `*👤 DADOS DO CLIENTE*\n`;
     text += `Nome: ${clientName}\n`;
     text += `Telefone: ${clientPhone}\n\n`;
-    
+
     text += `*🛫 DETALHES DO VOO*\n`;
-    text += `Tipo: ${tripType === 'one_way' ? 'Só Ida' : tripType === 'round_trip' ? 'Ida e Volta' : 'Múltiplos Trechos'}\n`;
-    
-    if (tripType === 'round_trip') {
+    text += `Tipo: ${
+      tripType === "one_way"
+        ? "Só Ida"
+        : tripType === "round_trip"
+        ? "Ida e Volta"
+        : "Múltiplos Trechos"
+    }\n`;
+
+    if (tripType === "round_trip") {
       text += `Origem: ${roundTripData.origin}\n`;
       text += `Destino: ${roundTripData.destination}\n`;
-      // Parse dates correctly to avoid timezone issues
-      const [depYear, depMonth, depDay] = roundTripData.departureDate.split('-');
-      const [retYear, retMonth, retDay] = roundTripData.returnDate.split('-');
+      // Parse dates corretamente
+      const [depYear, depMonth, depDay] =
+        roundTripData.departureDate.split("-");
+      const [retYear, retMonth, retDay] = roundTripData.returnDate.split("-");
       text += `Data de Ida: ${depDay}/${depMonth}/${depYear}\n`;
       text += `Data de Volta: ${retDay}/${retMonth}/${retYear}\n`;
-      text += `Milhas: ${formatMiles(roundTripData.miles)} por passageiro\n`;
+
+      const milesPerPax =
+        (roundTripData.milesOutbound || 0) +
+          (roundTripData.milesReturn || 0) ||
+        roundTripData.miles ||
+        0;
+      text += `Milhas: ${formatMiles(milesPerPax)} por passageiro\n`;
     } else {
-      flightSegments.filter(seg => seg.from && seg.to).forEach((segment, index) => {
-        text += `\nTrecho ${index + 1}: ${segment.from} → ${segment.to}\n`;
-        if (segment.date) {
-          const [year, month, day] = segment.date.split('-');
-          text += `Data: ${day}/${month}/${year}\n`;
-        }
-        if (segment.miles) {
-          text += `Milhas: ${formatMiles(segment.miles)} por passageiro\n`;
-        }
-      });
+      flightSegments
+        .filter((seg) => seg.from && seg.to)
+        .forEach((segment, index) => {
+          text += `\nTrecho ${index + 1}: ${segment.from} → ${
+            segment.to
+          }\n`;
+          if (segment.date) {
+            const [year, month, day] = segment.date.split("-");
+            text += `Data: ${day}/${month}/${year}\n`;
+          }
+          if (segment.miles) {
+            text += `Milhas: ${formatMiles(
+              segment.miles
+            )} por passageiro\n`;
+          }
+        });
     }
-    
+
     text += `\n*💰 VALORES*\n`;
     text += `Passageiros: ${passengers}\n`;
     if (boardingFee && parseFloat(boardingFee) > 0) {
-      text += `Taxa de embarque: R$ ${parseFloat(boardingFee).toFixed(2)} por passageiro\n`;
+      text += `Taxa de embarque: R$ ${parseFloat(
+        boardingFee
+      ).toFixed(2)} por passageiro\n`;
       text += `Total taxas: R$ ${totalBoardingFee}\n`;
     }
-    if (parseInt(passengers) > 1) {
+    if (passengersNum > 1) {
       text += `Valor por pessoa: R$ ${pricePerPassenger}\n`;
     }
-    text += `\n*VALOR À VISTA: R$ ${parseFloat(totalPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}*\n`;
-    
+    text += `\n*VALOR À VISTA: R$ ${parseFloat(totalPrice).toLocaleString(
+      "pt-BR",
+      { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+    )}*\n`;
+
     text += `\n*💳 FORMAS DE PAGAMENTO*\n`;
-    
+
     // Use configured payment methods
     if (activeMethods && activeMethods.length > 0) {
-      activeMethods.forEach(method => {
+      activeMethods.forEach((method) => {
         text += `• ${method.method_name}`;
-        if (method.method_type === 'pix' && method.additional_info) {
+        if (method.method_type === "pix" && method.additional_info) {
           try {
             const info = JSON.parse(method.additional_info as string);
             if (info.pix_key) {
@@ -242,37 +362,65 @@ export function QuoteGeneratorNew() {
     } else {
       text += `• PIX - R$ ${parseFloat(totalPrice).toFixed(2)}\n`;
     }
-    
+
     text += `\n_Orçamento válido por 48h_\n`;
     text += `_Sujeito à disponibilidade_`;
-    
+
     return text;
   };
 
   const handleSaveQuote = async () => {
     try {
       setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
 
-      const totalMiles = tripType === 'round_trip' 
-        ? roundTripData.miles 
-        : flightSegments.reduce((sum, seg) => sum + (seg.miles || 0), 0);
+      const passengersNum = parseInt(passengers || "1") || 1;
 
-      const segments = tripType === 'round_trip'
-        ? [
-            { from: roundTripData.origin, to: roundTripData.destination, date: roundTripData.departureDate },
-            { from: roundTripData.destination, to: roundTripData.origin, date: roundTripData.returnDate }
-          ]
-        : flightSegments.filter(seg => seg.from && seg.to);
+      // ✅ Milhas POR PASSAGEIRO
+      const milesPerPassenger =
+        tripType === "round_trip"
+          ? (roundTripData.milesOutbound || 0) +
+              (roundTripData.milesReturn || 0) ||
+            roundTripData.miles ||
+            0
+          : flightSegments.reduce(
+              (sum, seg) => sum + (seg.miles || 0),
+              0
+            );
+
+      // ✅ Total de milhas (todos os passageiros)
+      const totalMiles = milesPerPassenger * passengersNum;
+
+      // ✅ Array de segmentos com milhas (para ida e volta)
+      const segments =
+        tripType === "round_trip"
+          ? [
+              {
+                // campos usados no NewSaleWizard
+                origin: roundTripData.origin,
+                destination: roundTripData.destination,
+                from: roundTripData.origin,
+                to: roundTripData.destination,
+                departureDate: roundTripData.departureDate,
+                date: roundTripData.departureDate,
+                returnDate: roundTripData.returnDate,
+                milesOutbound: roundTripData.milesOutbound,
+                milesReturn: roundTripData.milesReturn,
+                miles: milesPerPassenger, // soma ida+volta por passageiro
+              },
+            ]
+          : flightSegments.filter((seg) => seg.from && seg.to);
 
       const quoteData: any = {
         user_id: user.id,
         client_name: clientName,
         client_phone: clientPhone,
         total_price: parseFloat(totalPrice),
-        miles_needed: totalMiles * parseInt(passengers),
-        passengers: parseInt(passengers),
+        miles_needed: totalMiles, // ✅ agora é (ida+volta) * passageiros
+        passengers: passengersNum,
         boarding_fee: parseFloat(boardingFee) || null,
         trip_type: tripType,
         flight_segments: segments,
@@ -288,7 +436,7 @@ export function QuoteGeneratorNew() {
           .eq("id", existingQuoteId)
           .select()
           .single();
-        
+
         if (error) throw error;
         result = data;
 
@@ -337,15 +485,15 @@ export function QuoteGeneratorNew() {
   const handleSendWhatsApp = async () => {
     const text = generateQuoteText();
     const encodedText = encodeURIComponent(text);
-    const phoneNumber = clientPhone.replace(/\D/g, '');
+    const phoneNumber = clientPhone.replace(/\D/g, "");
     const whatsappUrl = `https://wa.me/55${phoneNumber}?text=${encodedText}`;
-    
+
     // Save quote if not saved yet
     if (!existingQuoteId) {
       await handleSaveQuote();
     }
-    
-    window.open(whatsappUrl, '_blank');
+
+    window.open(whatsappUrl, "_blank");
   };
 
   const handleAddSegment = () => {
@@ -357,37 +505,53 @@ export function QuoteGeneratorNew() {
     setFlightSegments(newSegments);
   };
 
-  const updateSegment = (index: number, field: keyof FlightSegment, value: string | number) => {
+  const updateSegment = (
+    index: number,
+    field: keyof FlightSegment,
+    value: string | number
+  ) => {
     const newSegments = [...flightSegments];
     newSegments[index] = { ...newSegments[index], [field]: value };
     setFlightSegments(newSegments);
   };
 
-  // Cálculos da calculadora automática
-  const milesNum = tripType === 'round_trip' 
-    ? roundTripData.miles 
-    : flightSegments.reduce((sum, seg) => sum + (seg.miles || 0), 0);
+  // ✅ Cálculos da calculadora automática
+  const passengersNumCalc = parseInt(passengers || "1") || 1;
+  const milesPerPassengerCalc =
+    tripType === "round_trip"
+      ? (roundTripData.milesOutbound || 0) +
+          (roundTripData.milesReturn || 0) ||
+        roundTripData.miles ||
+        0
+      : flightSegments.reduce((sum, seg) => sum + (seg.miles || 0), 0);
+
   const costPerMileNum = parseFloat(costPerMile) || 0;
   const boardingFeeNum = parseFloat(boardingFee) || 0;
-  const passengersNum = parseInt(passengers) || 1;
   const targetMarginNum = parseFloat(desiredMarkup) || 0;
 
-  const costPerPassenger = (milesNum / 1000) * costPerMileNum + boardingFeeNum;
-  const totalCost = costPerPassenger * passengersNum;
-  const suggestedPrice = targetMarginNum > 0 && targetMarginNum < 100 
-    ? totalCost / (1 - targetMarginNum / 100) 
-    : totalCost;
-  
+  const costPerPassenger =
+    (milesPerPassengerCalc / 1000) * costPerMileNum + boardingFeeNum;
+  const totalCost = costPerPassenger * passengersNumCalc;
+  const suggestedPrice =
+    targetMarginNum > 0 && targetMarginNum < 100
+      ? totalCost / (1 - targetMarginNum / 100)
+      : totalCost;
+
   const currentPrice = parseFloat(totalPrice) || 0;
   const profit = currentPrice - totalCost;
   const profitMargin = currentPrice > 0 ? (profit / currentPrice) * 100 : 0;
 
   // Update totalPrice when calculator values change
   useEffect(() => {
-    if (costPerMile && desiredMarkup && milesNum > 0 && suggestedPrice > 0) {
+    if (
+      costPerMile &&
+      desiredMarkup &&
+      milesPerPassengerCalc > 0 &&
+      suggestedPrice > 0
+    ) {
       setTotalPrice(suggestedPrice.toFixed(2));
     }
-  }, [costPerMile, desiredMarkup, milesNum, passengersNum, boardingFeeNum]);
+  }, [costPerMile, desiredMarkup, milesPerPassengerCalc, passengersNumCalc, boardingFeeNum]);
 
   if (loading) {
     return (
@@ -409,10 +573,9 @@ export function QuoteGeneratorNew() {
             {existingQuoteId ? "Editar Orçamento" : "Gerador de Orçamentos"}
           </h1>
           <p className="text-muted-foreground mt-1">
-            {existingQuoteId 
-              ? "Atualize os campos e salve as alterações" 
-              : "Crie orçamentos profissionais em segundos"
-            }
+            {existingQuoteId
+              ? "Atualize os campos e salve as alterações"
+              : "Crie orçamentos profissionais em segundos"}
           </p>
         </div>
         <div className="flex gap-2">
@@ -464,18 +627,37 @@ export function QuoteGeneratorNew() {
         <CardContent className="space-y-4">
           <div>
             <Label>Tipo de Viagem</Label>
-            <RadioGroup value={tripType} onValueChange={(v: any) => setTripType(v)} className="flex gap-4 mt-2">
+            <RadioGroup
+              value={tripType}
+              onValueChange={(v: any) => setTripType(v)}
+              className="flex gap-4 mt-2"
+            >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="one_way" id="one_way" />
-                <Label htmlFor="one_way" className="font-normal cursor-pointer">Só Ida</Label>
+                <Label
+                  htmlFor="one_way"
+                  className="font-normal cursor-pointer"
+                >
+                  Só Ida
+                </Label>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="round_trip" id="round_trip" />
-                <Label htmlFor="round_trip" className="font-normal cursor-pointer">Ida e Volta</Label>
+                <Label
+                  htmlFor="round_trip"
+                  className="font-normal cursor-pointer"
+                >
+                  Ida e Volta
+                </Label>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="multi_city" id="multi_city" />
-                <Label htmlFor="multi_city" className="font-normal cursor-pointer">Múltiplos Trechos</Label>
+                <Label
+                  htmlFor="multi_city"
+                  className="font-normal cursor-pointer"
+                >
+                  Múltiplos Trechos
+                </Label>
               </div>
             </RadioGroup>
           </div>
@@ -516,10 +698,15 @@ export function QuoteGeneratorNew() {
                 <Calculator className="h-5 w-5" />
                 Calculadora de Preço (Automática)
               </CardTitle>
-              <ChevronDown className={`h-5 w-5 transition-transform ${showCalculator ? 'rotate-180' : ''}`} />
+              <ChevronDown
+                className={`h-5 w-5 transition-transform ${
+                  showCalculator ? "rotate-180" : ""
+                }`}
+              />
             </CollapsibleTrigger>
             <CardDescription>
-              Configure o custo e margem. O preço será calculado automaticamente.
+              Configure o custo e margem. O preço será calculado
+              automaticamente.
             </CardDescription>
           </CardHeader>
           <CollapsibleContent>
@@ -549,26 +736,47 @@ export function QuoteGeneratorNew() {
                 </div>
               </div>
 
-              {costPerMile && desiredMarkup && milesNum > 0 && (
-                <Alert>
-                  <Info className="h-4 w-4" />
-                  <AlertDescription>
-                    <div className="space-y-1 text-sm">
-                      <p><strong>Total de Milhas:</strong> {formatMiles(milesNum * passengersNum)}</p>
-                      <p><strong>Custo Total:</strong> R$ {totalCost.toFixed(2)}</p>
-                      <p><strong>Preço Sugerido:</strong> R$ {suggestedPrice.toFixed(2)}</p>
-                      {currentPrice > 0 && (
-                        <>
-                          <Separator className="my-2" />
-                          <p className={profit >= 0 ? "text-green-600" : "text-red-600"}>
-                            <strong>Lucro:</strong> R$ {profit.toFixed(2)} ({profitMargin.toFixed(1)}% de margem)
-                          </p>
-                        </>
-                      )}
-                    </div>
-                  </AlertDescription>
-                </Alert>
-              )}
+              {costPerMile &&
+                desiredMarkup &&
+                milesPerPassengerCalc > 0 && (
+                  <Alert>
+                    <Info className="h-4 w-4" />
+                    <AlertDescription>
+                      <div className="space-y-1 text-sm">
+                        <p>
+                          <strong>Total de Milhas:</strong>{" "}
+                          {formatMiles(
+                            milesPerPassengerCalc * passengersNumCalc
+                          )}
+                        </p>
+                        <p>
+                          <strong>Custo Total:</strong> R${" "}
+                          {totalCost.toFixed(2)}
+                        </p>
+                        <p>
+                          <strong>Preço Sugerido:</strong> R${" "}
+                          {suggestedPrice.toFixed(2)}
+                        </p>
+                        {currentPrice > 0 && (
+                          <>
+                            <Separator className="my-2" />
+                            <p
+                              className={
+                                profit >= 0
+                                  ? "text-green-600"
+                                  : "text-red-600"
+                              }
+                            >
+                              <strong>Lucro:</strong> R${" "}
+                              {profit.toFixed(2)} (
+                              {profitMargin.toFixed(1)}% de margem)
+                            </p>
+                          </>
+                        )}
+                      </div>
+                    </AlertDescription>
+                  </Alert>
+                )}
             </CardContent>
           </CollapsibleContent>
         </Card>
@@ -594,7 +802,9 @@ export function QuoteGeneratorNew() {
               />
             </div>
             <div>
-              <Label htmlFor="boardingFee">Taxa de Embarque por Pessoa (R$)</Label>
+              <Label htmlFor="boardingFee">
+                Taxa de Embarque por Pessoa (R$)
+              </Label>
               <Input
                 id="boardingFee"
                 type="number"
@@ -633,15 +843,21 @@ export function QuoteGeneratorNew() {
         <Card className="border-primary">
           <CardHeader>
             <CardTitle>Prévia do Orçamento</CardTitle>
-            <CardDescription>Confira a mensagem antes de enviar</CardDescription>
+            <CardDescription>
+              Confira a mensagem antes de enviar
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="p-4 bg-muted rounded-lg font-mono text-sm whitespace-pre-wrap">
               {generateQuoteText()}
             </div>
-            
+
             <div className="flex gap-2">
-              <Button onClick={handleCopyText} variant="outline" className="flex-1">
+              <Button
+                onClick={handleCopyText}
+                variant="outline"
+                className="flex-1"
+              >
                 <Copy className="h-4 w-4 mr-2" />
                 Copiar
               </Button>
