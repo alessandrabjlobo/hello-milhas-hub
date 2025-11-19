@@ -152,9 +152,6 @@ export default function NewSaleWizard() {
   const selectedAccount =
     accounts.find((acc) => acc.id === accountId) || undefined;
 
-  // 🔹 Cálculo de milhas totais já existe no financialData; mas precisamos dele
-  // para filtrar contas internas com saldo suficiente.
-
   const updateTripType = (type: typeof tripType) => {
     setTripType(type);
     if (type === "one_way") {
@@ -256,14 +253,9 @@ export default function NewSaleWizard() {
       return activeAccounts;
     }
 
-    return activeAccounts.filter((acc: any) => {
-      const balanceMiles =
-        acc.available_miles ??
-        acc.balance_miles ??
-        acc.total_miles ??
-        acc.miles_balance ??
-        0;
-
+    return activeAccounts.filter((acc) => {
+      // ✅ campo correto vindo do Supabase
+      const balanceMiles = acc.balance ?? 0;
       return balanceMiles >= totalMiles;
     });
   }, [accounts, totalMiles, saleSource]);
@@ -302,12 +294,8 @@ export default function NewSaleWizard() {
     ) {
       const selectedAcc = accounts.find((a) => a.id === accountId);
       if (selectedAcc) {
-        const accountBalance =
-          (selectedAcc as any).available_miles ??
-          (selectedAcc as any).balance_miles ??
-          (selectedAcc as any).total_miles ??
-          (selectedAcc as any).miles_balance ??
-          0;
+        // ✅ usa balance, não campos inexistentes
+        const accountBalance = selectedAcc.balance ?? 0;
 
         if (accountBalance < totalMiles) {
           toast({
@@ -388,17 +376,16 @@ export default function NewSaleWizard() {
             const milesOutboundPerPax =
               seg.milesOutbound ??
               seg.miles_ida ??
-              seg.miles_ida_pax ??      // campo que vem do formulário "Milhas ida/pax"
-              seg.miles_outbound_pax ?? // fallback extra, caso o nome esteja assim
+              seg.miles_ida_pax ??
+              seg.miles_outbound_pax ??
               0;
-            
+
             const milesReturnPerPax =
               seg.milesReturn ??
               seg.miles_volta ??
-              seg.miles_volta_pax ??    // campo que vem do formulário "Milhas volta/pax"
-              seg.miles_return_pax ??   // fallback extra
+              seg.miles_volta_pax ??
+              seg.miles_return_pax ??
               0;
-
 
             const milesOutboundTotal = milesOutboundPerPax * paxCount;
             const milesReturnTotal = milesReturnPerPax * paxCount;
@@ -427,14 +414,14 @@ export default function NewSaleWizard() {
             const departureDate =
               seg.departureDate || seg.departure_date || seg.date || "";
 
-           const milesPerPax =
-            seg.miles ??
-            seg.milesOutbound ??
-            seg.miles_ida ??
-            seg.miles_ida_pax ??      // milhas ida/pax do orçamento
-            seg.miles_outbound_pax ?? // outro possível nome
-            data.miles_needed ??
-            0;
+            const milesPerPax =
+              seg.miles ??
+              seg.milesOutbound ??
+              seg.miles_ida ??
+              seg.miles_ida_pax ??
+              seg.miles_outbound_pax ??
+              data.miles_needed ??
+              0;
 
             const milesTotal = milesPerPax * paxCount;
 
