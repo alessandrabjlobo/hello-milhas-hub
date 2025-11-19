@@ -73,18 +73,39 @@ serve(async (req: Request): Promise<Response> => {
 
   try {
     const rawBody = await req.text();
+    
+    // Validação de tamanho
+    if (rawBody.length > 100000) {
+      return new Response(
+        JSON.stringify({ error: "Payload muito grande (máximo 100KB)" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
     let body: any = {};
     try {
       body = rawBody ? JSON.parse(rawBody) : {};
     } catch (err) {
       console.error("[parse-ticket] Erro ao parsear JSON:", err);
+      return new Response(
+        JSON.stringify({ error: "JSON inválido" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const text = body?.text;
     if (!text || typeof text !== "string" || !text.trim()) {
       return new Response(
         JSON.stringify({ error: "Campo 'text' é obrigatório." }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    // Validação de caracteres
+    if (!/^[\x20-\x7E\s\n\r\u00C0-\u00FF]+$/.test(text)) {
+      return new Response(
+        JSON.stringify({ error: "Texto contém caracteres inválidos" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 

@@ -63,6 +63,7 @@ const reportsNavItems = [
 ];
 
 const settingsNavItems = [
+  { title: "Configurações da Agência", url: "/settings/agency", icon: Building2 },
   { title: "Regras de Programas", url: "/settings/programs", icon: Plane },
   { title: "Formas de Pagamento", url: "/settings/payment-methods", icon: CreditCard },
   { title: "Juros - Débito/Crédito", url: "/settings/payment-interest", icon: Percent },
