@@ -11,7 +11,7 @@ export async function createSaleWithSegments(
   supplierId: string
 ): Promise<CreateSaleResult> {
   try {
-    // ✅ Validação explícita do supplierId
+    // ✅ 0) Validação explícita do supplierId
     if (!supplierId || supplierId.trim() === "") {
       throw new Error(
         "ID do fornecedor (agency_id) não fornecido. Aguarde o carregamento dos dados da agência antes de salvar."
@@ -33,7 +33,7 @@ export async function createSaleWithSegments(
 
     // -------------------------------------------------
     // 1) Normalizar e validar canal (internal vs counter)
-    //    👉 usado apenas na lógica do serviço, NÃO vai para o banco
+    //    👉 usado apenas na lógica do serviço, NÃO vai para o banco direto
     // -------------------------------------------------
     const channel = (formData as any).channel as
       | "internal"
@@ -76,7 +76,7 @@ export async function createSaleWithSegments(
     // -------------------------------------------------
     // 2) Mapear channel para os valores aceitos pelo banco
     //    - "internal" → "internal"
-    //    - "counter" → "balcao"
+    //    - "counter"  → "balcao"
     // -------------------------------------------------
     const dbChannel =
       channel === "internal"
@@ -123,7 +123,7 @@ export async function createSaleWithSegments(
     }
 
     // -------------------------------------------------
-    // 3) Normalizar valores financeiros vindos da tela
+    // 4) Normalizar valores financeiros vindos da tela
     // -------------------------------------------------
     // CUSTO TOTAL (obrigatório p/ coluna total_cost NOT NULL)
     const totalCostRaw =
@@ -132,11 +132,11 @@ export async function createSaleWithSegments(
     const totalCost = Number(totalCostRaw) || 0;
 
     // -------------------------------------------------
-    // 4) Montar payload da venda (tabela sales)
+    // 5) Montar payload da venda (tabela sales)
     // -------------------------------------------------
     const salePayload: any = {
       supplier_id: supplierId,
-      channel: dbChannel, // ✅ usando dbChannel mapeado para o banco
+      channel: dbChannel, // ✅ usando valor aceito pelo banco
       client_name: formData.customerName,
       client_cpf_encrypted: formData.customerCpf,
       client_contact: formData.customerPhone || null,
@@ -169,11 +169,11 @@ export async function createSaleWithSegments(
         ? Number((formData as any).boardingFee)
         : null,
 
-      // ✅ CPFs dos passageiros
+      // ✅ CPFs dos passageiros (vai como JSONB na venda)
       passenger_cpfs: (formData as any).passengerCpfs || [],
     };
 
-    // Campos específicos por canal – agora só mexemos em sale_source e dados do balcão
+    // Campos específicos por canal
     if (channel === "internal") {
       salePayload.program_id = (formData as any).programId;
       salePayload.mileage_account_id = (formData as any).accountId;
@@ -204,7 +204,7 @@ export async function createSaleWithSegments(
     console.log("[createSaleWithSegments] Payload para sales:", salePayload);
 
     // -------------------------------------------------
-    // 5) Inserir na tabela sales
+    // 6) Inserir na tabela sales
     // -------------------------------------------------
     const { data: saleData, error: saleError } = await supabase
       .from("sales")
@@ -222,7 +222,7 @@ export async function createSaleWithSegments(
     }
 
     // -------------------------------------------------
-    // 6) Abater milhas da conta (apenas para vendas internas)
+    // 7) Abater milhas da conta (apenas para vendas internas)
     // -------------------------------------------------
     if (channel === "internal") {
       const accountId = (formData as any).accountId;
@@ -249,7 +249,7 @@ export async function createSaleWithSegments(
     }
 
     // -------------------------------------------------
-    // 7) Registrar CPFs dos passageiros no cpf_registry (só conta interna)
+    // 8) Registrar CPFs dos passageiros no cpf_registry (só conta interna)
     // -------------------------------------------------
     if (channel === "internal") {
       const accountId = (formData as any).accountId;
@@ -327,7 +327,7 @@ export async function createSaleWithSegments(
           const { error: countError } = await supabase.rpc(
             "update_account_cpf_count",
             {
-              p_account_id: accountId,
+              p_account_id: accountId, // ✅ ajuste conforme nome do parâmetro da function
             }
           );
 
@@ -346,7 +346,7 @@ export async function createSaleWithSegments(
     }
 
     // -------------------------------------------------
-    // 8) Inserir na tabela sale_segments (se houver trechos)
+    // 9) Inserir na tabela sale_segments (se houver trechos)
     // -------------------------------------------------
     if (flightSegments.length > 0) {
       const direction =
