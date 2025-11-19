@@ -14,8 +14,24 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PlusCircle, Eye, Calendar, MoreHorizontal, Edit, Trash2, Ticket as TicketIcon, Filter, X } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  PlusCircle,
+  Eye,
+  Calendar,
+  MoreHorizontal,
+  Edit,
+  Trash2,
+  Ticket as TicketIcon,
+  Filter,
+  X,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,25 +51,28 @@ export default function Tickets() {
   const navigate = useNavigate();
   const { tickets, loading, fetchTickets } = useTickets();
   const [registerDialogOpen, setRegisterDialogOpen] = useState(false);
-  const [editingTicket, setEditingTicket] = useState<typeof tickets[0] | null>(null);
-  const [deletingTicket, setDeletingTicket] = useState<typeof tickets[0] | null>(null);
-  const [detailTicket, setDetailTicket] = useState<typeof tickets[0] | null>(null);
+  const [editingTicket, setEditingTicket] =
+    useState<(typeof tickets)[0] | null>(null);
+  const [deletingTicket, setDeletingTicket] =
+    useState<(typeof tickets)[0] | null>(null);
+  const [detailTicket, setDetailTicket] =
+    useState<(typeof tickets)[0] | null>(null);
   const { toast } = useToast();
 
-  const [searchTerm, setSearchTerm] = useState(() => 
-    localStorage.getItem("tickets_filter_search") || ""
+  const [searchTerm, setSearchTerm] = useState(
+    () => localStorage.getItem("tickets_filter_search") || ""
   );
-  const [selectedAirline, setSelectedAirline] = useState(() => 
-    localStorage.getItem("tickets_filter_airline") || "all"
+  const [selectedAirline, setSelectedAirline] = useState(
+    () => localStorage.getItem("tickets_filter_airline") || "all"
   );
-  const [selectedStatus, setSelectedStatus] = useState(() => 
-    localStorage.getItem("tickets_filter_status") || "all"
+  const [selectedStatus, setSelectedStatus] = useState(
+    () => localStorage.getItem("tickets_filter_status") || "all"
   );
-  const [dateFrom, setDateFrom] = useState(() => 
-    localStorage.getItem("tickets_filter_date_from") || ""
+  const [dateFrom, setDateFrom] = useState(
+    () => localStorage.getItem("tickets_filter_date_from") || ""
   );
-  const [dateTo, setDateTo] = useState(() => 
-    localStorage.getItem("tickets_filter_date_to") || ""
+  const [dateTo, setDateTo] = useState(
+    () => localStorage.getItem("tickets_filter_date_to") || ""
   );
 
   // Persistir filtros
@@ -65,24 +84,28 @@ export default function Tickets() {
     localStorage.setItem("tickets_filter_date_to", dateTo);
   }, [searchTerm, selectedAirline, selectedStatus, dateFrom, dateTo]);
 
-  // Extrair companhias únicas
+  // Extrair companhias únicas (usando campo airline gravado no ticket,
+  // com fallback para relação, se existir)
   const airlines = useMemo(() => {
     const uniqueAirlines = new Set<string>();
-    tickets.forEach(t => {
-      const code = t.sales?.mileage_accounts?.airline_companies?.code;
+    tickets.forEach((t) => {
+      const code =
+        t.airline ||
+        t.sales?.mileage_accounts?.airline_companies?.code ||
+        "";
       if (code) uniqueAirlines.add(code);
     });
     return Array.from(uniqueAirlines).sort();
   }, [tickets]);
 
-  // Função para obter status do voo
+  // Status do voo em função da data
   const getFlightStatus = (departureDate: string | null) => {
     if (!departureDate) return "unknown";
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const flightDate = new Date(departureDate);
     flightDate.setHours(0, 0, 0, 0);
-    
+
     if (flightDate < today) return "past";
     if (flightDate.getTime() === today.getTime()) return "today";
     return "future";
@@ -90,36 +113,54 @@ export default function Tickets() {
 
   // Aplicar filtros
   const filteredTickets = useMemo(() => {
-    return tickets.filter(ticket => {
-      // Busca
+    return tickets.filter((ticket) => {
+      // Busca (PNR, código do bilhete, cliente ou passageiro)
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
-        const matchesPNR = ticket.pnr?.toLowerCase().includes(search);
-        const matchesTicket = ticket.ticket_number?.toLowerCase().includes(search);
-        const matchesCustomer = ticket.sales?.customer_name?.toLowerCase().includes(search);
-        if (!matchesPNR && !matchesTicket && !matchesCustomer) return false;
+
+        const matchesPNR = ticket.pnr
+          ?.toLowerCase()
+          .includes(search);
+
+        const matchesTicket = ticket.ticket_code
+          ?.toLowerCase()
+          .includes(search);
+
+        const matchesCustomer =
+          ticket.sales?.customer_name
+            ?.toLowerCase()
+            .includes(search) ||
+          ticket.passenger_name?.toLowerCase().includes(search);
+
+        if (!matchesPNR && !matchesTicket && !matchesCustomer) {
+          return false;
+        }
       }
 
       // Companhia
       if (selectedAirline !== "all") {
-        const airlineCode = ticket.sales?.mileage_accounts?.airline_companies?.code;
+        const airlineCode =
+          ticket.airline ||
+          ticket.sales?.mileage_accounts?.airline_companies?.code;
         if (airlineCode !== selectedAirline) return false;
       }
 
-      // Status
+      // Status (passado, hoje, futuro)
       if (selectedStatus !== "all") {
-        const status = getFlightStatus(ticket.departure_date);
+        const status = getFlightStatus(
+          ticket.departure_date || null
+        );
         if (status !== selectedStatus) return false;
       }
 
-      // Data from
+      // Data "De"
       if (dateFrom && ticket.departure_date) {
         const ticketDate = new Date(ticket.departure_date);
         const fromDate = new Date(dateFrom);
         if (ticketDate < fromDate) return false;
       }
 
-      // Data to
+      // Data "Até"
       if (dateTo && ticket.departure_date) {
         const ticketDate = new Date(ticket.departure_date);
         const toDate = new Date(dateTo);
@@ -138,25 +179,50 @@ export default function Tickets() {
     setDateTo("");
   };
 
-  const hasActiveFilters = searchTerm || selectedAirline !== "all" || selectedStatus !== "all" || dateFrom || dateTo;
+  const hasActiveFilters =
+    searchTerm ||
+    selectedAirline !== "all" ||
+    selectedStatus !== "all" ||
+    dateFrom ||
+    dateTo;
 
-  const getFlightStatusDot = (ticket: typeof tickets[0]) => {
+  const getFlightStatusDot = (ticket: (typeof tickets)[0]) => {
     if (!ticket.departure_date) {
-      return <div className="w-3 h-3 rounded-full bg-muted" title="Sem data" />;
+      return (
+        <div
+          className="w-3 h-3 rounded-full bg-muted"
+          title="Sem data"
+        />
+      );
     }
-    
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     const flightDate = new Date(ticket.departure_date);
     flightDate.setHours(0, 0, 0, 0);
-    
+
     if (flightDate < today) {
-      return <div className="w-3 h-3 rounded-full bg-green-500" title="Já voado" />;
+      return (
+        <div
+          className="w-3 h-3 rounded-full bg-green-500"
+          title="Já voado"
+        />
+      );
     } else if (flightDate.getTime() === today.getTime()) {
-      return <div className="w-3 h-3 rounded-full bg-yellow-500" title="Voa hoje" />;
+      return (
+        <div
+          className="w-3 h-3 rounded-full bg-yellow-500"
+          title="Voa hoje"
+        />
+      );
     } else {
-      return <div className="w-3 h-3 rounded-full bg-blue-500" title="Próximo voo" />;
+      return (
+        <div
+          className="w-3 h-3 rounded-full bg-blue-500"
+          title="Próximo voo"
+        />
+      );
     }
   };
 
@@ -186,7 +252,6 @@ export default function Tickets() {
       });
     }
   };
-
 
   if (loading) {
     return (
@@ -227,7 +292,12 @@ export default function Tickets() {
             <Filter className="h-4 w-4" />
             <h3 className="font-semibold">Filtros</h3>
             {hasActiveFilters && (
-              <Button variant="ghost" size="sm" onClick={clearFilters} className="ml-auto">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+                className="ml-auto"
+              >
                 <X className="h-4 w-4 mr-2" />
                 Limpar Filtros
               </Button>
@@ -238,28 +308,36 @@ export default function Tickets() {
               <Label htmlFor="search">Buscar</Label>
               <Input
                 id="search"
-                placeholder="PNR, bilhete, cliente..."
+                placeholder="PNR, bilhete, cliente/passageiro..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
             <div>
               <Label htmlFor="airline">Companhia</Label>
-              <Select value={selectedAirline} onValueChange={setSelectedAirline}>
+              <Select
+                value={selectedAirline}
+                onValueChange={setSelectedAirline}
+              >
                 <SelectTrigger id="airline">
                   <SelectValue placeholder="Todas" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas</SelectItem>
-                  {airlines.map(code => (
-                    <SelectItem key={code} value={code}>{code}</SelectItem>
+                  {airlines.map((code) => (
+                    <SelectItem key={code} value={code}>
+                      {code}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label htmlFor="status">Status</Label>
-              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+              <Select
+                value={selectedStatus}
+                onValueChange={setSelectedStatus}
+              >
                 <SelectTrigger id="status">
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
@@ -267,7 +345,9 @@ export default function Tickets() {
                   <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="past">🟢 Já voado</SelectItem>
                   <SelectItem value="today">🟡 Voa hoje</SelectItem>
-                  <SelectItem value="future">🔵 Próximo voo</SelectItem>
+                  <SelectItem value="future">
+                    🔵 Próximo voo
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -296,23 +376,43 @@ export default function Tickets() {
           {filteredTickets.length === 0 ? (
             <EmptyState
               icon={TicketIcon}
-              title={tickets.length === 0 ? "Nenhuma passagem registrada" : "Nenhuma passagem encontrada"}
-              description={tickets.length === 0 ? "Registre a primeira emissão de passagem para começar." : "Ajuste os filtros para ver mais resultados."}
-              actionLabel={tickets.length === 0 ? "Registrar Emissão" : undefined}
-              onAction={tickets.length === 0 ? () => setRegisterDialogOpen(true) : undefined}
+              title={
+                tickets.length === 0
+                  ? "Nenhuma passagem registrada"
+                  : "Nenhuma passagem encontrada"
+              }
+              description={
+                tickets.length === 0
+                  ? "Registre a primeira emissão de passagem para começar."
+                  : "Ajuste os filtros para ver mais resultados."
+              }
+              actionLabel={
+                tickets.length === 0
+                  ? "Registrar Emissão"
+                  : undefined
+              }
+              onAction={
+                tickets.length === 0
+                  ? () => setRegisterDialogOpen(true)
+                  : undefined
+              }
             />
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Data Emissão</TableHead>
-                  <TableHead>Cliente</TableHead>
+                  <TableHead>Cliente / Passageiro</TableHead>
                   <TableHead>Data do Voo</TableHead>
                   <TableHead>Companhia</TableHead>
                   <TableHead>Localizador</TableHead>
                   <TableHead>Bilhete</TableHead>
-                  <TableHead className="text-center">Status</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
+                  <TableHead className="text-center">
+                    Status
+                  </TableHead>
+                  <TableHead className="text-right">
+                    Ações
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -321,34 +421,45 @@ export default function Tickets() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4 text-muted-foreground" />
-                        {ticket.issued_at
-                          ? new Date(ticket.issued_at).toLocaleDateString("pt-BR")
+                        {ticket.issued_at || ticket.created_at
+                          ? new Date(
+                              ticket.issued_at ||
+                                ticket.created_at
+                            ).toLocaleDateString("pt-BR")
                           : "-"}
                       </div>
                     </TableCell>
                     <TableCell>
                       <p className="font-medium">
-                        {ticket.sales?.customer_name || "-"}
+                        {ticket.sales?.customer_name ||
+                          ticket.passenger_name ||
+                          "-"}
                       </p>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4 text-muted-foreground" />
                         {ticket.departure_date
-                          ? new Date(ticket.departure_date).toLocaleDateString("pt-BR")
+                          ? new Date(
+                              ticket.departure_date
+                            ).toLocaleDateString("pt-BR")
                           : "-"}
                       </div>
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">
-                        {ticket.sales?.mileage_accounts?.airline_companies?.code || "-"}
+                        {ticket.airline ||
+                          ticket.sales
+                            ?.mileage_accounts
+                            ?.airline_companies?.code ||
+                          "-"}
                       </Badge>
                     </TableCell>
                     <TableCell className="font-mono text-sm">
                       {ticket.pnr || "-"}
                     </TableCell>
                     <TableCell className="font-mono text-sm">
-                      {ticket.ticket_number || "-"}
+                      {ticket.ticket_code || "-"}
                     </TableCell>
                     <TableCell>
                       <div className="flex justify-center">
@@ -363,17 +474,27 @@ export default function Tickets() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setDetailTicket(ticket)}>
+                          <DropdownMenuItem
+                            onClick={() =>
+                              setDetailTicket(ticket)
+                            }
+                          >
                             <Eye className="h-4 w-4 mr-2" />
                             Ver Detalhes
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => setEditingTicket(ticket)}>
+                          <DropdownMenuItem
+                            onClick={() =>
+                              setEditingTicket(ticket)
+                            }
+                          >
                             <Edit className="h-4 w-4 mr-2" />
                             Editar
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             className="text-destructive"
-                            onClick={() => setDeletingTicket(ticket)}
+                            onClick={() =>
+                              setDeletingTicket(ticket)
+                            }
                           >
                             <Trash2 className="h-4 w-4 mr-2" />
                             Excluir
@@ -394,15 +515,21 @@ export default function Tickets() {
               <div className="flex flex-wrap gap-6">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-green-500" />
-                  <span className="text-sm text-muted-foreground">Já voado</span>
+                  <span className="text-sm text-muted-foreground">
+                    Já voado
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-yellow-500" />
-                  <span className="text-sm text-muted-foreground">Voa hoje</span>
+                  <span className="text-sm text-muted-foreground">
+                    Voa hoje
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-blue-500" />
-                  <span className="text-sm text-muted-foreground">Próximo voo</span>
+                  <span className="text-sm text-muted-foreground">
+                    Próximo voo
+                  </span>
                 </div>
               </div>
             </div>
