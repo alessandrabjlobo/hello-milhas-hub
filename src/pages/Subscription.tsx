@@ -7,41 +7,14 @@ import { Plane } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 
-function loadStripeScript() {
-  return new Promise<void>((resolve) => {
-    if (
-      document.querySelector(
-        `script[src="https://js.stripe.com/v3/pricing-table.js"]`
-      )
-    ) {
-      return resolve();
-    }
-    const script = document.createElement("script");
-    script.src = "https://js.stripe.com/v3/pricing-table.js";
-    script.async = true;
-    script.onload = () => resolve();
-    document.head.appendChild(script);
-  });
-}
-
-// 🔗 Seu checkout direto do Stripe
-const STRIPE_CHECKOUT_URL =
-  "https://buy.stripe.com/4gMaEQe8IceS3pl0lH3Nm01";
-
 export default function Subscription() {
   const { user } = useAuth();
-  const [ready, setReady] = useState(false);
   const [subscription, setSubscription] = useState<any>(null);
   const [loadingSubscription, setLoadingSubscription] = useState(true);
 
-  const pricingTableId = import.meta.env.VITE_STRIPE_PRICING_TABLE_ID;
-  const publishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
-
   useEffect(() => {
-    loadStripeScript().then(() => setReady(true));
-
     if (user) {
-      fetchSubscriptionStatus();
+      void fetchSubscriptionStatus();
     } else {
       setLoadingSubscription(false);
     }
@@ -65,12 +38,8 @@ export default function Subscription() {
     }
   };
 
-  // Se usuário logado COM assinatura ativa, mostrar status
-  if (
-    user &&
-    subscription &&
-    (subscription.status === "active" || subscription.status === "trialing")
-  ) {
+  // Usuário logado COM assinatura ativa ou em teste → mostra status
+  if (!loadingSubscription && user && subscription && (subscription.status === "active" || subscription.status === "trialing")) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5">
         <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 relative z-50">
@@ -121,9 +90,7 @@ export default function Subscription() {
                 <div className="space-y-2">
                   <p className="text-muted-foreground">Próxima renovação</p>
                   <p className="font-semibold">
-                    {new Date(
-                      subscription.renewal_date
-                    ).toLocaleDateString("pt-BR")}
+                    {new Date(subscription.renewal_date).toLocaleDateString("pt-BR")}
                   </p>
                 </div>
               )}
@@ -140,7 +107,7 @@ export default function Subscription() {
     );
   }
 
-  // Página padrão de escolha de plano + Stripe
+  // Tela padrão de assinatura (SEM duplicar botão)
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5">
       {/* Header */}
@@ -160,23 +127,13 @@ export default function Subscription() {
               <Button asChild variant="outline">
                 <Link to="/login">Já tenho conta</Link>
               </Button>
-              {/* 🔴 Botão direto do Stripe no header */}
-              <Button asChild>
-                <a
-                  href={STRIPE_CHECKOUT_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Assinar agora
-                </a>
-              </Button>
             </div>
           </div>
         </div>
       </nav>
 
       <div className="container mx-auto px-4 py-16">
-        {/* Título */}
+        {/* Hero */}
         <div className="text-center mb-12">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
             <Plane className="w-8 h-8 text-primary" />
@@ -189,53 +146,35 @@ export default function Subscription() {
           </p>
         </div>
 
-        {/* Stripe Pricing Table */}
-        <div className="max-w-5xl mx-auto">
-          {ready && pricingTableId && publishableKey ? (
-            <stripe-pricing-table
-              pricing-table-id={pricingTableId}
-              publishable-key={publishableKey}
-              customer-email={user?.email || undefined}
-            />
-          ) : (
-            // Fallback se a tabela não estiver configurada
-            <Card className="max-w-xl mx-auto">
-              <CardHeader>
-                <CardTitle className="text-center">
-                  Plano Hello Milhas +
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 text-center">
-                <p className="text-muted-foreground">
-                  Clique no botão abaixo para concluir sua assinatura com
-                  segurança pelo Stripe.
-                </p>
-                <Button asChild size="lg">
-                  <a
-                    href={STRIPE_CHECKOUT_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Assinar agora pelo Stripe
-                  </a>
-                </Button>
-              </CardContent>
-            </Card>
-          )}
+        {/* Card com ÚNICO botão de assinatura */}
+        <div className="max-w-xl mx-auto">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-center text-xl">Plano Hello Milhas +</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6 text-center">
+              <p className="text-muted-foreground">
+                Clique no botão abaixo para concluir sua assinatura com segurança pelo Stripe.
+              </p>
+
+              <Button
+                className="w-full"
+                asChild
+              >
+                <a
+                  href="https://buy.stripe.com/4gMaEQe8IceS3pl0lH3Nm01"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Assinar agora pelo Stripe
+                </a>
+              </Button>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* CTA inferior */}
-        <div className="text-center mt-12 space-y-4">
-          <Button asChild size="lg">
-            <a
-              href={STRIPE_CHECKOUT_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Assinar agora pelo Stripe
-            </a>
-          </Button>
-
+        {/* Bottom CTA */}
+        <div className="text-center mt-12">
           <p className="text-muted-foreground">
             Já tem uma conta?{" "}
             <Button asChild variant="link" className="text-primary p-0">
@@ -246,20 +185,4 @@ export default function Subscription() {
       </div>
     </div>
   );
-}
-
-// Declaração de tipo para o web component do Stripe
-declare global {
-  namespace JSX {
-    interface IntrinsicElements {
-      "stripe-pricing-table": React.DetailedHTMLProps<
-        React.HTMLAttributes<HTMLElement> & {
-          "pricing-table-id": string;
-          "publishable-key": string;
-          "customer-email"?: string;
-        },
-        HTMLElement
-      >;
-    }
-  }
 }
