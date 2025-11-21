@@ -209,10 +209,11 @@ export default function Customers() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => navigate(`/sales?customer=${customer.cpf_encrypted}`)}
+                          onClick={() => navigate(`/customers/${customer.id}`)}
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
+
                       </TableCell>
                     </TableRow>
                   ))}
