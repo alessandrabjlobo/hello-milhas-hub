@@ -38,6 +38,7 @@ import NotFound from "./pages/NotFound";
 import Demo from "./pages/Demo";
 import FinancialReports from "./pages/FinancialReports";
 import UserProfile from "./pages/settings/UserProfile";
+import CustomerDetail from "./pages/CustomerDetail"; // ✅ detalhe do cliente
 
 // Lazy load para páginas pesadas
 const NewSaleWizard = lazy(() => import("./pages/sales/NewSaleWizard"));
@@ -77,15 +78,20 @@ const App = () => (
                         <Route path="/dashboard" element={<DashboardKPIs />} />
                         <Route path="/onboarding" element={<Onboarding />} />
                         <Route path="/admin/users" element={<AdminUsers />} />
-                        <Route path="/sales/new" element={
-                          <Suspense fallback={
-                            <div className="flex h-screen items-center justify-center">
-                              <Skeleton className="h-96 w-full max-w-4xl" />
-                            </div>
-                          }>
-                            <NewSaleWizard />
-                          </Suspense>
-                        } />
+                        <Route
+                          path="/sales/new"
+                          element={
+                            <Suspense
+                              fallback={
+                                <div className="flex h-screen items-center justify-center">
+                                  <Skeleton className="h-96 w-full max-w-4xl" />
+                                </div>
+                              }
+                            >
+                              <NewSaleWizard />
+                            </Suspense>
+                          }
+                        />
                         <Route path="/sales/:id" element={<SaleDetail />} />
                         <Route path="/sales" element={<SalesList />} />
                         <Route path="/accounts/:id" element={<AccountDetail />} />
@@ -98,6 +104,7 @@ const App = () => (
                         <Route path="/quotes/:quoteId" element={<QuoteGenerator />} />
                         <Route path="/quotes" element={<QuoteHistory />} />
                         <Route path="/customers" element={<Customers />} />
+                        <Route path="/customers/:id" element={<CustomerDetail />} /> {/* ✅ nova rota */}
                         <Route path="/profile" element={<UserProfile />} />
                         <Route path="/settings/my-airlines" element={<MyAirlines />} />
                         <Route path="/settings/programs" element={<ProgramRules />} />
@@ -105,18 +112,29 @@ const App = () => (
                         <Route path="/settings/credit" element={<PaymentInterestSettings />} />
                         <Route path="/settings/payment-interest" element={<PaymentInterestSettings />} />
                         <Route path="/settings/payment-methods" element={<PaymentSettings />} />
-                        <Route path="/settings/agency" element={
-                          <Suspense fallback={
-                            <div className="container py-8">
-                              <Skeleton className="h-12 w-64 mb-4" />
-                              <Skeleton className="h-96 w-full" />
-                            </div>
-                          }>
-                            <AgencySettings />
-                          </Suspense>
-                        } />
-                        <Route path="/my-airlines" element={<Navigate to="/settings/my-airlines" replace />} />
-                        <Route path="/program-rules" element={<Navigate to="/settings/programs" replace />} />
+                        <Route
+                          path="/settings/agency"
+                          element={
+                            <Suspense
+                              fallback={
+                                <div className="container py-8">
+                                  <Skeleton className="h-12 w-64 mb-4" />
+                                  <Skeleton className="h-96 w-full" />
+                                </div>
+                              }
+                            >
+                              <AgencySettings />
+                            </Suspense>
+                          }
+                        />
+                        <Route
+                          path="/my-airlines"
+                          element={<Navigate to="/settings/my-airlines" replace />}
+                        />
+                        <Route
+                          path="/program-rules"
+                          element={<Navigate to="/settings/programs" replace />}
+                        />
                         <Route path="*" element={<NotFound />} />
                       </Routes>
                     </main>
