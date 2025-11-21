@@ -1,4 +1,6 @@
-import { Link, useLocation } from "react-router-dom";
+// src/components/shared/AppSidebar.tsx
+import * as React from "react";
+import { Link } from "react-router-dom";
 import {
   Sidebar,
   SidebarContent,
@@ -31,6 +33,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { Separator } from "@/components/ui/separator";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const mainNavItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -54,15 +57,47 @@ const settingsNavItems = [
 
 export default function AppSidebar() {
   const { state } = useSidebar();
-  const location = useLocation();
-  const { signOut } = useAuth();
+  const { user, signOut } = useAuth();
   const isCollapsed = state === "collapsed";
+
+  const userName =
+    (user?.user_metadata as any)?.name ||
+    user?.email?.split("@")[0] ||
+    "Usuário";
+  const userEmail = user?.email || "";
+  const initials = userName
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarContent className="pt-4">
-        {/* Logo / Brand */}
-        <div className="px-4 mb-6">
+      <SidebarContent className="flex flex-col pt-0">
+        {/* Cabeçalho com usuário */}
+        <div className="p-3 border-b bg-gradient-to-br from-primary/5 to-primary/10">
+          <div className="flex items-center gap-3">
+            <Avatar className="h-10 w-10 ring-2 ring-primary/20">
+              <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+            {!isCollapsed && (
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold truncate text-foreground">
+                  {userName}
+                </p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {userEmail}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Logo / Brand (link para dashboard) */}
+        <div className="px-4 py-3">
           <Link to="/dashboard" className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
               <Plane className="h-5 w-5 text-primary-foreground" />
@@ -102,7 +137,12 @@ export default function AppSidebar() {
 
         {/* Configurações */}
         <SidebarGroup>
-          <SidebarGroupLabel>Configurações</SidebarGroupLabel>
+          <SidebarGroupLabel>
+            <div className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              {!isCollapsed && <span>Configurações</span>}
+            </div>
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {settingsNavItems.map((item) => (
@@ -123,7 +163,7 @@ export default function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Botão de Logout */}
+        {/* Logout na parte inferior */}
         <div className="mt-auto px-3 pb-4">
           <Button
             variant="ghost"
