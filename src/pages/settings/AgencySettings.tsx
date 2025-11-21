@@ -207,7 +207,7 @@ export default function AgencySettings() {
           </div>
 
           <div className="border-t pt-4 mt-4">
-            <h3 className="font-semibold mb-4">Endereço Completo</h3>
+            <h3 className="font-semibold mb-4">Endereço completo</h3>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2 md:col-span-2">
