@@ -377,45 +377,60 @@ export type Database = {
       customers: {
         Row: {
           birth_date: string | null
+          city: string | null
+          country: string | null
           cpf_encrypted: string
           created_at: string | null
           email: string | null
           id: string
           last_purchase_at: string | null
           name: string
+          notes: string | null
           phone: string | null
           rg: string | null
+          state: string | null
           supplier_id: string
+          tags: Json | null
           total_purchases: number | null
           total_spent: number | null
           updated_at: string | null
         }
         Insert: {
           birth_date?: string | null
+          city?: string | null
+          country?: string | null
           cpf_encrypted: string
           created_at?: string | null
           email?: string | null
           id?: string
           last_purchase_at?: string | null
           name: string
+          notes?: string | null
           phone?: string | null
           rg?: string | null
+          state?: string | null
           supplier_id: string
+          tags?: Json | null
           total_purchases?: number | null
           total_spent?: number | null
           updated_at?: string | null
         }
         Update: {
           birth_date?: string | null
+          city?: string | null
+          country?: string | null
           cpf_encrypted?: string
           created_at?: string | null
           email?: string | null
           id?: string
           last_purchase_at?: string | null
           name?: string
+          notes?: string | null
           phone?: string | null
           rg?: string | null
+          state?: string | null
           supplier_id?: string
+          tags?: Json | null
           total_purchases?: number | null
           total_spent?: number | null
           updated_at?: string | null
@@ -864,6 +879,7 @@ export type Database = {
           channel: string
           client_contact: string | null
           client_cpf_encrypted: string
+          client_id: string | null
           client_name: string
           cost_per_mile: number | null
           cost_per_mile_snapshot: number | null
@@ -920,6 +936,7 @@ export type Database = {
           channel: string
           client_contact?: string | null
           client_cpf_encrypted: string
+          client_id?: string | null
           client_name: string
           cost_per_mile?: number | null
           cost_per_mile_snapshot?: number | null
@@ -976,6 +993,7 @@ export type Database = {
           channel?: string
           client_contact?: string | null
           client_cpf_encrypted?: string
+          client_id?: string | null
           client_name?: string
           cost_per_mile?: number | null
           cost_per_mile_snapshot?: number | null
@@ -1028,6 +1046,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "sales_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sales_cpf_used_id_fkey"
             columns: ["cpf_used_id"]

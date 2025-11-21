@@ -37,6 +37,7 @@ import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import NotFound from "./pages/NotFound";
 import Demo from "./pages/Demo";
+import FinancialReports from "./pages/FinancialReports";
 
 // Lazy load para páginas pesadas
 const NewSaleWizard = lazy(() => import("./pages/sales/NewSaleWizard"));
@@ -92,6 +93,7 @@ const App = () => (
                         <Route path="/suppliers" element={<Suppliers />} />
                         <Route path="/tickets" element={<Tickets />} />
                         <Route path="/reports" element={<Reports />} />
+                        <Route path="/reports/financial" element={<FinancialReports />} />
                         <Route path="/calculator" element={<Calculator />} />
                         <Route path="/quotes/new" element={<QuoteGenerator />} />
                         <Route path="/quotes/:quoteId" element={<QuoteGenerator />} />
