@@ -66,41 +66,71 @@ export type Database = {
         Row: {
           address: string | null
           agency_name: string
+          billing_email: string | null
+          city: string | null
+          cnpj_cpf: string | null
+          complement: string | null
           created_at: string | null
           email: string | null
           id: string
           instagram: string | null
           logo_url: string | null
+          neighborhood: string | null
+          number: string | null
           phone: string | null
+          responsible_name: string | null
+          state: string | null
+          street: string | null
           supplier_id: string
           updated_at: string | null
           website: string | null
+          zip_code: string | null
         }
         Insert: {
           address?: string | null
           agency_name: string
+          billing_email?: string | null
+          city?: string | null
+          cnpj_cpf?: string | null
+          complement?: string | null
           created_at?: string | null
           email?: string | null
           id?: string
           instagram?: string | null
           logo_url?: string | null
+          neighborhood?: string | null
+          number?: string | null
           phone?: string | null
+          responsible_name?: string | null
+          state?: string | null
+          street?: string | null
           supplier_id: string
           updated_at?: string | null
           website?: string | null
+          zip_code?: string | null
         }
         Update: {
           address?: string | null
           agency_name?: string
+          billing_email?: string | null
+          city?: string | null
+          cnpj_cpf?: string | null
+          complement?: string | null
           created_at?: string | null
           email?: string | null
           id?: string
           instagram?: string | null
           logo_url?: string | null
+          neighborhood?: string | null
+          number?: string | null
           phone?: string | null
+          responsible_name?: string | null
+          state?: string | null
+          street?: string | null
           supplier_id?: string
           updated_at?: string | null
           website?: string | null
+          zip_code?: string | null
         }
         Relationships: [
           {

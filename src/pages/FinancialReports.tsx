@@ -9,19 +9,25 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { CalendarIcon, BarChart3, TrendingUp, DollarSign, Download, RefreshCw } from "lucide-react";
 import { format, subDays, startOfMonth, endOfMonth, startOfYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 import { useFinancialReports } from "@/hooks/useFinancialReports";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useMileageAccounts } from "@/hooks/useMileageAccounts";
 import { MetricsCard } from "@/components/dashboard/MetricsCard";
+import { exportToCSV } from "@/lib/csv-export";
+import { useToast } from "@/hooks/use-toast";
 
 export default function FinancialReports() {
   const { supplierId } = useUserRole();
+  const { accounts } = useMileageAccounts();
+  const { toast } = useToast();
   
   const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
     from: startOfMonth(new Date()),
     to: new Date(),
   });
 
-  const { kpis, loading, refreshReports } = useFinancialReports(
+  const { kpis, sales, loading, refreshReports } = useFinancialReports(
     supplierId,
     dateRange.from,
     dateRange.to
@@ -63,6 +69,49 @@ export default function FinancialReports() {
     }
   };
 
+  // Função de exportação
+  const exportSalesReport = () => {
+    if (!kpis || sales.length === 0) {
+      toast({
+        title: "Nenhum dado para exportar",
+        description: "Não há vendas no período selecionado",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const exportData = sales.map(sale => ({
+      "Data da Venda": new Date(sale.created_at).toLocaleDateString("pt-BR"),
+      "ID da Venda": sale.id.substring(0, 8),
+      "Cliente": sale.client_name || "N/A",
+      "CPF/CNPJ": sale.client_cpf_encrypted ? `***.***.***-${sale.client_cpf_encrypted.slice(-2)}` : "N/A",
+      "Canal": sale.sale_source === "internal_account" ? "Conta Interna" : "Balcão",
+      "Companhia Aérea": sale.mileage_accounts?.airline_companies?.name || sale.counter_airline_program || "N/A",
+      "Milhas Usadas": sale.miles_used || 0,
+      "Custo das Milhas": sale.total_cost ? (sale.total_cost - ((sale.boarding_fee || 0) * (sale.passengers || 1))).toFixed(2) : "0.00",
+      "Taxa de Embarque": sale.boarding_fee ? ((sale.boarding_fee || 0) * (sale.passengers || 1)).toFixed(2) : "0.00",
+      "Custo Total": sale.total_cost || 0,
+      "Valor Bruto (sem juros)": sale.price_total || sale.sale_price || 0,
+      "Juros": sale.final_price_with_interest ? (sale.final_price_with_interest - (sale.price_total || sale.sale_price || 0)).toFixed(2) : "0.00",
+      "Valor Final (com juros)": sale.final_price_with_interest || sale.price_total || sale.sale_price || 0,
+      "Lucro": sale.margin_value || ((sale.price_total || sale.sale_price || 0) - (sale.total_cost || 0)) || 0,
+      "Margem (%)": sale.margin_percentage?.toFixed(2) || "0.00",
+      "Forma de Pagamento": sale.payment_method || "N/A",
+      "Parcelas": sale.installments || 1,
+      "Taxa de Juros (%)": sale.interest_rate?.toFixed(2) || "0.00",
+      "Status Pagamento": sale.payment_status || "pending",
+    }));
+
+    const filename = `relatorio-vendas-${format(dateRange.from || new Date(), "yyyy-MM-dd")}_${format(dateRange.to || new Date(), "yyyy-MM-dd")}`;
+    
+    exportToCSV(exportData, filename);
+    
+    toast({
+      title: "Relatório exportado",
+      description: `${exportData.length} vendas exportadas com sucesso`,
+    });
+  };
+
   if (loading || !kpis) {
     return (
       <div className="p-6">
@@ -88,10 +137,16 @@ export default function FinancialReports() {
             </p>
           </div>
           
-          <Button variant="outline" onClick={() => refreshReports()}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Atualizar
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => refreshReports()}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Atualizar
+            </Button>
+            <Button variant="default" onClick={exportSalesReport}>
+              <Download className="h-4 w-4 mr-2" />
+              Exportar CSV
+            </Button>
+          </div>
         </div>
 
         {/* Filtros */}
@@ -185,13 +240,14 @@ export default function FinancialReports() {
 
         {/* Tabs */}
         <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-            <TabsTrigger value="accounts">Por Conta</TabsTrigger>
-            <TabsTrigger value="airlines">Por Companhia</TabsTrigger>
-            <TabsTrigger value="channels">Por Canal</TabsTrigger>
-            <TabsTrigger value="payments">Por Pagamento</TabsTrigger>
-          </TabsList>
+        <TabsList>
+          <TabsTrigger value="overview">Visão Geral</TabsTrigger>
+          <TabsTrigger value="accounts">Por Conta</TabsTrigger>
+          <TabsTrigger value="airlines">Por Companhia</TabsTrigger>
+          <TabsTrigger value="channels">Por Canal</TabsTrigger>
+          <TabsTrigger value="payments">Por Pagamento</TabsTrigger>
+          <TabsTrigger value="cpf">CPFs por Conta</TabsTrigger>
+        </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -419,9 +475,77 @@ export default function FinancialReports() {
                 </Table>
               </CardContent>
             </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
+        </TabsContent>
+
+        {/* Tab: CPFs por Conta */}
+        <TabsContent value="cpf" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Uso de CPFs por Conta</CardTitle>
+              <CardDescription>
+                Acompanhe o consumo de CPFs e renovações necessárias
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {accounts.map((account) => {
+                  const used = account.cpf_count || 0;
+                  const limit = account.cpf_limit || 25;
+                  const percentage = (used / limit) * 100;
+                  
+                  return (
+                    <div key={account.id} className="border rounded-lg p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">{account.airline_companies?.name || "N/A"}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {account.airline_companies?.code || "N/A"} - {account.account_number}
+                          </p>
+                        </div>
+                        <Badge 
+                          variant={
+                            percentage >= 90 ? "destructive" : 
+                            percentage >= 75 ? "secondary" : 
+                            "default"
+                          }
+                        >
+                          {used}/{limit} CPFs
+                        </Badge>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Uso</span>
+                          <span className="font-medium">{percentage.toFixed(0)}%</span>
+                        </div>
+                        <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                          <div 
+                            className={cn(
+                              "h-full transition-all",
+                              percentage >= 90 ? "bg-destructive" :
+                              percentage >= 75 ? "bg-yellow-500" :
+                              "bg-primary"
+                            )}
+                            style={{ width: `${Math.min(percentage, 100)}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {percentage >= 75 && (
+                        <p className="text-sm text-muted-foreground">
+                          ⚠️ {percentage >= 90 ? "Atenção: " : "Aviso: "}
+                          {limit - used} CPF(s) disponível(is)
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
+  </div>
   );
 }

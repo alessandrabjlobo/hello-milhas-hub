@@ -202,7 +202,7 @@ export default function DashboardKPIs() {
                 <span className="text-sm">Vendas</span>
               </div>
             </Button>
-            <Button variant="outline" onClick={() => navigate("/reports")} className="h-20">
+            <Button variant="outline" onClick={() => navigate("/reports/financial")} className="h-20">
               <div className="flex flex-col items-center gap-2">
                 <TrendingUp className="h-5 w-5" />
                 <span className="text-sm">Relatórios</span>

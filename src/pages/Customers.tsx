@@ -14,10 +14,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Users, Search, Eye } from "lucide-react";
+import { Users, Search, Eye, Download } from "lucide-react";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useToast } from "@/hooks/use-toast";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { exportToCSV } from "@/lib/csv-export";
 
 interface Customer {
   id: string;
@@ -87,6 +88,38 @@ export default function Customers() {
     );
   }
 
+  const exportCustomers = () => {
+    if (customers.length === 0) {
+      toast({
+        title: "Nenhum cliente para exportar",
+        description: "Sua base de clientes está vazia",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const exportData = customers.map(customer => ({
+      "ID": customer.id.substring(0, 8),
+      "Nome": customer.name,
+      "CPF": customer.cpf_encrypted ? `***.***.***-${customer.cpf_encrypted.slice(-2)}` : "N/A",
+      "Telefone": customer.phone || "N/A",
+      "Email": customer.email || "N/A",
+      "Total de Compras": customer.total_purchases || 0,
+      "Total Gasto (R$)": (customer.total_spent || 0).toFixed(2),
+      "Última Compra": customer.last_purchase_at ? new Date(customer.last_purchase_at).toLocaleDateString("pt-BR") : "N/A",
+      "Cadastrado em": new Date(customer.created_at).toLocaleDateString("pt-BR"),
+    }));
+
+    const filename = `clientes-${new Date().toISOString().split('T')[0]}`;
+    
+    exportToCSV(exportData, filename);
+    
+    toast({
+      title: "Clientes exportados",
+      description: `${exportData.length} clientes exportados com sucesso`,
+    });
+  };
+
   return (
     <div className="container max-w-7xl mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -99,6 +132,11 @@ export default function Customers() {
             Banco de dados de clientes cadastrados automaticamente
           </p>
         </div>
+        
+        <Button onClick={exportCustomers} variant="default">
+          <Download className="h-4 w-4 mr-2" />
+          Exportar CSV
+        </Button>
       </div>
 
       <Card>

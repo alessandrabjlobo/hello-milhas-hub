@@ -16,6 +16,16 @@ export default function AgencySettings() {
   const [email, setEmail] = useState("");
   const [address, setAddress] = useState("");
   const [website, setWebsite] = useState("");
+  const [cnpjCpf, setCnpjCpf] = useState("");
+  const [responsibleName, setResponsibleName] = useState("");
+  const [billingEmail, setBillingEmail] = useState("");
+  const [street, setStreet] = useState("");
+  const [number, setNumber] = useState("");
+  const [complement, setComplement] = useState("");
+  const [neighborhood, setNeighborhood] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [zipCode, setZipCode] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -26,6 +36,16 @@ export default function AgencySettings() {
       setEmail(settings.email || "");
       setAddress(settings.address || "");
       setWebsite(settings.website || "");
+      setCnpjCpf(settings.cnpj_cpf || "");
+      setResponsibleName(settings.responsible_name || "");
+      setBillingEmail(settings.billing_email || "");
+      setStreet(settings.street || "");
+      setNumber(settings.number || "");
+      setComplement(settings.complement || "");
+      setNeighborhood(settings.neighborhood || "");
+      setCity(settings.city || "");
+      setState(settings.state || "");
+      setZipCode(settings.zip_code || "");
     }
   }, [settings]);
 
@@ -39,6 +59,16 @@ export default function AgencySettings() {
         email,
         address,
         website,
+        cnpj_cpf: cnpjCpf,
+        responsible_name: responsibleName,
+        billing_email: billingEmail,
+        street,
+        number,
+        complement,
+        neighborhood,
+        city,
+        state,
+        zip_code: zipCode,
       });
     } finally {
       setSaving(false);
@@ -137,6 +167,124 @@ export default function AgencySettings() {
               onChange={(e) => setWebsite(e.target.value)}
               placeholder="https://www.agencia.com.br"
             />
+          </div>
+
+          <div className="border-t pt-4 mt-4">
+            <h3 className="font-semibold mb-4">Informações Adicionais</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="cnpjCpf">CNPJ / CPF</Label>
+                <Input
+                  id="cnpjCpf"
+                  value={cnpjCpf}
+                  onChange={(e) => setCnpjCpf(e.target.value)}
+                  placeholder="00.000.000/0000-00"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="responsibleName">Nome do Responsável</Label>
+                <Input
+                  id="responsibleName"
+                  value={responsibleName}
+                  onChange={(e) => setResponsibleName(e.target.value)}
+                  placeholder="João Silva"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2 mt-4">
+              <Label htmlFor="billingEmail">E-mail para Faturamento</Label>
+              <Input
+                id="billingEmail"
+                type="email"
+                value={billingEmail}
+                onChange={(e) => setBillingEmail(e.target.value)}
+                placeholder="financeiro@agencia.com.br"
+              />
+            </div>
+          </div>
+
+          <div className="border-t pt-4 mt-4">
+            <h3 className="font-semibold mb-4">Endereço Completo</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="street">Rua/Avenida</Label>
+                <Input
+                  id="street"
+                  value={street}
+                  onChange={(e) => setStreet(e.target.value)}
+                  placeholder="Rua Exemplo"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="number">Número</Label>
+                <Input
+                  id="number"
+                  value={number}
+                  onChange={(e) => setNumber(e.target.value)}
+                  placeholder="123"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              <div className="space-y-2">
+                <Label htmlFor="complement">Complemento</Label>
+                <Input
+                  id="complement"
+                  value={complement}
+                  onChange={(e) => setComplement(e.target.value)}
+                  placeholder="Sala 456"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="neighborhood">Bairro</Label>
+                <Input
+                  id="neighborhood"
+                  value={neighborhood}
+                  onChange={(e) => setNeighborhood(e.target.value)}
+                  placeholder="Centro"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+              <div className="space-y-2">
+                <Label htmlFor="city">Cidade</Label>
+                <Input
+                  id="city"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  placeholder="São Paulo"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="state">Estado (UF)</Label>
+                <Input
+                  id="state"
+                  value={state}
+                  onChange={(e) => setState(e.target.value)}
+                  placeholder="SP"
+                  maxLength={2}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="zipCode">CEP</Label>
+                <Input
+                  id="zipCode"
+                  value={zipCode}
+                  onChange={(e) => setZipCode(e.target.value)}
+                  placeholder="00000-000"
+                />
+              </div>
+            </div>
           </div>
 
           <div className="flex justify-end pt-4 border-t">

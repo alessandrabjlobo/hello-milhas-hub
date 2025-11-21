@@ -23,7 +23,6 @@ import AccountDetail from "./pages/AccountDetail";
 import Accounts from "./pages/Accounts";
 import Suppliers from "./pages/Suppliers";
 import Tickets from "./pages/Tickets";
-import Reports from "./pages/Reports";
 import Calculator from "./pages/Calculator";
 import ProgramRules from "./pages/ProgramRules";
 import MyAirlines from "./pages/MyAirlines";
@@ -38,6 +37,7 @@ import Privacy from "./pages/Privacy";
 import NotFound from "./pages/NotFound";
 import Demo from "./pages/Demo";
 import FinancialReports from "./pages/FinancialReports";
+import UserProfile from "./pages/settings/UserProfile";
 
 // Lazy load para páginas pesadas
 const NewSaleWizard = lazy(() => import("./pages/sales/NewSaleWizard"));
@@ -92,13 +92,13 @@ const App = () => (
                         <Route path="/accounts" element={<Accounts />} />
                         <Route path="/suppliers" element={<Suppliers />} />
                         <Route path="/tickets" element={<Tickets />} />
-                        <Route path="/reports" element={<Reports />} />
                         <Route path="/reports/financial" element={<FinancialReports />} />
                         <Route path="/calculator" element={<Calculator />} />
                         <Route path="/quotes/new" element={<QuoteGenerator />} />
                         <Route path="/quotes/:quoteId" element={<QuoteGenerator />} />
                         <Route path="/quotes" element={<QuoteHistory />} />
                         <Route path="/customers" element={<Customers />} />
+                        <Route path="/profile" element={<UserProfile />} />
                         <Route path="/settings/my-airlines" element={<MyAirlines />} />
                         <Route path="/settings/programs" element={<ProgramRules />} />
                         <Route path="/settings/billing" element={<Billing />} />

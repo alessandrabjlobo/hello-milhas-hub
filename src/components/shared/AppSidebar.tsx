@@ -18,6 +18,7 @@ import {
   Calculator,
   LogOut,
   Percent,
+  User,
 } from "lucide-react";
 import {
   Sidebar,
@@ -59,12 +60,13 @@ const toolsNavItems = [
 ];
 
   const reportsNavItems = [
-    { title: "Relatórios Financeiros", url: "/reports/financial", icon: DollarSign },
-    { title: "Relatórios Gerais", url: "/reports", icon: BarChart3 },
+    { title: "Dashboard KPIs", url: "/dashboard-kpis", icon: BarChart3 },
+    { title: "Relatórios Financeiros", url: "/reports/financial", icon: FileText },
   ];
 
-const settingsNavItems = [
-  { title: "Configurações da Agência", url: "/settings/agency", icon: Building2 },
+  const settingsNavItems = [
+    { title: "Meu Perfil", url: "/profile", icon: User },
+    { title: "Configurações da Agência", url: "/settings/agency", icon: Building2 },
   { title: "Regras de Programas", url: "/settings/programs", icon: Plane },
   { title: "Formas de Pagamento", url: "/settings/payment-methods", icon: CreditCard },
   { title: "Juros - Débito/Crédito", url: "/settings/payment-interest", icon: Percent },
