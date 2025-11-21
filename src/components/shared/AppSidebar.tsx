@@ -1,407 +1,140 @@
-import { useState, useMemo, useEffect } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  useSidebar,
+} from "@/components/ui/sidebar";
+import { NavLink } from "@/components/NavLink";
+import {
+  LayoutDashboard,
+  ShoppingCart,
+  Users,
+  Plane,
+  Wallet,
+  FileText,
+  Settings,
+  Building2,
+  CreditCard,
+  Percent,
+  TrendingUp,
+  User,
+  Calculator,
+  MessageSquare,
+  LogOut,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle, Eye, ShoppingCart, MoreHorizontal, Filter, X } from "lucide-react";
-import { useSales } from "@/hooks/useSales";
-import { EmptyState } from "@/components/shared/EmptyState";
-import { exportToCSV } from "@/lib/csv-export";
-import { PaymentStatusBadge } from "@/components/sales/PaymentStatusBadge";
-import { EditSaleDialog } from "@/components/sales/EditSaleDialog";
-import { DeleteSaleDialog } from "@/components/sales/DeleteSaleDialog";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { Separator } from "@/components/ui/separator";
 
-export default function SalesList() {
-  const { sales, loading, fetchSales } = useSales();
-  const { toast } = useToast();
-  const [editingSale, setEditingSale] = useState<typeof sales[0] | null>(null);
-  const [deletingSale, setDeletingSale] = useState<typeof sales[0] | null>(null);
+const mainNavItems = [
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  { title: "Vendas", url: "/sales", icon: ShoppingCart },
+  { title: "Clientes", url: "/customers", icon: Users },
+  { title: "Contas", url: "/accounts", icon: Wallet },
+  { title: "Passagens", url: "/tickets", icon: Plane },
+  { title: "Relatórios Financeiros", url: "/reports/financial", icon: TrendingUp },
+  { title: "Cotações", url: "/quotes", icon: MessageSquare },
+  { title: "Calculadora", url: "/calculator", icon: Calculator },
+];
 
-  const [searchParams] = useSearchParams();
-  const [initializedFromUrl, setInitializedFromUrl] = useState(false);
-  
-  // Filter states
-  const [searchTerm, setSearchTerm] = useState(() => 
-    localStorage.getItem("sales_filter_search") || ""
-  );
-  const [selectedPaymentStatus, setSelectedPaymentStatus] = useState(() => 
-    localStorage.getItem("sales_filter_payment_status") || "all"
-  );
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(() => 
-    localStorage.getItem("sales_filter_payment_method") || "all"
-  );
-  const [dateFrom, setDateFrom] = useState(() => 
-    localStorage.getItem("sales_filter_date_from") || ""
-  );
-  const [dateTo, setDateTo] = useState(() => 
-    localStorage.getItem("sales_filter_date_to") || ""
-  );
+const settingsNavItems = [
+  { title: "Meu Perfil", url: "/profile", icon: User },
+  { title: "Configurações da Agência", url: "/settings/agency", icon: Building2 },
+  { title: "Formas de Pagamento", url: "/settings/payment-methods", icon: CreditCard },
+  { title: "Juros do Parcelamento", url: "/settings/payment-interest", icon: Percent },
+  { title: "Minhas Companhias", url: "/settings/my-airlines", icon: Plane },
+  { title: "Regras dos Programas", url: "/settings/programs", icon: FileText },
+];
 
-  // Salvar filtros no localStorage
-  useEffect(() => {
-    localStorage.setItem("sales_filter_search", searchTerm);
-    localStorage.setItem("sales_filter_payment_status", selectedPaymentStatus);
-    localStorage.setItem("sales_filter_payment_method", selectedPaymentMethod);
-    localStorage.setItem("sales_filter_date_from", dateFrom);
-    localStorage.setItem("sales_filter_date_to", dateTo);
-  }, [searchTerm, selectedPaymentStatus, selectedPaymentMethod, dateFrom, dateTo]);
-
-  // Inicializar busca a partir de ?customer=... (usado ao vir da tela de Clientes)
-  useEffect(() => {
-    if (initializedFromUrl) return;
-
-    const customerParam = searchParams.get("customer");
-    if (customerParam) {
-      setSearchTerm(customerParam);
-    }
-
-    setInitializedFromUrl(true);
-  }, [searchParams, initializedFromUrl]);
-
-  // Apply filters
-  const filteredSales = useMemo(() => {
-    return sales.filter((sale) => {
-      // Search filter
-      if (searchTerm) {
-        const search = searchTerm.toLowerCase();
-        const matchesName = (sale.customer_name || sale.client_name || "").toLowerCase().includes(search);
-        const matchesCpf = (sale.customer_cpf || sale.client_cpf_encrypted || "").toLowerCase().includes(search);
-        if (!matchesName && !matchesCpf) return false;
-      }
-
-      // Payment status filter
-      if (selectedPaymentStatus !== "all" && sale.payment_status !== selectedPaymentStatus) {
-        return false;
-      }
-
-      // Payment method filter
-      if (selectedPaymentMethod !== "all") {
-        const method = sale.payment_method || "";
-        if (selectedPaymentMethod === "pix" && method !== "pix") return false;
-        if (selectedPaymentMethod === "credit" && method !== "credit_card") return false;
-        if (selectedPaymentMethod === "debit" && method !== "debit_card") return false;
-      }
-
-      // Date filters
-      if (dateFrom) {
-        const saleDate = new Date(sale.created_at);
-        const fromDate = new Date(dateFrom);
-        if (saleDate < fromDate) return false;
-      }
-
-      if (dateTo) {
-        const saleDate = new Date(sale.created_at);
-        const toDate = new Date(dateTo);
-        toDate.setHours(23, 59, 59);
-        if (saleDate > toDate) return false;
-      }
-
-      return true;
-    });
-  }, [sales, searchTerm, selectedPaymentStatus, selectedPaymentMethod, dateFrom, dateTo]);
-
-  const hasActiveFilters = searchTerm || selectedPaymentStatus !== "all" || 
-    selectedPaymentMethod !== "all" || dateFrom || dateTo;
-
-  const clearFilters = () => {
-    setSearchTerm("");
-    setSelectedPaymentStatus("all");
-    setSelectedPaymentMethod("all");
-    setDateFrom("");
-    setDateTo("");
-  };
-
-  const handleDeleteSale = async () => {
-    if (!deletingSale) return;
-
-    try {
-      const { error } = await supabase
-        .from("sales")
-        .delete()
-        .eq("id", deletingSale.id);
-
-      if (error) throw error;
-
-      toast({
-        title: "Venda excluída",
-        description: "A venda foi removida com sucesso.",
-      });
-
-      fetchSales();
-      setDeletingSale(null);
-    } catch (error: any) {
-      toast({
-        title: "Erro ao excluir",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleExportCSV = () => {
-    const data = filteredSales.map((sale) => ({
-      Data: new Date(sale.created_at).toLocaleDateString("pt-BR"),
-      Cliente: sale.customer_name || sale.client_name,
-      Rota: sale.route_text,
-      Passageiros: sale.passengers,
-      Milhagem: sale.miles_needed?.toLocaleString('pt-BR') || '0',
-      "Valor Total": sale.price_total,
-      Status: sale.status === 'pending' ? 'Aguardando' : sale.status === 'completed' ? 'Concluída' : 'Cancelada',
-    }));
-    exportToCSV(data, `vendas-${new Date().toISOString().split("T")[0]}`);
-  };
-
-
-  if (loading) {
-    return (
-      <div className="p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
-          <div className="flex justify-between items-center">
-            <Skeleton className="h-10 w-48" />
-            <Skeleton className="h-10 w-32" />
-          </div>
-          <Card className="p-6">
-            <div className="space-y-4">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <Skeleton key={i} className="h-16 w-full" />
-              ))}
-            </div>
-          </Card>
-        </div>
-      </div>
-    );
-  }
+export default function AppSidebar() {
+  const { state } = useSidebar();
+  const location = useLocation();
+  const { signOut } = useAuth();
+  const isCollapsed = state === "collapsed";
 
   return (
-    <div className="p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold">Todas as Vendas</h1>
-            <p className="text-muted-foreground">
-              {filteredSales.length} de {sales.length} venda(s)
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={handleExportCSV} disabled={filteredSales.length === 0}>
-              Exportar CSV
-            </Button>
-            <Link to="/sales/new">
-              <Button>
-                <PlusCircle className="h-4 w-4 mr-2" />
-                Nova Venda
-              </Button>
-            </Link>
-          </div>
+    <Sidebar collapsible="icon">
+      <SidebarContent className="pt-4">
+        {/* Logo / Brand */}
+        <div className="px-4 mb-6">
+          <Link to="/dashboard" className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
+              <Plane className="h-5 w-5 text-primary-foreground" />
+            </div>
+            {!isCollapsed && (
+              <span className="text-lg font-bold text-foreground">
+                Hello Milhas
+              </span>
+            )}
+          </Link>
         </div>
 
-        {/* Filtros */}
-        <Card className="p-4">
-          <div className="flex items-center gap-2 mb-4">
-            <Filter className="h-4 w-4" />
-            <h3 className="font-semibold">Filtros</h3>
-            {hasActiveFilters && (
-              <Button variant="ghost" size="sm" onClick={clearFilters} className="ml-auto">
-                <X className="h-4 w-4 mr-2" />
-                Limpar Filtros
-              </Button>
-            )}
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <div>
-              <Label>Buscar</Label>
-              <Input
-                placeholder="Cliente, CPF..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label>Status Pagamento</Label>
-              <Select value={selectedPaymentStatus} onValueChange={setSelectedPaymentStatus}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="pending">Pendente</SelectItem>
-                  <SelectItem value="partial">Parcial</SelectItem>
-                  <SelectItem value="paid">Pago</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Forma de Pagamento</Label>
-              <Select value={selectedPaymentMethod} onValueChange={setSelectedPaymentMethod}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todas" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
-                  <SelectItem value="pix">PIX</SelectItem>
-                  <SelectItem value="credit">Crédito</SelectItem>
-                  <SelectItem value="debit">Débito</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Data Início</Label>
-              <Input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label>Data Fim</Label>
-              <Input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-              />
-            </div>
-          </div>
-        </Card>
+        {/* Menu Principal */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Menu Principal</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {mainNavItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild>
+                    <NavLink
+                      to={item.url}
+                      className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent transition-colors"
+                      activeClassName="bg-accent text-accent-foreground font-medium"
+                    >
+                      <item.icon className="h-4 w-4" />
+                      {!isCollapsed && <span>{item.title}</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
 
-        <Card>
-          {filteredSales.length === 0 ? (
-            <EmptyState
-              icon={ShoppingCart}
-              title="Nenhuma venda registrada"
-              description="Crie sua primeira venda para começar a gerenciar suas emissões."
-              actionLabel="Nova Venda"
-              onAction={() => window.location.href = "/sales/new"}
-            />
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Data</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Passageiros</TableHead>
-                  <TableHead>Companhia</TableHead>
-                  <TableHead>Valor</TableHead>
-                  <TableHead>% Lucro</TableHead>
-                  <TableHead>Forma Pagamento</TableHead>
-                  <TableHead>Status Pagamento</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredSales.map((sale) => (
-                  <TableRow key={sale.id}>
-                    <TableCell>
-                      {new Date(sale.created_at).toLocaleDateString("pt-BR")}
-                    </TableCell>
-                    <TableCell>{sale.customer_name || sale.client_name}</TableCell>
-                    <TableCell>{sale.passengers}</TableCell>
-                    <TableCell>
-                      {sale.mileage_accounts?.airline_companies?.code || 
-                       (sale.sale_source === 'mileage_counter' ? sale.counter_airline_program : '-')}
-                    </TableCell>
-                    <TableCell>
-                      R$ {(sale.price_total || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={
-                        (sale.margin_percentage || 0) >= 20 ? "default" : 
-                        (sale.margin_percentage || 0) >= 10 ? "secondary" : "destructive"
-                      }>
-                        {(sale.margin_percentage || 0).toFixed(1)}%
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {sale.payment_method === 'pix' ? '📱 PIX' : 
-                         sale.payment_method === 'credit_card' ? '💳 Crédito' : 
-                         sale.payment_method === 'debit_card' ? '💳 Débito' : 
-                         sale.payment_method || '-'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <PaymentStatusBadge
-                        status={sale.payment_status || "pending"}
-                        paidAmount={sale.paid_amount || 0}
-                        totalAmount={sale.sale_price || 0}
-                      />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" asChild>
-                        <Link to={`/sales/${sale.id}`}>
-                          <Eye className="h-4 w-4" />
-                        </Link>
-                      </Button>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setEditingSale(sale)}>
-                            Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={() => setDeletingSale(sale)}
-                          >
-                            Excluir
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </Card>
-      </div>
+        <Separator className="my-4" />
 
-      <EditSaleDialog
-        sale={editingSale}
-        open={!!editingSale}
-        onOpenChange={(open) => !open && setEditingSale(null)}
-        onSuccess={fetchSales}
-      />
+        {/* Configurações */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Configurações</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {settingsNavItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild>
+                    <NavLink
+                      to={item.url}
+                      className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent transition-colors"
+                      activeClassName="bg-accent text-accent-foreground font-medium"
+                    >
+                      <item.icon className="h-4 w-4" />
+                      {!isCollapsed && <span>{item.title}</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
 
-      <DeleteSaleDialog
-        open={!!deletingSale}
-        onOpenChange={(open) => !open && setDeletingSale(null)}
-        onConfirm={handleDeleteSale}
-        customerName={deletingSale?.customer_name || deletingSale?.client_name || ""}
-        hasTickets={false}
-      />
-    </div>
+        {/* Botão de Logout */}
+        <div className="mt-auto px-3 pb-4">
+          <Button
+            variant="ghost"
+            className="w-full justify-start"
+            onClick={() => signOut()}
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            {!isCollapsed && <span>Sair</span>}
+          </Button>
+        </div>
+      </SidebarContent>
+    </Sidebar>
   );
 }
