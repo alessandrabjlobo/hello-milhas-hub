@@ -3,7 +3,6 @@ import * as React from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
-  ShoppingCart,
   PlusCircle,
   List,
   Ticket,
@@ -13,7 +12,6 @@ import {
   Settings,
   Plane,
   FileText,
-  DollarSign,
   Shield,
   Calculator,
   LogOut,
@@ -29,7 +27,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarTrigger,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -59,18 +59,19 @@ const toolsNavItems = [
   { title: "Histórico de Orçamentos", url: "/quotes", icon: List },
 ];
 
-  const reportsNavItems = [
-    { title: "Dashboard KPIs", url: "/dashboard-kpis", icon: BarChart3 },
-    { title: "Relatórios Financeiros", url: "/reports/financial", icon: FileText },
-  ];
+const reportsNavItems = [
+  { title: "Dashboard KPIs", url: "/dashboard-kpis", icon: BarChart3 },
+  { title: "Relatórios Financeiros", url: "/reports/financial", icon: FileText },
+];
 
-  const settingsNavItems = [
-    { title: "Meu Perfil", url: "/profile", icon: User },
-    { title: "Configurações da Agência", url: "/settings/agency", icon: Building2 },
+// Configurações – agora só "Meu Perfil" fica como item direto
+const settingsProfileItem = { title: "Meu Perfil", url: "/profile", icon: User };
+
+// Esses vão para o submenu "Operação de Vendas"
+const settingsOperationsItems = [
   { title: "Regras de Programas", url: "/settings/programs", icon: Plane },
   { title: "Formas de Pagamento", url: "/settings/payment-methods", icon: CreditCard },
   { title: "Juros - Débito/Crédito", url: "/settings/payment-interest", icon: Percent },
-  { title: "Plano & Pagamento", url: "/settings/billing", icon: DollarSign },
 ];
 
 const legalNavItems = [
@@ -84,8 +85,7 @@ const adminNavItems = [
 
 const linkBase =
   "flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm transition-colors";
-const linkActive =
-  "bg-muted text-primary font-medium";
+const linkActive = "bg-muted text-primary font-medium";
 const linkInactive =
   "text-muted-foreground hover:bg-accent hover:text-accent-foreground";
 
@@ -103,15 +103,13 @@ function ItemLink({
   exact?: boolean;
 }) {
   const location = useLocation();
-  const isActivePath =
-    exact
-      ? location.pathname === to
-      : location.pathname === to || location.pathname.startsWith(to + "/");
+  const isActivePath = exact
+    ? location.pathname === to
+    : location.pathname === to || location.pathname.startsWith(to + "/");
 
   return (
     <SidebarMenuItem>
       <SidebarMenuButton asChild>
-        {/* Usamos NavLink só pra a11y (aria-current), mas controlamos a classe pelo helper acima */}
         <NavLink
           to={to}
           aria-current={isActivePath ? "page" : undefined}
@@ -130,17 +128,29 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
 
   const { isAdmin } = useUserRole();
-  
-  // Buscar dados do usuário
   const { user } = useAuth();
-  const userName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Usuário';
-  const userEmail = user?.email || '';
+  const location = useLocation();
+
+  const userName =
+    user?.user_metadata?.name ||
+    user?.email?.split("@")[0] ||
+    "Usuário";
+  const userEmail = user?.email || "";
   const initials = userName
-    .split(' ')
-    .map(n => n[0])
-    .join('')
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
     .toUpperCase()
     .substring(0, 2);
+
+  const isPathActive = React.useCallback(
+    (path: string, exact = false) =>
+      exact
+        ? location.pathname === path
+        : location.pathname === path ||
+          location.pathname.startsWith(path + "/"),
+    [location.pathname],
+  );
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -149,7 +159,7 @@ export function AppSidebar() {
 
   return (
     <Sidebar className={collapsed ? "w-14" : "w-60"}>
-      {/* Perfil do usuário */}
+      {/* Cabeçalho com usuário */}
       <div className="p-3 border-b bg-gradient-to-br from-primary/5 to-primary/10">
         <div className="flex items-center gap-3">
           <Avatar className="h-10 w-10 ring-2 ring-primary/20">
@@ -157,7 +167,7 @@ export function AppSidebar() {
               {initials}
             </AvatarFallback>
           </Avatar>
-          
+
           {!collapsed && (
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold truncate text-foreground">
@@ -246,6 +256,7 @@ export function AppSidebar() {
 
         {/* Relatórios */}
         <SidebarGroup>
+          <SidebarGroupLabel>Relatórios</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {reportsNavItems.map((item) => (
@@ -271,15 +282,48 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {settingsNavItems.map((item) => (
-                <ItemLink
-                  key={item.url}
-                  to={item.url}
-                  icon={item.icon}
-                  title={item.title}
-                  collapsed={collapsed}
-                />
-              ))}
+              {/* Meu Perfil (dados pessoais, agência e assinatura) */}
+              <ItemLink
+                to={settingsProfileItem.url}
+                icon={settingsProfileItem.icon}
+                title={settingsProfileItem.title}
+                collapsed={collapsed}
+              />
+
+              {/* Operação de Vendas (submenu) */}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  className={`${linkBase} ${linkInactive}`}
+                  asChild
+                >
+                  <button type="button">
+                    <Settings className="h-4 w-4" />
+                    {!collapsed && <span>Operação de Vendas</span>}
+                  </button>
+                </SidebarMenuButton>
+
+                <SidebarMenuSub>
+                  {settingsOperationsItems.map((item) => (
+                    <SidebarMenuSubItem key={item.url}>
+                      <SidebarMenuSubButton
+                        asChild
+                        isActive={isPathActive(item.url)}
+                      >
+                        <NavLink
+                          to={item.url}
+                          aria-current={
+                            isPathActive(item.url) ? "page" : undefined
+                          }
+                          className="flex items-center gap-2 text-xs px-2 py-1 rounded-md hover:bg-accent hover:text-accent-foreground"
+                        >
+                          <item.icon className="h-3 w-3" />
+                          <span>{item.title}</span>
+                        </NavLink>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  ))}
+                </SidebarMenuSub>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -318,23 +362,6 @@ export function AppSidebar() {
                   collapsed={collapsed}
                 />
               ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        {/* Subscription Button */}
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
-                  onClick={() => window.open("https://buy.stripe.com/4gMaEQe8IceS3pl0lH3Nm01", "_blank")}
-                >
-                  <DollarSign className="h-4 w-4" />
-                  {!collapsed && <span>Assinar Plano Pro</span>}
-                </SidebarMenuButton>
-              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
