@@ -1,6 +1,35 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { SaleFormData } from "@/schemas/saleSchema";
 
+/**
+ * SERVIÇO DE CRIAÇÃO DE VENDAS
+ * 
+ * Este arquivo contém a lógica principal de criação de vendas do sistema.
+ * 
+ * FLUXO DE CONTROLE DE CPF (Vendas Internas):
+ * 1. CPFs dos passageiros são registrados em `cpf_registry` por companhia aérea
+ * 2. Se CPF já existe: incrementa `usage_count` e atualiza `last_used_at`
+ * 3. Se CPF é novo: cria registro com `usage_count = 1`
+ * 4. Após registro, chama `update_account_cpf_count()` para atualizar contador da conta
+ * 
+ * BLOQUEIO FUTURO DE CPF:
+ * Para implementar bloqueio por limite de uso, adicione verificação antes da linha 279:
+ * 
+ * if (existingCpf.usage_count >= LIMITE_MAX) {
+ *   await supabase.from("cpf_registry")
+ *     .update({ status: "blocked", blocked_until: calcularDataBloqueio() })
+ *     .eq("id", existingCpf.id);
+ *   throw new Error(`CPF ${cpfEncrypted} atingiu limite de uso`);
+ * }
+ * 
+ * CÁLCULOS FINANCEIROS:
+ * - price_total: Preço base SEM juros (usado para calcular margem)
+ * - final_price_with_interest: Preço FINAL COM juros (valor que cliente paga)
+ * - total_cost: Custo total (milhas + taxas de embarque)
+ * - profit/margin_value: price_total - total_cost (NÃO usa final_price_with_interest)
+ * - profit_margin/margin_percentage: (profit / price_total) * 100
+ */
+
 export interface CreateSaleResult {
   saleId: string;
   error?: string;

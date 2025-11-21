@@ -58,9 +58,10 @@ const toolsNavItems = [
   { title: "Histórico de Orçamentos", url: "/quotes", icon: List },
 ];
 
-const reportsNavItems = [
-  { title: "Relatórios", url: "/reports", icon: BarChart3 },
-];
+  const reportsNavItems = [
+    { title: "Relatórios Financeiros", url: "/reports/financial", icon: DollarSign },
+    { title: "Relatórios Gerais", url: "/reports", icon: BarChart3 },
+  ];
 
 const settingsNavItems = [
   { title: "Configurações da Agência", url: "/settings/agency", icon: Building2 },
@@ -315,6 +316,23 @@ export function AppSidebar() {
                   collapsed={collapsed}
                 />
               ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Subscription Button */}
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+                  onClick={() => window.open("https://buy.stripe.com/4gMaEQe8IceS3pl0lH3Nm01", "_blank")}
+                >
+                  <DollarSign className="h-4 w-4" />
+                  {!collapsed && <span>Assinar Plano Pro</span>}
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
