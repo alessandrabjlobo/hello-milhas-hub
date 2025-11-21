@@ -5,7 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HashRouter as BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/shared/AppSidebar";
+import AppSidebar from "@/components/shared/AppSidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import Index from "./pages/Index";

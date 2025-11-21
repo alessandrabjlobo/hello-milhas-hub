@@ -140,16 +140,22 @@ export default function AccountDetail() {
       const limit = rule?.cpf_limit ?? acc.cpf_limit ?? 25;
       const renewalType: RenewalType = rule?.renewal_type ?? "annual";
 
-      // 2) busca os CPFs usados nessa conta
-      // OBS: ajuste o nome da tabela/colunas aqui se o seu schema for diferente
-      const { data: usageData, error: usageError } = await supabase
-        .from("account_cpfs")
-        .select("cpf_document, first_used_at")
-        .eq("mileage_account_id", acc.id);
+      // 2) busca os CPFs usados nessa conta através das vendas
+      const { data: salesData, error: usageError } = await supabase
+        .from("sales")
+        .select("cpf_used_id, cpf_registry(cpf_encrypted, first_use_date)")
+        .eq("mileage_account_id", acc.id)
+        .not("cpf_used_id", "is", null);
 
       if (usageError) throw usageError;
 
-      const rows = (usageData ?? []) as CpfUsageRow[];
+      // Mapeia para o formato esperado
+      const rows = (salesData ?? [])
+        .filter((sale: any) => sale.cpf_registry)
+        .map((sale: any) => ({
+          cpf_document: sale.cpf_registry.cpf_encrypted,
+          first_used_at: sale.cpf_registry.first_use_date,
+        })) as CpfUsageRow[];
       const now = new Date();
 
       let filtered: CpfUsageRow[];
