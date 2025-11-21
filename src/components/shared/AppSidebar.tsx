@@ -8,7 +8,6 @@ import {
   Ticket,
   CreditCard,
   Building2,
-  BarChart3,
   Settings,
   Plane,
   FileText,
@@ -59,8 +58,8 @@ const toolsNavItems = [
   { title: "Histórico de Orçamentos", url: "/quotes", icon: List },
 ];
 
+// 🔻 Aqui agora só tem Relatórios Financeiros
 const reportsNavItems = [
-  { title: "Dashboard KPIs", url: "/dashboard-kpis", icon: BarChart3 },
   { title: "Relatórios Financeiros", url: "/reports/financial", icon: FileText },
 ];
 
