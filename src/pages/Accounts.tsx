@@ -1,3 +1,5 @@
+// src/pages/Accounts.tsx (ou equivalente)
+
 import { Link } from "react-router-dom";
 import { useState, useEffect, useMemo } from "react";
 import { Card } from "@/components/ui/card";
@@ -15,10 +17,28 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Eye, CreditCard, TrendingUp, AlertTriangle, Filter, X, ChevronDown } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  Eye,
+  CreditCard,
+  TrendingUp,
+  AlertTriangle,
+  Filter,
+  X,
+  ChevronDown,
+} from "lucide-react";
 import { useMileageAccounts } from "@/hooks/useMileageAccounts";
 import { AddAccountDialog } from "@/components/accounts/AddAccountDialog";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -26,45 +46,66 @@ import { AddMovementDialog } from "@/components/movements/AddMovementDialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { formatMiles } from "@/lib/utils";
+import { getSupplierId } from "@/lib/getSupplierId";
+import { startOfYear, subYears } from "date-fns";
+
+type CpfUsageMap = Record<string, number>;
+
+type RenewalType = "annual" | "rolling";
+
+interface ProgramRule {
+  cpf_limit: number;
+  renewal_type: RenewalType;
+}
 
 export default function Accounts() {
   const { accounts, loading, fetchAccounts } = useMileageAccounts();
   const { toast } = useToast();
   const [updatingStatus, setUpdatingStatus] = useState<Set<string>>(new Set());
 
-  // Estados dos filtros
-  const [searchTerm, setSearchTerm] = useState(() => 
-    localStorage.getItem("accounts_filter_search") || ""
+  // Uso de CPFs únicos por conta (calculado a partir de sales)
+  const [cpfUsage, setCpfUsage] = useState<CpfUsageMap>({});
+
+  // Regras de programa por companhia (airline_id -> regra)
+  const [programRules, setProgramRules] = useState<Record<string, ProgramRule>>(
+    {}
   );
-  const [selectedProgram, setSelectedProgram] = useState(() => 
-    localStorage.getItem("accounts_filter_program") || "all"
+
+  // ------------------------
+  // Filtros
+  // ------------------------
+  const [searchTerm, setSearchTerm] = useState(
+    () => localStorage.getItem("accounts_filter_search") || ""
   );
-  const [selectedSupplier, setSelectedSupplier] = useState(() => 
-    localStorage.getItem("accounts_filter_supplier") || "all"
+  const [selectedProgram, setSelectedProgram] = useState(
+    () => localStorage.getItem("accounts_filter_program") || "all"
   );
-  const [selectedStatus, setSelectedStatus] = useState(() => 
-    localStorage.getItem("accounts_filter_status") || "all"
+  const [selectedSupplier, setSelectedSupplier] = useState(
+    () => localStorage.getItem("accounts_filter_supplier") || "all"
   );
-  const [balanceZero, setBalanceZero] = useState(() => 
-    localStorage.getItem("accounts_filter_balance_zero") === "true"
+  const [selectedStatus, setSelectedStatus] = useState(
+    () => localStorage.getItem("accounts_filter_status") || "all"
   );
-  const [balanceUnder10k, setBalanceUnder10k] = useState(() => 
-    localStorage.getItem("accounts_filter_balance_under10k") === "true"
+  const [balanceZero, setBalanceZero] = useState(
+    () => localStorage.getItem("accounts_filter_balance_zero") === "true"
   );
-  const [balance10to50k, setBalance10to50k] = useState(() => 
-    localStorage.getItem("accounts_filter_balance_10to50k") === "true"
+  const [balanceUnder10k, setBalanceUnder10k] = useState(
+    () => localStorage.getItem("accounts_filter_balance_under10k") === "true"
   );
-  const [balanceOver50k, setBalanceOver50k] = useState(() => 
-    localStorage.getItem("accounts_filter_balance_over50k") === "true"
+  const [balance10to50k, setBalance10to50k] = useState(
+    () => localStorage.getItem("accounts_filter_balance_10to50k") === "true"
   );
-  const [cpfCritical, setCpfCritical] = useState(() => 
-    localStorage.getItem("accounts_filter_cpf_critical") === "true"
+  const [balanceOver50k, setBalanceOver50k] = useState(
+    () => localStorage.getItem("accounts_filter_balance_over50k") === "true"
   );
-  const [cpfWarning, setCpfWarning] = useState(() => 
-    localStorage.getItem("accounts_filter_cpf_warning") === "true"
+  const [cpfCritical, setCpfCritical] = useState(
+    () => localStorage.getItem("accounts_filter_cpf_critical") === "true"
   );
-  const [cpfNormal, setCpfNormal] = useState(() => 
-    localStorage.getItem("accounts_filter_cpf_normal") === "true"
+  const [cpfWarning, setCpfWarning] = useState(
+    () => localStorage.getItem("accounts_filter_cpf_warning") === "true"
+  );
+  const [cpfNormal, setCpfNormal] = useState(
+    () => localStorage.getItem("accounts_filter_cpf_normal") === "true"
   );
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
 
@@ -75,18 +116,187 @@ export default function Accounts() {
     localStorage.setItem("accounts_filter_supplier", selectedSupplier);
     localStorage.setItem("accounts_filter_status", selectedStatus);
     localStorage.setItem("accounts_filter_balance_zero", balanceZero.toString());
-    localStorage.setItem("accounts_filter_balance_under10k", balanceUnder10k.toString());
-    localStorage.setItem("accounts_filter_balance_10to50k", balance10to50k.toString());
-    localStorage.setItem("accounts_filter_balance_over50k", balanceOver50k.toString());
-    localStorage.setItem("accounts_filter_cpf_critical", cpfCritical.toString());
-    localStorage.setItem("accounts_filter_cpf_warning", cpfWarning.toString());
+    localStorage.setItem(
+      "accounts_filter_balance_under10k",
+      balanceUnder10k.toString()
+    );
+    localStorage.setItem(
+      "accounts_filter_balance_10to50k",
+      balance10to50k.toString()
+    );
+    localStorage.setItem(
+      "accounts_filter_balance_over50k",
+      balanceOver50k.toString()
+    );
+    localStorage.setItem(
+      "accounts_filter_cpf_critical",
+      cpfCritical.toString()
+    );
+    localStorage.setItem(
+      "accounts_filter_cpf_warning",
+      cpfWarning.toString()
+    );
     localStorage.setItem("accounts_filter_cpf_normal", cpfNormal.toString());
-  }, [searchTerm, selectedProgram, selectedSupplier, selectedStatus, balanceZero, balanceUnder10k, balance10to50k, balanceOver50k, cpfCritical, cpfWarning, cpfNormal]);
+  }, [
+    searchTerm,
+    selectedProgram,
+    selectedSupplier,
+    selectedStatus,
+    balanceZero,
+    balanceUnder10k,
+    balance10to50k,
+    balanceOver50k,
+    cpfCritical,
+    cpfWarning,
+    cpfNormal,
+  ]);
 
-  // Extrair programas e fornecedores únicos
+  // ------------------------
+  // Buscar regras de programa (program_rules)
+  // ------------------------
+  useEffect(() => {
+    const fetchProgramRules = async () => {
+      try {
+        const { supplierId } = await getSupplierId();
+
+        const { data, error } = await supabase
+          .from("program_rules")
+          .select("airline_id, cpf_limit, renewal_type")
+          .eq("supplier_id", supplierId);
+
+        if (error) throw error;
+
+        const map: Record<string, ProgramRule> = {};
+        (data || []).forEach((row: any) => {
+          const limit = Number(row.cpf_limit) || 25;
+          const renewal: RenewalType =
+            row.renewal_type === "rolling" ? "rolling" : "annual";
+
+          map[row.airline_id] = {
+            cpf_limit: limit,
+            renewal_type: renewal,
+          };
+        });
+
+        setProgramRules(map);
+      } catch (err: any) {
+        console.error("Erro ao carregar regras de programa:", err);
+        toast({
+          title: "Erro ao carregar regras de programa",
+          description: err?.message ?? "Tente novamente em instantes.",
+          variant: "destructive",
+        });
+      }
+    };
+
+    fetchProgramRules();
+  }, [toast]);
+
+  // Helper: retorna limite de CPF para uma conta (considerando regra do programa)
+  const getCpfLimitForAccount = (account: any): number => {
+    const airlineId =
+      account.airline_company_id || account.airline_companies?.id;
+    const rule = airlineId ? programRules[airlineId] : undefined;
+
+    if (rule?.cpf_limit) return rule.cpf_limit;
+
+    // fallback: campo na conta ou default 25
+    if (account.cpf_limit) return Number(account.cpf_limit) || 25;
+    return 25;
+  };
+
+  // Helper: renewal_type da conta
+  const getRenewalTypeForAccount = (account: any): RenewalType => {
+    const airlineId =
+      account.airline_company_id || account.airline_companies?.id;
+    const rule = airlineId ? programRules[airlineId] : undefined;
+    if (rule?.renewal_type) return rule.renewal_type;
+    return "annual";
+  };
+
+  // ------------------------
+  // Buscar uso de CPFs únicos por conta (respeitando a regra)
+  // ------------------------
+  useEffect(() => {
+    const fetchCpfUsage = async () => {
+      if (!accounts || accounts.length === 0) {
+        setCpfUsage({});
+        return;
+      }
+
+      try {
+        const accountIds = accounts.map((a) => a.id);
+        const now = new Date();
+        const startYear = startOfYear(now);
+        const rollingStart = subYears(now, 1);
+
+        // Globalmente buscamos desde o início da janela mais longa (rolling)
+        const globalStart =
+          rollingStart < startYear ? rollingStart : startYear;
+
+        const { data, error } = await supabase
+          .from("sales")
+          .select("mileage_account_id, client_cpf_encrypted, created_at")
+          .in("mileage_account_id", accountIds)
+          .gte("created_at", globalStart.toISOString());
+
+        if (error) throw error;
+
+        const accountMap = new Map<string, any>();
+        accounts.forEach((acc) => accountMap.set(acc.id, acc));
+
+        const perAccountSets: Record<string, Set<string>> = {};
+
+        (data || []).forEach((row: any) => {
+          const accountId = row.mileage_account_id as string | null;
+          const cpf = row.client_cpf_encrypted as string | null;
+          const createdAt = row.created_at
+            ? new Date(row.created_at)
+            : null;
+
+          if (!accountId || !cpf || !createdAt) return;
+
+          const account = accountMap.get(accountId);
+          if (!account) return;
+
+          const renewalType = getRenewalTypeForAccount(account);
+          const fromDate =
+            renewalType === "rolling" ? rollingStart : startYear;
+
+          // Respeita a janela do programa
+          if (createdAt < fromDate) return;
+
+          if (!perAccountSets[accountId]) {
+            perAccountSets[accountId] = new Set<string>();
+          }
+          perAccountSets[accountId].add(cpf);
+        });
+
+        const counts: CpfUsageMap = {};
+        Object.entries(perAccountSets).forEach(([accountId, set]) => {
+          counts[accountId] = (set as Set<string>).size;
+        });
+
+        setCpfUsage(counts);
+      } catch (error: any) {
+        console.error("Erro ao calcular uso de CPFs:", error);
+        toast({
+          title: "Erro ao calcular uso de CPFs",
+          description: error?.message ?? "Tente novamente em instantes.",
+          variant: "destructive",
+        });
+      }
+    };
+
+    fetchCpfUsage();
+  }, [accounts, programRules, toast]);
+
+  // ------------------------
+  // Programas / Fornecedores únicos
+  // ------------------------
   const programs = useMemo(() => {
     const uniquePrograms = new Set<string>();
-    accounts.forEach(acc => {
+    accounts.forEach((acc) => {
       const code = acc.airline_companies?.code;
       if (code) uniquePrograms.add(code);
     });
@@ -95,21 +305,25 @@ export default function Accounts() {
 
   const suppliers = useMemo(() => {
     const uniqueSuppliers = new Set<string>();
-    accounts.forEach(acc => {
+    accounts.forEach((acc) => {
       const name = acc.supplier?.name;
       if (name) uniqueSuppliers.add(name);
     });
     return Array.from(uniqueSuppliers).sort();
   }, [accounts]);
 
-  // Aplicar filtros
+  // ------------------------
+  // Filtro principal
+  // ------------------------
   const filteredAccounts = useMemo(() => {
-    return accounts.filter(account => {
+    return accounts.filter((account) => {
       // Busca
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
-        const matchesAccount = account.account_number?.toLowerCase().includes(search);
-        const matchesHolder = account.account_holder_name?.toLowerCase().includes(search);
+        const matchesAccount =
+          account.account_number?.toLowerCase().includes(search);
+        const matchesHolder =
+          account.account_holder_name?.toLowerCase().includes(search);
         if (!matchesAccount && !matchesHolder) return false;
       }
 
@@ -131,10 +345,11 @@ export default function Accounts() {
       }
 
       // Filtros de saldo
-      const hasBalanceFilter = balanceZero || balanceUnder10k || balance10to50k || balanceOver50k;
+      const hasBalanceFilter =
+        balanceZero || balanceUnder10k || balance10to50k || balanceOver50k;
       if (hasBalanceFilter) {
         const balance = account.balance || 0;
-        const matchesBalance = 
+        const matchesBalance =
           (balanceZero && balance === 0) ||
           (balanceUnder10k && balance > 0 && balance < 10000) ||
           (balance10to50k && balance >= 10000 && balance <= 50000) ||
@@ -142,20 +357,38 @@ export default function Accounts() {
         if (!matchesBalance) return false;
       }
 
-      // Filtros de CPF
+      // Filtros de CPF (usando CPFs ÚNICOS conforme regra do programa)
       const hasCpfFilter = cpfCritical || cpfWarning || cpfNormal;
       if (hasCpfFilter) {
-        const percentage = ((account.cpf_count || 0) / (account.cpf_limit || 25)) * 100;
-        const matchesCpf = 
+        const used = cpfUsage[account.id] ?? 0;
+        const limit = getCpfLimitForAccount(account);
+        const percentage = limit > 0 ? (used / limit) * 100 : 0;
+
+        const matchesCpf =
           (cpfCritical && percentage >= 90) ||
           (cpfWarning && percentage >= 75 && percentage < 90) ||
           (cpfNormal && percentage < 75);
+
         if (!matchesCpf) return false;
       }
 
       return true;
     });
-  }, [accounts, searchTerm, selectedProgram, selectedSupplier, selectedStatus, balanceZero, balanceUnder10k, balance10to50k, balanceOver50k, cpfCritical, cpfWarning, cpfNormal]);
+  }, [
+    accounts,
+    searchTerm,
+    selectedProgram,
+    selectedSupplier,
+    selectedStatus,
+    balanceZero,
+    balanceUnder10k,
+    balance10to50k,
+    balanceOver50k,
+    cpfCritical,
+    cpfWarning,
+    cpfNormal,
+    cpfUsage,
+  ]);
 
   const clearFilters = () => {
     setSearchTerm("");
@@ -171,26 +404,35 @@ export default function Accounts() {
     setCpfNormal(false);
   };
 
-  const hasActiveFilters = searchTerm || selectedProgram !== "all" || selectedSupplier !== "all" || 
-    selectedStatus !== "all" || balanceZero || balanceUnder10k || balance10to50k || balanceOver50k || 
-    cpfCritical || cpfWarning || cpfNormal;
-  
-  const advancedFiltersCount = 
-    (balanceZero ? 1 : 0) + 
-    (balanceUnder10k ? 1 : 0) + 
-    (balance10to50k ? 1 : 0) + 
-    (balanceOver50k ? 1 : 0) + 
-    (cpfCritical ? 1 : 0) + 
-    (cpfWarning ? 1 : 0) + 
+  const hasActiveFilters =
+    searchTerm ||
+    selectedProgram !== "all" ||
+    selectedSupplier !== "all" ||
+    selectedStatus !== "all" ||
+    balanceZero ||
+    balanceUnder10k ||
+    balance10to50k ||
+    balanceOver50k ||
+    cpfCritical ||
+    cpfWarning ||
+    cpfNormal;
+
+  const advancedFiltersCount =
+    (balanceZero ? 1 : 0) +
+    (balanceUnder10k ? 1 : 0) +
+    (balance10to50k ? 1 : 0) +
+    (balanceOver50k ? 1 : 0) +
+    (cpfCritical ? 1 : 0) +
+    (cpfWarning ? 1 : 0) +
     (cpfNormal ? 1 : 0);
 
   const getCPFBadge = (used: number, limit: number) => {
-    const percentage = (used / limit) * 100;
+    const percentage = limit > 0 ? (used / limit) * 100 : 0;
     let variant: "default" | "secondary" | "destructive" = "default";
-    
+
     if (percentage >= 90) variant = "destructive";
     else if (percentage >= 75) variant = "secondary";
-    
+
     return (
       <Badge variant={variant}>
         {used}/{limit}
@@ -198,11 +440,14 @@ export default function Accounts() {
     );
   };
 
-  const toggleAccountStatus = async (accountId: string, currentStatus: string) => {
+  const toggleAccountStatus = async (
+    accountId: string,
+    currentStatus: string
+  ) => {
     const newStatus = currentStatus === "active" ? "inactive" : "active";
-    
-    setUpdatingStatus(prev => new Set(prev).add(accountId));
-    
+
+    setUpdatingStatus((prev) => new Set(prev).add(accountId));
+
     try {
       const { error } = await supabase
         .from("mileage_accounts")
@@ -212,10 +457,12 @@ export default function Accounts() {
       if (error) throw error;
 
       await fetchAccounts();
-      
+
       toast({
         title: "Status atualizado",
-        description: `Conta ${newStatus === "active" ? "ativada" : "desativada"} com sucesso.`,
+        description: `Conta ${
+          newStatus === "active" ? "ativada" : "desativada"
+        } com sucesso.`,
       });
     } catch (error: any) {
       toast({
@@ -224,7 +471,7 @@ export default function Accounts() {
         variant: "destructive",
       });
     } finally {
-      setUpdatingStatus(prev => {
+      setUpdatingStatus((prev) => {
         const newSet = new Set(prev);
         newSet.delete(accountId);
         return newSet;
@@ -232,6 +479,9 @@ export default function Accounts() {
     }
   };
 
+  // ------------------------
+  // Loading
+  // ------------------------
   if (loading) {
     return (
       <div className="p-6">
@@ -249,6 +499,9 @@ export default function Accounts() {
     );
   }
 
+  // ------------------------
+  // Render
+  // ------------------------
   return (
     <div className="p-6">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -268,13 +521,18 @@ export default function Accounts() {
             <Filter className="h-4 w-4" />
             <h3 className="font-semibold">Filtros</h3>
             {hasActiveFilters && (
-              <Button variant="ghost" size="sm" onClick={clearFilters} className="ml-auto">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+                className="ml-auto"
+              >
                 <X className="h-4 w-4 mr-2" />
                 Limpar Filtros
               </Button>
             )}
           </div>
-          
+
           <div className="space-y-4">
             {/* Filtros Básicos */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -289,35 +547,48 @@ export default function Accounts() {
               </div>
               <div>
                 <Label htmlFor="program">Programa</Label>
-                <Select value={selectedProgram} onValueChange={setSelectedProgram}>
+                <Select
+                  value={selectedProgram}
+                  onValueChange={setSelectedProgram}
+                >
                   <SelectTrigger id="program">
                     <SelectValue placeholder="Todos" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
-                    {programs.map(code => (
-                      <SelectItem key={code} value={code}>{code}</SelectItem>
+                    {programs.map((code) => (
+                      <SelectItem key={code} value={code}>
+                        {code}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
                 <Label htmlFor="supplier">Fornecedor</Label>
-                <Select value={selectedSupplier} onValueChange={setSelectedSupplier}>
+                <Select
+                  value={selectedSupplier}
+                  onValueChange={setSelectedSupplier}
+                >
                   <SelectTrigger id="supplier">
                     <SelectValue placeholder="Todos" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
-                    {suppliers.map(name => (
-                      <SelectItem key={name} value={name}>{name}</SelectItem>
+                    {suppliers.map((name) => (
+                      <SelectItem key={name} value={name}>
+                        {name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
                 <Label htmlFor="status">Status</Label>
-                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                <Select
+                  value={selectedStatus}
+                  onValueChange={setSelectedStatus}
+                >
                   <SelectTrigger id="status">
                     <SelectValue placeholder="Todos" />
                   </SelectTrigger>
@@ -329,11 +600,18 @@ export default function Accounts() {
                 </Select>
               </div>
             </div>
-            
-            {/* Filtros Avançados (Collapsible) */}
-            <Collapsible open={advancedFiltersOpen} onOpenChange={setAdvancedFiltersOpen}>
+
+            {/* Filtros Avançados */}
+            <Collapsible
+              open={advancedFiltersOpen}
+              onOpenChange={setAdvancedFiltersOpen}
+            >
               <CollapsibleTrigger asChild>
-                <Button variant="outline" size="sm" className="w-full flex items-center justify-between">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full flex items-center justify-between"
+                >
                   <span className="flex items-center gap-2">
                     <Filter className="h-4 w-4" />
                     Filtros Avançados
@@ -343,7 +621,11 @@ export default function Accounts() {
                       </span>
                     )}
                   </span>
-                  <ChevronDown className={`h-4 w-4 transition-transform ${advancedFiltersOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown
+                    className={`h-4 w-4 transition-transform ${
+                      advancedFiltersOpen ? "rotate-180" : ""
+                    }`}
+                  />
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="pt-4">
@@ -352,38 +634,117 @@ export default function Accounts() {
                     <Label className="mb-3 block font-semibold">Saldo</Label>
                     <div className="space-y-2">
                       <div className="flex items-center space-x-2">
-                        <Checkbox id="balance-zero" checked={balanceZero} onCheckedChange={(checked) => setBalanceZero(checked as boolean)} />
-                        <label htmlFor="balance-zero" className="text-sm cursor-pointer">Zeradas (0)</label>
+                        <Checkbox
+                          id="balance-zero"
+                          checked={balanceZero}
+                          onCheckedChange={(checked) =>
+                            setBalanceZero(checked as boolean)
+                          }
+                        />
+                        <label
+                          htmlFor="balance-zero"
+                          className="text-sm cursor-pointer"
+                        >
+                          Zeradas (0)
+                        </label>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Checkbox id="balance-under10k" checked={balanceUnder10k} onCheckedChange={(checked) => setBalanceUnder10k(checked as boolean)} />
-                        <label htmlFor="balance-under10k" className="text-sm cursor-pointer">Abaixo de 10k</label>
+                        <Checkbox
+                          id="balance-under10k"
+                          checked={balanceUnder10k}
+                          onCheckedChange={(checked) =>
+                            setBalanceUnder10k(checked as boolean)
+                          }
+                        />
+                        <label
+                          htmlFor="balance-under10k"
+                          className="text-sm cursor-pointer"
+                        >
+                          Abaixo de 10k
+                        </label>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Checkbox id="balance-10to50k" checked={balance10to50k} onCheckedChange={(checked) => setBalance10to50k(checked as boolean)} />
-                        <label htmlFor="balance-10to50k" className="text-sm cursor-pointer">Entre 10k-50k</label>
+                        <Checkbox
+                          id="balance-10to50k"
+                          checked={balance10to50k}
+                          onCheckedChange={(checked) =>
+                            setBalance10to50k(checked as boolean)
+                          }
+                        />
+                        <label
+                          htmlFor="balance-10to50k"
+                          className="text-sm cursor-pointer"
+                        >
+                          Entre 10k-50k
+                        </label>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Checkbox id="balance-over50k" checked={balanceOver50k} onCheckedChange={(checked) => setBalanceOver50k(checked as boolean)} />
-                        <label htmlFor="balance-over50k" className="text-sm cursor-pointer">Acima de 50k</label>
+                        <Checkbox
+                          id="balance-over50k"
+                          checked={balanceOver50k}
+                          onCheckedChange={(checked) =>
+                            setBalanceOver50k(checked as boolean)
+                          }
+                        />
+                        <label
+                          htmlFor="balance-over50k"
+                          className="text-sm cursor-pointer"
+                        >
+                          Acima de 50k
+                        </label>
                       </div>
                     </div>
                   </div>
-                  
+
                   <div>
-                    <Label className="mb-3 block font-semibold">Uso de CPF</Label>
+                    <Label className="mb-3 block font-semibold">
+                      Uso de CPF (CPFs únicos conforme regra do programa)
+                    </Label>
                     <div className="space-y-2">
                       <div className="flex items-center space-x-2">
-                        <Checkbox id="cpf-critical" checked={cpfCritical} onCheckedChange={(checked) => setCpfCritical(checked as boolean)} />
-                        <label htmlFor="cpf-critical" className="text-sm cursor-pointer">Crítico (≥90%)</label>
+                        <Checkbox
+                          id="cpf-critical"
+                          checked={cpfCritical}
+                          onCheckedChange={(checked) =>
+                            setCpfCritical(checked as boolean)
+                          }
+                        />
+                        <label
+                          htmlFor="cpf-critical"
+                          className="text-sm cursor-pointer"
+                        >
+                          Crítico (≥90%)
+                        </label>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Checkbox id="cpf-warning" checked={cpfWarning} onCheckedChange={(checked) => setCpfWarning(checked as boolean)} />
-                        <label htmlFor="cpf-warning" className="text-sm cursor-pointer">Alerta (≥75%)</label>
+                        <Checkbox
+                          id="cpf-warning"
+                          checked={cpfWarning}
+                          onCheckedChange={(checked) =>
+                            setCpfWarning(checked as boolean)
+                          }
+                        />
+                        <label
+                          htmlFor="cpf-warning"
+                          className="text-sm cursor-pointer"
+                        >
+                          Alerta (≥75%)
+                        </label>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Checkbox id="cpf-normal" checked={cpfNormal} onCheckedChange={(checked) => setCpfNormal(checked as boolean)} />
-                        <label htmlFor="cpf-normal" className="text-sm cursor-pointer">Normal (&lt;75%)</label>
+                        <Checkbox
+                          id="cpf-normal"
+                          checked={cpfNormal}
+                          onCheckedChange={(checked) =>
+                            setCpfNormal(checked as boolean)
+                          }
+                        />
+                        <label
+                          htmlFor="cpf-normal"
+                          className="text-sm cursor-pointer"
+                        >
+                          Normal (&lt;75%)
+                        </label>
                       </div>
                     </div>
                   </div>
@@ -398,8 +759,16 @@ export default function Accounts() {
             <>
               <EmptyState
                 icon={CreditCard}
-                title={accounts.length === 0 ? "Nenhuma conta cadastrada" : "Nenhuma conta encontrada"}
-                description={accounts.length === 0 ? "Cadastre a primeira conta de milhagem para começar." : "Ajuste os filtros para ver mais resultados."}
+                title={
+                  accounts.length === 0
+                    ? "Nenhuma conta cadastrada"
+                    : "Nenhuma conta encontrada"
+                }
+                description={
+                  accounts.length === 0
+                    ? "Cadastre a primeira conta de milhagem para começar."
+                    : "Ajuste os filtros para ver mais resultados."
+                }
               />
               {accounts.length === 0 && (
                 <div className="text-center pb-6">
@@ -422,72 +791,87 @@ export default function Accounts() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredAccounts.map((account) => (
-                  <TableRow key={account.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline">
-                          {account.airline_companies?.code || "-"}
-                        </Badge>
+                {filteredAccounts.map((account) => {
+                  const used = cpfUsage[account.id] ?? 0;
+                  const limit = getCpfLimitForAccount(account);
+                  const percentage =
+                    limit > 0 ? (used / limit) : 0;
+
+                  return (
+                    <TableRow key={account.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline">
+                            {account.airline_companies?.code || "-"}
+                          </Badge>
+                          <span className="font-medium">
+                            {account.airline_companies?.name || "-"}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
                         <span className="font-medium">
-                          {account.airline_companies?.name || "-"}
+                          {account.supplier?.name || "Não informado"}
                         </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="font-medium">
-                        {account.supplier?.name || "Não informado"}
-                      </span>
-                    </TableCell>
-                    <TableCell className="font-mono">
-                      {account.account_number?.slice(-4) 
-                        ? `****${account.account_number.slice(-4)}`
-                        : account.account_number}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <TrendingUp className="h-4 w-4 text-green-600" />
-                        <span className="font-semibold">
-                          {formatMiles(account.balance || 0)}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {getCPFBadge(account.cpf_count || 0, account.cpf_limit || 25)}
-                        {((account.cpf_count || 0) / (account.cpf_limit || 25)) >= 0.9 && (
-                          <AlertTriangle className="h-4 w-4 text-destructive" />
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      R$ {(account.cost_per_mile * 1000).toFixed(2)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          checked={account.status === "active"}
-                          onCheckedChange={() => toggleAccountStatus(account.id, account.status)}
-                          disabled={updatingStatus.has(account.id)}
-                        />
-                        <span className="text-sm">
-                          {account.status === "active" ? "Ativa" : "Inativa"}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <AddMovementDialog accountId={account.id} onMovementAdded={fetchAccounts} showLabel />
-                        <Button variant="ghost" size="sm" asChild>
-                          <Link to={`/accounts/${account.id}`}>
-                            <Eye className="h-4 w-4 mr-2" />
-                            Ver detalhes
-                          </Link>
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      <TableCell className="font-mono">
+                        {account.account_number?.slice(-4)
+                          ? `****${account.account_number.slice(-4)}`
+                          : account.account_number}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <TrendingUp className="h-4 w-4 text-green-600" />
+                          <span className="font-semibold">
+                            {formatMiles(account.balance || 0)}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {getCPFBadge(used, limit)}
+                          {percentage >= 0.9 && (
+                            <AlertTriangle className="h-4 w-4 text-destructive" />
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        R$ {(account.cost_per_mile * 1000).toFixed(2)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={account.status === "active"}
+                            onCheckedChange={() =>
+                              toggleAccountStatus(account.id, account.status)
+                            }
+                            disabled={updatingStatus.has(account.id)}
+                          />
+                          <span className="text-sm">
+                            {account.status === "active"
+                              ? "Ativa"
+                              : "Inativa"}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <AddMovementDialog
+                            accountId={account.id}
+                            onMovementAdded={fetchAccounts}
+                            showLabel
+                          />
+                          <Button variant="ghost" size="sm" asChild>
+                            <Link to={`/accounts/${account.id}`}>
+                              <Eye className="h-4 w-4 mr-2" />
+                              Ver detalhes
+                            </Link>
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}
