@@ -7,8 +7,7 @@ import {
   Plane,
   BarChart3,
   AlertTriangle,
-  Plus,
-  Settings
+  Plus
 } from "lucide-react";
 import { MetricsCard } from "@/components/dashboard/MetricsCard";
 import { useSalesKPIs } from "@/hooks/useSalesKPIs";
@@ -21,14 +20,14 @@ export default function DashboardKPIs() {
   const { kpis, loading } = useSalesKPIs(supplierId, 30);
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
     }).format(value);
   };
 
   const formatNumber = (value: number) => {
-    return new Intl.NumberFormat('pt-BR').format(value);
+    return new Intl.NumberFormat("pt-BR").format(value);
   };
 
   if (loading) {
@@ -83,10 +82,6 @@ export default function DashboardKPIs() {
             <p className="text-muted-foreground">Visão geral dos últimos 30 dias</p>
           </div>
           <div className="flex gap-3">
-            <Button variant="outline" onClick={() => navigate("/settings/programs")}>
-              <Settings className="h-4 w-4 mr-2" />
-              Configurar Programas
-            </Button>
             <Button onClick={() => navigate("/sales/new")}>
               <Plus className="h-4 w-4 mr-2" />
               Nova Venda
@@ -167,8 +162,8 @@ export default function DashboardKPIs() {
                   ))}
                 </div>
               )}
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="w-full mt-4"
                 onClick={() => navigate("/accounts")}
               >
@@ -202,7 +197,11 @@ export default function DashboardKPIs() {
                 <span className="text-sm">Vendas</span>
               </div>
             </Button>
-            <Button variant="outline" onClick={() => navigate("/reports/financial")} className="h-20">
+            <Button
+              variant="outline"
+              onClick={() => navigate("/reports/financial")}
+              className="h-20"
+            >
               <div className="flex flex-col items-center gap-2">
                 <TrendingUp className="h-5 w-5" />
                 <span className="text-sm">Relatórios</span>
