@@ -13,6 +13,16 @@ export interface AgencySettings {
   logo_url?: string;
   address?: string;
   website?: string;
+  cnpj_cpf?: string;
+  responsible_name?: string;
+  billing_email?: string;
+  street?: string;
+  number?: string;
+  complement?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  zip_code?: string;
 }
 
 export function useAgencySettings() {

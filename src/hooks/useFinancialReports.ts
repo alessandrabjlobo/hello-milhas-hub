@@ -73,6 +73,7 @@ export const useFinancialReports = (
   dateTo?: Date
 ) => {
   const [kpis, setKpis] = useState<FinancialKPIs | null>(null);
+  const [sales, setSales] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -133,6 +134,7 @@ export const useFinancialReports = (
 
   return {
     kpis,
+    sales,
     loading,
     refreshReports: fetchReports,
   };
