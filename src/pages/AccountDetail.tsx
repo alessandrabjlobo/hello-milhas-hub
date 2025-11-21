@@ -18,6 +18,10 @@ import { EditAccountDialog } from "@/components/accounts/EditAccountDialog";
 import { CPFsUsedTable } from "@/components/accounts/CPFsUsedTable";
 import { CPFRenewalCalendar } from "@/components/accounts/CPFRenewalCalendar";
 import { exportToCSV } from "@/lib/csv-export";
+import { getSupplierId } from "@/lib/getSupplierId";
+import { startOfYear, endOfYear, subYears } from "date-fns";
+
+type RenewalType = "annual" | "rolling";
 
 interface AccountDetails {
   id: string;
@@ -38,13 +42,29 @@ interface AccountDetails {
   } | null;
 }
 
+interface CpfUsageRow {
+  cpf_document: string;
+  first_used_at: string; // ISO
+}
+
+interface ProgramRule {
+  cpf_limit: number;
+  renewal_type: RenewalType;
+}
+
 export default function AccountDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+
   const [account, setAccount] = useState<AccountDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+
+  // novo estado para uso de CPF calculado pela regra
+  const [cpfStats, setCpfStats] = useState<{ used: number; limit: number } | null>(null);
+  const [cpfLoading, setCpfLoading] = useState(false);
+
   const { movements, loading: movementsLoading, fetchMovements } = useMovements(id);
   const { auditLogs, loading: auditLoading } = useAuditLogs(id, "mileage_accounts");
 
@@ -52,6 +72,7 @@ export default function AccountDetail() {
     if (id) {
       fetchAccountDetails();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const fetchAccountDetails = async () => {
@@ -69,7 +90,12 @@ export default function AccountDetail() {
         .single();
 
       if (error) throw error;
-      setAccount(data as AccountDetails);
+
+      const acc = data as AccountDetails;
+      setAccount(acc);
+
+      // depois de carregar a conta, calcula uso de CPF com base na regra
+      void fetchCpfStats(acc);
     } catch (error: any) {
       toast({
         title: "Erro ao carregar conta",
@@ -82,8 +108,85 @@ export default function AccountDetail() {
     }
   };
 
+  const fetchCpfStats = async (acc: AccountDetails) => {
+    try {
+      if (!acc?.id || !acc?.airline_company_id) {
+        setCpfStats(null);
+        return;
+      }
+
+      setCpfLoading(true);
+
+      // 1) pega a regra do programa para essa cia + fornecedor
+      const { supplierId } = await getSupplierId();
+
+      const { data: ruleData, error: ruleError } = await supabase
+        .from("program_rules")
+        .select("cpf_limit, renewal_type")
+        .eq("airline_id", acc.airline_company_id)
+        .eq("supplier_id", supplierId)
+        .maybeSingle();
+
+      if (ruleError) throw ruleError;
+
+      const rule: ProgramRule | null = ruleData
+        ? {
+            cpf_limit: Number(ruleData.cpf_limit) || acc.cpf_limit || 25,
+            renewal_type:
+              (ruleData.renewal_type as RenewalType) === "rolling" ? "rolling" : "annual",
+          }
+        : null;
+
+      const limit = rule?.cpf_limit ?? acc.cpf_limit ?? 25;
+      const renewalType: RenewalType = rule?.renewal_type ?? "annual";
+
+      // 2) busca os CPFs usados nessa conta
+      // OBS: ajuste o nome da tabela/colunas aqui se o seu schema for diferente
+      const { data: usageData, error: usageError } = await supabase
+        .from("account_cpfs")
+        .select("cpf_document, first_used_at")
+        .eq("mileage_account_id", acc.id);
+
+      if (usageError) throw usageError;
+
+      const rows = (usageData ?? []) as CpfUsageRow[];
+      const now = new Date();
+
+      let filtered: CpfUsageRow[];
+
+      if (renewalType === "rolling") {
+        // últimos 12 meses
+        const limitDate = subYears(now, 1);
+        filtered = rows.filter((row) => {
+          const firstUsed = new Date(row.first_used_at);
+          return firstUsed >= limitDate && firstUsed <= now;
+        });
+      } else {
+        // anual – ano corrente (1º jan até 31 dez)
+        const start = startOfYear(now);
+        const end = endOfYear(now);
+        filtered = rows.filter((row) => {
+          const firstUsed = new Date(row.first_used_at);
+          return firstUsed >= start && firstUsed <= end;
+        });
+      }
+
+      // 3) conta apenas CPFs ÚNICOS
+      const uniqueCpfs = new Set(filtered.map((r) => r.cpf_document));
+      const used = uniqueCpfs.size;
+
+      setCpfStats({ used, limit });
+    } catch (error: any) {
+      console.error("Erro ao calcular uso de CPF:", error);
+      // fallback: usa os campos da própria conta se der erro
+      setCpfStats(null);
+    } finally {
+      setCpfLoading(false);
+    }
+  };
+
   const handleExportMovements = () => {
-    const data = movements.map(m => ({
+    const data = movements.map((m) => ({
       Data: new Date(m.created_at).toLocaleString("pt-BR"),
       Tipo: m.type === "credit" ? "Crédito" : "Débito",
       Quantidade: m.amount,
@@ -104,17 +207,23 @@ export default function AccountDetail() {
   if (!account) return null;
 
   const totalCredits = movements
-    .filter(m => m.type === "credit")
+    .filter((m) => m.type === "credit")
     .reduce((sum, m) => sum + Number(m.amount), 0);
-  
+
   const totalDebits = movements
-    .filter(m => m.type === "debit")
+    .filter((m) => m.type === "debit")
     .reduce((sum, m) => sum + Number(m.amount), 0);
+
+  // valor que vamos exibir no resumo
+  const usedCpfsToShow =
+    cpfStats?.used ?? (typeof account.cpf_count === "number" ? account.cpf_count : 0);
+  const limitCpfsToShow =
+    cpfStats?.limit ?? (typeof account.cpf_limit === "number" ? account.cpf_limit : 25);
 
   return (
     <div className="container max-w-6xl mx-auto p-6 space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
+        <Button variant="ghost" size="icon" onClick={() => navigate("/accounts")}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div className="flex-1">
@@ -138,7 +247,9 @@ export default function AccountDetail() {
             <CardTitle className="text-sm font-medium">Saldo Atual</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{account.balance.toLocaleString("pt-BR")} milhas</div>
+            <div className="text-2xl font-bold">
+              {account.balance.toLocaleString("pt-BR")} milhas
+            </div>
             <p className="text-xs text-muted-foreground mt-1">
               Custo Milheiro: R$ {(account.cost_per_mile * 1000).toFixed(2)}/mil
             </p>
@@ -157,7 +268,7 @@ export default function AccountDetail() {
               +{totalCredits.toLocaleString("pt-BR")} milhas
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {movements.filter(m => m.type === "credit").length} movimentações
+              {movements.filter((m) => m.type === "credit").length} movimentações
             </p>
           </CardContent>
         </Card>
@@ -174,7 +285,7 @@ export default function AccountDetail() {
               -{totalDebits.toLocaleString("pt-BR")} milhas
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {movements.filter(m => m.type === "debit").length} movimentações
+              {movements.filter((m) => m.type === "debit").length} movimentações
             </p>
           </CardContent>
         </Card>
@@ -205,8 +316,15 @@ export default function AccountDetail() {
                   <p className="font-medium">{account.account_holder_name || "N/A"}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">CPFs Utilizados</p>
-                  <p className="font-medium">{account.cpf_count} / {account.cpf_limit}</p>
+                  <p className="text-sm text-muted-foreground">
+                    CPFs Utilizados{" "}
+                    {cpfLoading && (
+                      <span className="text-xs text-muted-foreground">(atualizando...)</span>
+                    )}
+                  </p>
+                  <p className="font-medium">
+                    {usedCpfsToShow} / {limitCpfsToShow}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Código Companhia</p>
@@ -236,20 +354,20 @@ export default function AccountDetail() {
           <AccountSalesTable accountId={id!} />
         </TabsContent>
 
-        <TabsContent value="history" className="space-y-4">
-          <h3 className="text-lg font-semibold">Histórico de Alterações</h3>
-          <AuditLogsTable logs={auditLogs} loading={auditLoading} />
-        </TabsContent>
-
-        {/* FASE 2: Aba de CPFs Utilizados */}
+        {/* Aba CPFs */}
         <TabsContent value="cpfs" className="space-y-4">
           <h3 className="text-lg font-semibold">CPFs Cadastrados Nesta Conta</h3>
-          <CPFsUsedTable accountId={id!} cpfLimit={account.cpf_limit} />
-          
+          <CPFsUsedTable accountId={id!} cpfLimit={limitCpfsToShow} />
+
           <div className="mt-6">
             <h3 className="text-lg font-semibold mb-4">Calendário de Renovações</h3>
             <CPFRenewalCalendar airlineCompanyId={account.airline_company_id} />
           </div>
+        </TabsContent>
+
+        <TabsContent value="history" className="space-y-4">
+          <h3 className="text-lg font-semibold">Histórico de Alterações</h3>
+          <AuditLogsTable logs={auditLogs} loading={auditLoading} />
         </TabsContent>
       </Tabs>
 
@@ -265,10 +383,10 @@ export default function AccountDetail() {
             status: account.status as "active" | "inactive",
             cpf_limit: account.cpf_limit,
             account_holder_name: account.account_holder_name,
-            user_id: '',
-            airline_company_id: '',
-            created_at: '',
-            updated_at: '',
+            user_id: "",
+            airline_company_id: "",
+            created_at: "",
+            updated_at: "",
           }}
           onUpdate={async () => {
             await fetchAccountDetails();
