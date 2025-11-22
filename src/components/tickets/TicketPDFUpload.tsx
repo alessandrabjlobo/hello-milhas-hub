@@ -6,7 +6,8 @@ import { supabase } from "@/integrations/supabase/client";
 
 const TICKETS_BUCKET = "ticket-pdfs";
 
-interface Attachment {
+// ⬇️ exportado para você poder usar esse tipo em outros componentes
+export interface Attachment {
   fileName: string;
   filePath: string;
   fileSize: number;
@@ -19,6 +20,12 @@ interface TicketPDFUploadProps {
   onAttachmentsChange: (attachments: Attachment[]) => void;
   attachments: Attachment[];
   disabled?: boolean;
+  /**
+   * Opcional: id do input. Serve para você poder
+   * usar esse componente em mais de um lugar sem
+   * conflito de "pdf-upload".
+   */
+  inputId?: string;
 }
 
 export function TicketPDFUpload({
@@ -26,11 +33,18 @@ export function TicketPDFUpload({
   onAttachmentsChange,
   attachments,
   disabled = false,
+  inputId,
 }: TicketPDFUploadProps) {
   const [uploading, setUploading] = useState(false);
   const { toast } = useToast();
 
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  // se não vier inputId, gera um padrão
+  const resolvedInputId =
+    inputId || (ticketId ? `pdf-upload-${ticketId}` : "pdf-upload-ticket");
+
+  const handleFileSelect = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
@@ -42,7 +56,7 @@ export function TicketPDFUpload({
       const newAttachments: Attachment[] = [];
 
       for (const file of Array.from(files)) {
-        // Validate file type
+        // Tipo permitido
         if (!["application/pdf", "image/jpeg", "image/jpg"].includes(file.type)) {
           toast({
             title: "Tipo de arquivo inválido",
@@ -52,7 +66,7 @@ export function TicketPDFUpload({
           continue;
         }
 
-        // Validate file size (max 10MB)
+        // Tamanho máximo 10MB
         if (file.size > 10 * 1024 * 1024) {
           toast({
             title: "Arquivo muito grande",
@@ -62,7 +76,6 @@ export function TicketPDFUpload({
           continue;
         }
 
-        const fileExt = file.type === "application/pdf" ? "pdf" : "jpg";
         const fileName = `${Date.now()}-${file.name}`;
         const filePath = `${userData.user.id}/${ticketId || "temp"}/${fileName}`;
 
@@ -72,7 +85,9 @@ export function TicketPDFUpload({
 
         if (uploadError) {
           if (uploadError.message.includes("Bucket not found")) {
-            throw new Error("Bucket de anexos não configurado. Contate o suporte.");
+            throw new Error(
+              "Bucket de anexos não configurado. Contate o suporte."
+            );
           }
           throw uploadError;
         }
@@ -90,17 +105,19 @@ export function TicketPDFUpload({
         });
       }
 
-      onAttachmentsChange([...attachments, ...newAttachments]);
+      if (newAttachments.length > 0) {
+        onAttachmentsChange([...attachments, ...newAttachments]);
 
-      toast({
-        title: "Upload concluído!",
-        description: `${newAttachments.length} arquivo(s) enviado(s).`,
-      });
+        toast({
+          title: "Upload concluído!",
+          description: `${newAttachments.length} arquivo(s) enviado(s).`,
+        });
+      }
     } catch (error: any) {
-      const errorMessage = error.message.includes("Bucket")
+      const errorMessage = error.message?.includes("Bucket")
         ? error.message
         : "Falha ao enviar arquivo. Tente novamente.";
-      
+
       toast({
         title: "Erro no upload",
         description: errorMessage,
@@ -149,7 +166,7 @@ export function TicketPDFUpload({
           variant="outline"
           size="sm"
           disabled={disabled || uploading}
-          onClick={() => document.getElementById("pdf-upload")?.click()}
+          onClick={() => document.getElementById(resolvedInputId)?.click()}
         >
           {uploading ? (
             <>
@@ -169,7 +186,7 @@ export function TicketPDFUpload({
       </div>
 
       <input
-        id="pdf-upload"
+        id={resolvedInputId}
         type="file"
         accept="application/pdf,image/jpeg,image/jpg"
         multiple
