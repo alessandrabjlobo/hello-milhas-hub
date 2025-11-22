@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { FileUp, FileSpreadsheet, AlertCircle } from 'lucide-react';
 import { useBulkImport } from '@/hooks/useBulkImport';
-import { generateSalesImportTemplate } from '@/lib/bulk-import-generator';
+import { generateSimpleTemplate, generateCompleteTemplate } from '@/lib/bulk-import-generator';
 import { BulkImportUpload } from './BulkImportUpload';
 import { BulkImportReview } from './BulkImportReview';
 import { BulkImportInstructions } from './BulkImportInstructions';
@@ -40,7 +40,11 @@ export function BulkImportDialog({
   }, [localMode, bulkImport.setMode]);
 
   const handleDownloadTemplate = () => {
-    generateSalesImportTemplate('xlsx');
+    if (localMode === "simple") {
+      generateSimpleTemplate('xlsx');
+    } else {
+      generateCompleteTemplate('xlsx');
+    }
     setStep('upload');
   };
 

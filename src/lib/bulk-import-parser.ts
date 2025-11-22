@@ -121,6 +121,56 @@ async function parseXLSX(file: File): Promise<ParseResult> {
 }
 
 function normalizeRowData(row: any): SalesImportTemplate {
+  // ✨ Detectar se é planilha SIMPLES (tem quantidade_milhas + custo_milheiro)
+  const isSimpleTemplate = 'quantidade_milhas' in row && 'custo_milheiro' in row;
+  
+  if (isSimpleTemplate) {
+    // PLANILHA SIMPLES (Faturamento)
+    return {
+      data_venda: String(row.data_venda || '').trim(),
+      nome_cliente: String(row.nome_cliente || '').trim(),
+      quantidade_milhas: String(row.quantidade_milhas || '').trim(),
+      custo_milheiro: String(row.custo_milheiro || '').trim(),
+      taxa_embarque_total: String(row.taxa_embarque_total || '').trim(),
+      valor_total: String(row.valor_total || '').trim(),
+      forma_pagamento: String(row.forma_pagamento || '').trim().toLowerCase(),
+      status_pagamento: String(row.status_pagamento || '').trim().toLowerCase(),
+      programa_milhas: String(row.programa_milhas || '').trim().toUpperCase(),
+      localizador: String(row.localizador || '').trim().toUpperCase(),
+      observacoes: String(row.observacoes || '').trim(),
+      
+      // Campos não presentes na planilha simples
+      cpf_cliente: '',
+      telefone_cliente: '',
+      numero_conta: '',
+      tipo_viagem: 'one_way',
+      origem: '',
+      destino: '',
+      data_ida: '',
+      data_volta: '',
+      milhas_ida: '',
+      milhas_volta: '',
+      numero_passageiros: '1',
+      custo_mil_milhas_balcao: '',
+      vendedor_balcao: '',
+      contato_vendedor_balcao: '',
+    };
+  }
+  
+  // PLANILHA COMPLETA (estrutura original)
+  // Compatibilidade: se não tiver quantidade_milhas mas tiver milhas_ida/volta
+  let quantidadeMilhas = String(row.quantidade_milhas || '').trim();
+  if (!quantidadeMilhas && (row.milhas_ida || row.milhas_volta)) {
+    const ida = parseFloat(String(row.milhas_ida || '0').replace(/\./g, '').replace(',', '.')) || 0;
+    const volta = parseFloat(String(row.milhas_volta || '0').replace(/\./g, '').replace(',', '.')) || 0;
+    quantidadeMilhas = String(ida + volta);
+  }
+  
+  let custoMilheiro = String(row.custo_milheiro || '').trim();
+  if (!custoMilheiro && row.custo_mil_milhas_balcao) {
+    custoMilheiro = String(row.custo_mil_milhas_balcao).trim();
+  }
+  
   return {
     data_venda: String(row.data_venda || '').trim(),
     nome_cliente: String(row.nome_cliente || '').trim(),
@@ -145,5 +195,9 @@ function normalizeRowData(row: any): SalesImportTemplate {
     custo_mil_milhas_balcao: String(row.custo_mil_milhas_balcao || '').trim(),
     vendedor_balcao: String(row.vendedor_balcao || '').trim(),
     contato_vendedor_balcao: String(row.contato_vendedor_balcao || '').trim(),
+    
+    // Campos calculados/mapeados
+    quantidade_milhas: quantidadeMilhas,
+    custo_milheiro: custoMilheiro,
   };
 }

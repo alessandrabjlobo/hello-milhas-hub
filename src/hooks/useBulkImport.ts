@@ -194,14 +194,72 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
   const data = row.data;
   const resolved = row.validation.resolvedData;
   
-  // Determinar canal (interno, balcão ou legado)
-  const channel = resolved.isLegacyImport 
-    ? 'legacy' 
-    : resolved.isCounter 
-    ? 'counter' 
-    : 'internal';
+  // ✨ Detectar se é importação SIMPLES (tem quantidade_milhas e custo_milheiro)
+  const isSimpleImport = data.quantidade_milhas && data.custo_milheiro;
   
-  // Montar segmentos de voo (pode ser vazio no modo legacy)
+  if (isSimpleImport) {
+    // ============================================
+    // IMPORTAÇÃO SIMPLIFICADA (FATURAMENTO)
+    // ============================================
+    const qtdMilhas = parseBRNumber(data.quantidade_milhas || '0');
+    const custoMilheiro = parseBRNumber(data.custo_milheiro || '0');
+    const taxa = data.taxa_embarque_total ? parseBRNumber(data.taxa_embarque_total) : 0;
+    const valorTotal = parseBRNumber(data.valor_total || '0');
+    
+    // Fórmulas da calculadora
+    const custoMilhas = (qtdMilhas / 1000) * custoMilheiro;
+    const custoTotal = custoMilhas + taxa;
+    const lucro = valorTotal - custoTotal;
+    const margem = valorTotal > 0 ? (lucro / valorTotal) * 100 : 0;
+    
+    console.log('[Importação Simples] Cálculo financeiro:', {
+      quantidade_milhas: qtdMilhas,
+      custo_milheiro: custoMilheiro,
+      custo_milhas: custoMilhas.toFixed(2),
+      taxa_embarque: taxa.toFixed(2),
+      custo_total: custoTotal.toFixed(2),
+      valor_total: valorTotal.toFixed(2),
+      lucro: lucro.toFixed(2),
+      margem: margem.toFixed(2) + '%'
+    });
+    
+    return {
+      channel: 'legacy',
+      customerName: data.nome_cliente,
+      customerCpf: '',
+      customerPhone: '',
+      passengers: 1,
+      tripType: 'one_way' as const,
+      flightSegments: [],
+      
+      // Valores financeiros calculados
+      priceTotal: valorTotal,
+      boardingFee: taxa,
+      totalMilesUsed: qtdMilhas,
+      costPerThousand: custoMilheiro,
+      totalCost: custoTotal,
+      profitValue: lucro,
+      profitMargin: margem,
+      
+      paymentMethod: data.forma_pagamento,
+      paymentStatus: data.status_pagamento,
+      notes: data.observacoes || '',
+      airlineProgram: data.programa_milhas || '',
+      localizador: data.localizador || '',
+    };
+  }
+  
+  // ============================================
+  // IMPORTAÇÃO COMPLETA (DETALHADA)
+  // ============================================
+  const isCounter = resolved.isCounter;
+  const isLegacy = resolved.isLegacyImport;
+  
+  const channel: 'internal' | 'counter' | 'legacy' = 
+    isCounter ? 'counter' : 
+    isLegacy ? 'legacy' : 
+    'internal';
+
   const flightSegments: any[] = [];
   
   // Ida (apenas se tiver dados completos)
@@ -234,7 +292,7 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
     tripType: (data.tipo_viagem || 'one_way') as 'one_way' | 'round_trip',
     flightSegments,
     boardingFee: data.taxa_embarque_total ? parseBRNumber(data.taxa_embarque_total) : 0,
-    priceTotal: parseBRNumber(data.valor_total),
+    priceTotal: parseBRNumber(data.valor_total || '0'),
     paymentMethod: data.forma_pagamento,
     paymentStatus: data.status_pagamento,
     notes: data.observacoes || '',
@@ -264,7 +322,7 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
     channel: 'counter',
     sellerName: data.vendedor_balcao,
     sellerContact: data.contato_vendedor_balcao,
-    counterCostPerThousand: parseBRNumber(data.custo_mil_milhas_balcao),
+    counterCostPerThousand: parseBRNumber(data.custo_mil_milhas_balcao || '0'),
     counterAirlineProgram: data.programa_milhas,
   };
 }
