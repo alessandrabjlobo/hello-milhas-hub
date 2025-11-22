@@ -8,7 +8,6 @@ import { useUserRole } from './useUserRole';
 import { useToast } from './use-toast';
 import { parseBRNumber, parseBRDate, formatDateToISO } from '@/lib/bulk-import-helpers';
 import { supabase } from '@/integrations/supabase/client';
-import type { SaleFormData } from '@/schemas/saleSchema';
 
 export interface ProcessedSaleRow extends ParsedSaleRow {
   validation: ValidationResult;
@@ -21,8 +20,8 @@ export function useBulkImport() {
   const [rows, setRows] = useState<ProcessedSaleRow[]>([]);
   const [parsing, setParsing] = useState(false);
   const [importing, setImporting] = useState(false);
-  const [mode, setMode] = useState<"simple" | "full">("simple");
-  
+  const [mode, setMode] = useState<'simple' | 'full'>('simple');
+
   const { accounts } = useMileageAccounts();
   const { supplierId } = useUserRole();
   const { linkedAirlines } = useSupplierAirlines(supplierId);
@@ -32,10 +31,9 @@ export function useBulkImport() {
     try {
       setParsing(true);
       setFile(uploadedFile);
-      
-      // Parse file
+
       const parseResult = await parseSalesFile(uploadedFile);
-      
+
       if (!parseResult.success) {
         toast({
           title: 'Erro ao processar arquivo',
@@ -63,7 +61,6 @@ export function useBulkImport() {
         return;
       }
 
-      // Validate each row
       const processedRows: ProcessedSaleRow[] = await Promise.all(
         parseResult.rows.map(async (row) => {
           const validation = await validateSaleRow(
@@ -83,10 +80,10 @@ export function useBulkImport() {
       );
 
       setRows(processedRows);
-      
+
       const validCount = processedRows.filter((r) => r.status === 'valid').length;
       const invalidCount = processedRows.filter((r) => r.status === 'invalid').length;
-      
+
       toast({
         title: 'Arquivo processado',
         description: `${validCount} vendas válidas, ${invalidCount} com erros`,
@@ -104,19 +101,19 @@ export function useBulkImport() {
 
   const updateRow = (rowNumber: number, updates: Partial<ProcessedSaleRow>) => {
     setRows((prev) =>
-      prev.map((row) =>
-        row.rowNumber === rowNumber ? { ...row, ...updates } : row
-      )
+      prev.map((row) => (row.rowNumber === rowNumber ? { ...row, ...updates } : row))
     );
   };
 
-  // Função auxiliar para garantir que companhia aérea existe
-  const ensureAirlineExists = async (airlineCode: string, supplierId: string): Promise<string | null> => {
+  // Garante que a cia exista (para as duas importações)
+  const ensureAirlineExists = async (
+    airlineCode: string,
+    supplierId: string
+  ): Promise<string | null> => {
     if (!airlineCode) return null;
 
     const code = airlineCode.trim().toUpperCase();
-    
-    // Tentar buscar existente
+
     const { data: existing } = await supabase
       .from('airline_companies')
       .select('id')
@@ -126,17 +123,16 @@ export function useBulkImport() {
 
     if (existing) return existing.id;
 
-    // Criar nova companhia
     const { data: newAirline, error } = await supabase
       .from('airline_companies')
       .insert({
         supplier_id: supplierId,
         user_id: (await supabase.auth.getUser()).data.user?.id,
-        code: code,
-        name: code, // usar código como nome temporário
-        cpf_limit: 25, // padrão
-        renewal_type: 'annual', // padrão
-        cost_per_mile: 0.029, // padrão
+        code,
+        name: code,
+        cpf_limit: 25,
+        renewal_type: 'annual',
+        cost_per_mile: 0.029,
       })
       .select('id')
       .single();
@@ -146,13 +142,10 @@ export function useBulkImport() {
       return null;
     }
 
-    // Vincular ao supplier na tabela suppliers_airlines
-    await supabase
-      .from('suppliers_airlines')
-      .insert({
-        supplier_id: supplierId,
-        airline_company_id: newAirline.id,
-      });
+    await supabase.from('suppliers_airlines').insert({
+      supplier_id: supplierId,
+      airline_company_id: newAirline.id,
+    });
 
     console.log(`✅ Companhia ${code} cadastrada automaticamente`);
     return newAirline.id;
@@ -160,7 +153,7 @@ export function useBulkImport() {
 
   const importValidRows = async () => {
     const validRows = rows.filter((r) => r.status === 'valid');
-    
+
     if (validRows.length === 0) {
       toast({
         title: 'Nenhuma venda para importar',
@@ -183,27 +176,29 @@ export function useBulkImport() {
     let successCount = 0;
     let errorCount = 0;
     const newAirlines = new Set<string>();
-    const salesWithLocalizador: Array<{ saleId: string; customerName: string; localizador: string }> = [];
+    const salesWithLocalizador: Array<{
+      saleId: string;
+      customerName: string;
+      localizador: string;
+    }> = [];
 
     for (const row of validRows) {
       try {
-        // Garantir que companhia aérea existe
+        // Garante cia em qualquer modo
         if (row.data.programa_milhas) {
           const airlineId = await ensureAirlineExists(row.data.programa_milhas, supplierId);
-          
+
           if (airlineId && !row.validation.resolvedData.airlineCompanyId) {
             row.validation.resolvedData.airlineCompanyId = airlineId;
             row.validation.resolvedData.airlineName = row.data.programa_milhas;
             newAirlines.add(row.data.programa_milhas);
           }
         }
-        
-        // Converter dados da planilha para formato do saleService
+
         const saleData = convertRowToSaleData(row);
-        
-        // Criar venda usando serviço existente (REUTILIZA 100% DA LÓGICA)
-        const result = await createSaleWithSegments(saleData, supplierId);
-        
+
+        const result = await createSaleWithSegments(saleData as any, supplierId);
+
         if (result.error) {
           updateRow(row.rowNumber, {
             status: 'error',
@@ -213,8 +208,7 @@ export function useBulkImport() {
         } else {
           updateRow(row.rowNumber, { status: 'imported' });
           successCount++;
-          
-          // Coletar vendas com localizador para perguntar se quer criar tickets
+
           if (row.data.localizador && result.saleId) {
             salesWithLocalizador.push({
               saleId: result.saleId,
@@ -233,23 +227,23 @@ export function useBulkImport() {
     }
 
     setImporting(false);
-    
-    // Avisar sobre novas companhias cadastradas
+
     if (newAirlines.size > 0) {
       toast({
-        title: "Companhias cadastradas automaticamente",
-        description: `${Array.from(newAirlines).join(', ')}. Configure limites e regras em "Minhas Companhias".`,
+        title: 'Companhias cadastradas automaticamente',
+        description: `${Array.from(newAirlines).join(
+          ', '
+        )}. Configure limites e regras em "Minhas Companhias".`,
       });
     }
-    
-    // Avisar sobre vendas com localizador
+
     if (salesWithLocalizador.length > 0) {
       toast({
         title: `${salesWithLocalizador.length} venda(s) com localizador`,
-        description: "Você pode criar as passagens automaticamente. Confira na tela de revisão.",
+        description: 'Você pode criar as passagens automaticamente. Confira na tela de revisão.',
       });
     }
-    
+
     toast({
       title: 'Importação concluída',
       description: `${successCount} vendas importadas, ${errorCount} erros`,
@@ -277,39 +271,49 @@ export function useBulkImport() {
   };
 }
 
+// ===================================================
+// Conversão da linha para o formato do saleService
+// ===================================================
 function convertRowToSaleData(row: ProcessedSaleRow): any {
   const data = row.data;
   const resolved = row.validation.resolvedData;
-  
-  // ✨ Detectar se é importação SIMPLES (tem quantidade_milhas e custo_milheiro)
-  const isSimpleImport = data.quantidade_milhas && data.custo_milheiro;
-  
+
+  // Detecta se é planilha SIMPLES
+  const isSimpleImport = !!(data.quantidade_milhas && data.custo_milheiro);
+
   if (isSimpleImport) {
-    // ============================================
-    // IMPORTAÇÃO SIMPLIFICADA (FATURAMENTO)
-    // ============================================
+    // ---------------------------
+    // IMPORTAÇÃO SIMPLES
+    // ---------------------------
     const qtdMilhas = parseBRNumber(data.quantidade_milhas || '0');
     const custoMilheiro = parseBRNumber(data.custo_milheiro || '0');
-    const taxa = data.taxa_embarque_total ? parseBRNumber(data.taxa_embarque_total) : 0;
+    const taxa = data.taxa_embarque_total
+      ? parseBRNumber(data.taxa_embarque_total)
+      : 0;
     const valorTotal = parseBRNumber(data.valor_total || '0');
-    
-    // Fórmulas da calculadora (já usadas no sistema)
+
     const custoMilhas = (qtdMilhas / 1000) * custoMilheiro;
     const custoTotal = custoMilhas + taxa;
     const lucro = valorTotal - custoTotal;
-    
-    // Calcular margem apenas se valorTotal for válido (> 0)
+
     let margem: number | null = null;
-    if (valorTotal > 0 && !isNaN(valorTotal) && !isNaN(custoTotal)) {
+    if (
+      valorTotal > 0 &&
+      !isNaN(valorTotal) &&
+      !isNaN(custoTotal)
+    ) {
       margem = (lucro / valorTotal) * 100;
-      
-      // Se margem for absurda (fora do range -100% a +500%), marcar como null
+
       if (margem < -100 || margem > 500 || !isFinite(margem)) {
-        console.warn(`[Importação] Margem inválida: ${margem?.toFixed(2)}%. Definindo como null.`);
+        console.warn(
+          `[Importação] Margem fora do range esperado (${margem?.toFixed(
+            2
+          )}%). Definindo como null.`
+        );
         margem = null;
       }
     }
-    
+
     console.log('[Importação Simples] Cálculo financeiro:', {
       quantidade_milhas: qtdMilhas,
       custo_milheiro: custoMilheiro,
@@ -318,53 +322,56 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
       custo_total: custoTotal.toFixed(2),
       valor_total: valorTotal.toFixed(2),
       lucro: lucro.toFixed(2),
-      margem: margem !== null ? `${margem.toFixed(2)}%` : 'n/a',
+      margem: margem !== null ? `${margem.toFixed(2)}%` : 'null',
     });
-    
+
+    const saleDate =
+      data.data_venda && parseBRDate(data.data_venda)
+        ? formatDateToISO(parseBRDate(data.data_venda)!)
+        : undefined;
+
     return {
-      channel: 'legacy',
+      channel: 'legacy' as const,
       customerName: data.nome_cliente,
       customerCpf: '',
       customerPhone: '',
       passengers: 1,
       tripType: 'one_way' as const,
       flightSegments: [],
-      
-      // Valores financeiros calculados
+
+      // financeiro
       priceTotal: valorTotal,
       boardingFee: taxa,
       totalMilesUsed: qtdMilhas,
       costPerThousand: custoMilheiro,
       totalCost: custoTotal,
       profit: lucro,
-      profitMargin: margem, // pode ser null
-      saleDate: data.data_venda ? formatDateToISO(parseBRDate(data.data_venda)!) : undefined,
-      
+      profitMargin: margem,
+
+      saleDate,
+
       paymentMethod: data.forma_pagamento,
       paymentStatus: data.status_pagamento,
       notes: data.observacoes || '',
-      
-      // Programa de milhas
-      airlineProgram: data.programa_milhas || '',
-      programId: resolved.airlineCompanyId || '',
-      localizador: data.localizador || '',
+
+      // 🔹 Agora também linkamos a cia pelo ID para tabela "Companhia"
+      programId: resolved.airlineCompanyId || undefined,
+      airlineProgram: (data.programa_milhas || '').toUpperCase(),
+      localizador: (data.localizador || '').toUpperCase(),
     };
   }
-  
-  // ============================================
-  // IMPORTAÇÃO COMPLETA (DETALHADA)
-  // ============================================
+
+  // ---------------------------
+  // IMPORTAÇÃO COMPLETA
+  // ---------------------------
   const isCounter = resolved.isCounter;
   const isLegacy = resolved.isLegacyImport;
-  
-  const channel: 'internal' | 'counter' | 'legacy' = 
-    isCounter ? 'counter' : 
-    isLegacy ? 'legacy' : 
-    'internal';
+
+  const channel: 'internal' | 'counter' | 'legacy' =
+    isCounter ? 'counter' : isLegacy ? 'legacy' : 'internal';
 
   const flightSegments: any[] = [];
-  
-  // Ida (apenas se tiver dados completos)
+
   if (data.origem && data.destino && data.data_ida && data.milhas_ida) {
     const dataIdaDate = parseBRDate(data.data_ida);
     flightSegments.push({
@@ -374,9 +381,14 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
       miles: parseBRNumber(data.milhas_ida),
     });
   }
-  
-  // Volta (se round_trip e dados completos)
-  if (data.tipo_viagem === 'round_trip' && data.destino && data.origem && data.data_volta && data.milhas_volta) {
+
+  if (
+    data.tipo_viagem === 'round_trip' &&
+    data.destino &&
+    data.origem &&
+    data.data_volta &&
+    data.milhas_volta
+  ) {
     const dataVoltaDate = parseBRDate(data.data_volta);
     flightSegments.push({
       from: data.destino,
@@ -390,25 +402,28 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
     customerName: data.nome_cliente,
     customerCpf: data.cpf_cliente ? data.cpf_cliente.replace(/\D/g, '') : '',
     customerPhone: data.telefone_cliente || '',
-    passengers: data.numero_passageiros ? parseBRNumber(data.numero_passageiros) : 1,
+    passengers: data.numero_passageiros
+      ? parseBRNumber(data.numero_passageiros)
+      : 1,
     tripType: (data.tipo_viagem || 'one_way') as 'one_way' | 'round_trip',
     flightSegments,
-    boardingFee: data.taxa_embarque_total ? parseBRNumber(data.taxa_embarque_total) : 0,
+    boardingFee: data.taxa_embarque_total
+      ? parseBRNumber(data.taxa_embarque_total)
+      : 0,
     priceTotal: parseBRNumber(data.valor_total || '0'),
     paymentMethod: data.forma_pagamento,
     paymentStatus: data.status_pagamento,
     notes: data.observacoes || '',
+    localizador: (data.localizador || '').toUpperCase(),
   };
 
-  // Vendas legadas (modo simples)
   if (channel === 'legacy') {
     return {
       ...baseData,
       channel: 'legacy',
     };
   }
-  
-  // Vendas internas (modo completo)
+
   if (channel === 'internal') {
     return {
       ...baseData,
@@ -417,14 +432,15 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
       programId: resolved.airlineCompanyId || '',
     };
   }
-  
-  // Vendas de balcão
+
   return {
     ...baseData,
     channel: 'counter',
     sellerName: data.vendedor_balcao,
     sellerContact: data.contato_vendedor_balcao,
-    counterCostPerThousand: parseBRNumber(data.custo_mil_milhas_balcao || '0'),
+    counterCostPerThousand: parseBRNumber(
+      data.custo_mil_milhas_balcao || '0'
+    ),
     counterAirlineProgram: data.programa_milhas,
   };
 }
