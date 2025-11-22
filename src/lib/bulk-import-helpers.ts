@@ -15,95 +15,116 @@ export function parseBRNumber(value: string | number): number {
 }
 
 /**
- * Converte número de série do Excel em Date
- * Excel conta dias a partir de 1899-12-30
+ * Converte número serial do Excel em Date
+ * (excel conta dias a partir de 1899-12-30)
  */
-function parseExcelSerialDate(serial: number): Date | null {
+function excelSerialToDate(serial: number): Date | null {
   if (!isFinite(serial)) return null;
-  const excelEpoch = new Date(1899, 11, 30); // 1899-12-30
-  const msPerDay = 24 * 60 * 60 * 1000;
-  const date = new Date(excelEpoch.getTime() + serial * msPerDay);
-  if (isNaN(date.getTime())) return null;
-  return date;
+  const excelEpoch = new Date(Date.UTC(1899, 11, 30)); // 1899-12-30
+  const millis = excelEpoch.getTime() + serial * 24 * 60 * 60 * 1000;
+  const d = new Date(millis);
+  return isNaN(d.getTime()) ? null : d;
 }
 
 /**
- * Helper para parsing de datas em formato flexível:
- * - "DD/MM/YYYY" ou "D/M/YYYY"
- * - "YYYY-MM-DD"
- * - número de série do Excel (ex.: 45678)
- * - string numérica com 4–5 dígitos vinda do Excel
+ * Normaliza string de data:
+ * - remove horário (ex: "21/11/2025 00:00:00" -> "21/11/2025")
+ * - converte "YYYY-MM-DD" -> "DD/MM/YYYY"
  */
-export function parseBRDate(value: string | number): Date | null {
-  if (value === null || value === undefined) return null;
+function normalizeDateString(raw: string): string {
+  if (!raw) return '';
 
-  // Número direto (serial Excel)
-  if (typeof value === 'number') {
-    return parseExcelSerialDate(value);
+  let str = raw.trim();
+
+  // corta parte de horário se existir
+  if (str.includes('T')) {
+    str = str.split('T')[0];
+  }
+  if (str.includes(' ')) {
+    str = str.split(' ')[0];
   }
 
-  const dateStr = String(value).trim();
-
-  if (!dateStr) return null;
-
-  // String numérica que aparenta ser serial de Excel
-  if (/^\d{4,5}$/.test(dateStr)) {
-    const serial = parseInt(dateStr, 10);
-    const fromSerial = parseExcelSerialDate(serial);
-    if (fromSerial) return fromSerial;
+  // ISO -> BR
+  const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) {
+    const [, y, m, d] = isoMatch;
+    return `${d}/${m}/${y}`;
   }
 
-  // Formato DD/MM/YYYY ou D/M/YYYY
-  let m = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (m) {
-    const day = parseInt(m[1], 10);
-    const month = parseInt(m[2], 10);
-    const year = parseInt(m[3], 10);
+  return str;
+}
 
-    if (year < 2020 || year > 2100) return null;
-    const d = new Date(year, month - 1, day);
-    if (
-      d.getFullYear() === year &&
-      d.getMonth() === month - 1 &&
-      d.getDate() === day
-    ) {
-      return d;
-    }
+/**
+ * Helper para parsing de datas em formato brasileiro
+ * Aceita:
+ *  - "DD/MM/YYYY"
+ *  - "DD/MM/YY" (converte 25 -> 2025)
+ *  - "YYYY-MM-DD"
+ *  - "DD/MM/YYYY HH:MM[:SS]"
+ *  - número serial do Excel (ex: 45678)
+ */
+export function parseBRDate(dateInput: string | number): Date | null {
+  if (dateInput === null || dateInput === undefined || dateInput === '') {
     return null;
   }
 
-  // Formato ISO YYYY-MM-DD
-  m = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (m) {
-    const year = parseInt(m[1], 10);
-    const month = parseInt(m[2], 10);
-    const day = parseInt(m[3], 10);
-
-    if (year < 2020 || year > 2100) return null;
-    const d = new Date(year, month - 1, day);
-    if (
-      d.getFullYear() === year &&
-      d.getMonth() === month - 1 &&
-      d.getDate() === day
-    ) {
-      return d;
-    }
-    return null;
+  // Caso seja claramente número (serial Excel ou string numérica)
+  if (
+    typeof dateInput === 'number' ||
+    /^[0-9]+(\.[0-9]+)?$/.test(String(dateInput).trim())
+  ) {
+    const serial =
+      typeof dateInput === 'number'
+        ? dateInput
+        : parseFloat(String(dateInput).trim());
+    const excelDate = excelSerialToDate(serial);
+    if (excelDate) return excelDate;
   }
 
-  // Não reconheceu
-  return null;
+  let str = normalizeDateString(String(dateInput));
+
+  // Tenta DD/MM/YYYY
+  let match = str.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+
+  // Se não bater, tenta DD/MM/YY
+  if (!match) {
+    const short = str.match(/^(\d{2})\/(\d{2})\/(\d{2})$/);
+    if (!short) return null;
+
+    const day = short[1];
+    const month = short[2];
+    const yy = parseInt(short[3], 10);
+    const fullYear = yy >= 50 ? 1900 + yy : 2000 + yy; // 00–49 => 2000+, 50–99 => 1900+
+
+    match = [str, day, month, String(fullYear)] as any;
+  }
+
+  const day = parseInt(match[1], 10);
+  const month = parseInt(match[2], 10);
+  const year = parseInt(match[3], 10);
+
+  if (month < 1 || month > 12) return null;
+  if (day < 1 || day > 31) return null;
+  if (year < 2000 || year > 2100) return null;
+
+  const date = new Date(year, month - 1, day);
+
+  return date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day
+    ? date
+    : null;
 }
 
 /**
- * Valida se uma data é válida (aceita os formatos acima)
+ * Valida se uma data é aceitável (ver parseBRDate acima)
  */
-export function isValidBRDate(value: string | number): boolean {
-  return parseBRDate(value) !== null;
+export function isValidBRDate(dateInput: string | number): boolean {
+  return parseBRDate(dateInput) !== null;
 }
 
 /**
- * Formata data para ISO string (YYYY-MM-DD)
+ * Formata Date -> "YYYY-MM-DD" (para salvar no banco)
  */
 export function formatDateToISO(date: Date): string {
   const year = date.getFullYear();
