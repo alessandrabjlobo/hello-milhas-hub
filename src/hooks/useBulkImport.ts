@@ -20,6 +20,7 @@ export function useBulkImport() {
   const [rows, setRows] = useState<ProcessedSaleRow[]>([]);
   const [parsing, setParsing] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [mode, setMode] = useState<"simple" | "full">("simple");
   
   const { accounts } = useMileageAccounts();
   const { supplierId } = useUserRole();
@@ -68,7 +69,8 @@ export function useBulkImport() {
             row.data,
             linkedAirlines,
             accounts,
-            supplierId || ''
+            supplierId || '',
+            mode
           );
 
           return {
@@ -173,6 +175,8 @@ export function useBulkImport() {
     rows,
     parsing,
     importing,
+    mode,
+    setMode,
     handleFileUpload,
     updateRow,
     importValidRows,
@@ -186,27 +190,33 @@ export function useBulkImport() {
   };
 }
 
-function convertRowToSaleData(row: ProcessedSaleRow): SaleFormData {
+function convertRowToSaleData(row: ProcessedSaleRow): any {
   const data = row.data;
   const resolved = row.validation.resolvedData;
   
-  // Determinar canal (interno ou balcão)
-  const channel = resolved.isCounter ? 'balcao' : 'internal';
+  // Determinar canal (interno, balcão ou legado)
+  const channel = resolved.isLegacyImport 
+    ? 'legacy' 
+    : resolved.isCounter 
+    ? 'counter' 
+    : 'internal';
   
-  // Montar segmentos de voo
+  // Montar segmentos de voo (pode ser vazio no modo legacy)
   const flightSegments: any[] = [];
   
-  // Ida
-  const dataIdaDate = parseBRDate(data.data_ida);
-  flightSegments.push({
-    from: data.origem,
-    to: data.destino,
-    date: dataIdaDate ? formatDateToISO(dataIdaDate) : data.data_ida,
-    miles: parseBRNumber(data.milhas_ida),
-  });
+  // Ida (apenas se tiver dados completos)
+  if (data.origem && data.destino && data.data_ida && data.milhas_ida) {
+    const dataIdaDate = parseBRDate(data.data_ida);
+    flightSegments.push({
+      from: data.origem,
+      to: data.destino,
+      date: dataIdaDate ? formatDateToISO(dataIdaDate) : data.data_ida,
+      miles: parseBRNumber(data.milhas_ida),
+    });
+  }
   
-  // Volta (se round_trip)
-  if (data.tipo_viagem === 'round_trip' && data.data_volta && data.milhas_volta) {
+  // Volta (se round_trip e dados completos)
+  if (data.tipo_viagem === 'round_trip' && data.destino && data.origem && data.data_volta && data.milhas_volta) {
     const dataVoltaDate = parseBRDate(data.data_volta);
     flightSegments.push({
       from: data.destino,
@@ -218,15 +228,27 @@ function convertRowToSaleData(row: ProcessedSaleRow): SaleFormData {
 
   const baseData = {
     customerName: data.nome_cliente,
-    customerCpf: data.cpf_cliente.replace(/\D/g, ''),
-    customerPhone: data.telefone_cliente,
-    passengers: parseBRNumber(data.numero_passageiros),
-    tripType: data.tipo_viagem as 'one_way' | 'round_trip',
+    customerCpf: data.cpf_cliente ? data.cpf_cliente.replace(/\D/g, '') : '',
+    customerPhone: data.telefone_cliente || '',
+    passengers: data.numero_passageiros ? parseBRNumber(data.numero_passageiros) : 1,
+    tripType: (data.tipo_viagem || 'one_way') as 'one_way' | 'round_trip',
     flightSegments,
+    boardingFee: data.taxa_embarque_total ? parseBRNumber(data.taxa_embarque_total) : 0,
+    priceTotal: parseBRNumber(data.valor_total),
     paymentMethod: data.forma_pagamento,
-    notes: data.observacoes,
+    paymentStatus: data.status_pagamento,
+    notes: data.observacoes || '',
   };
 
+  // Vendas legadas (modo simples)
+  if (channel === 'legacy') {
+    return {
+      ...baseData,
+      channel: 'legacy',
+    };
+  }
+  
+  // Vendas internas (modo completo)
   if (channel === 'internal') {
     return {
       ...baseData,
@@ -234,13 +256,15 @@ function convertRowToSaleData(row: ProcessedSaleRow): SaleFormData {
       accountId: resolved.mileageAccountId || '',
       programId: resolved.airlineCompanyId || '',
     };
-  } else {
-    return {
-      ...baseData,
-      channel: 'balcao',
-      sellerName: data.vendedor_balcao,
-      sellerContact: data.contato_vendedor_balcao,
-      counterCostPerThousand: parseBRNumber(data.custo_mil_milhas_balcao),
-    };
   }
+  
+  // Vendas de balcão
+  return {
+    ...baseData,
+    channel: 'counter',
+    sellerName: data.vendedor_balcao,
+    sellerContact: data.contato_vendedor_balcao,
+    counterCostPerThousand: parseBRNumber(data.custo_mil_milhas_balcao),
+    counterAirlineProgram: data.programa_milhas,
+  };
 }

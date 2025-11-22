@@ -18,6 +18,7 @@ export interface SalesImportTemplate {
   taxa_embarque_total: string;
   valor_total: string;
   forma_pagamento: string;
+  status_pagamento: string;
   localizador: string;
   observacoes: string;
   custo_mil_milhas_balcao: string;
@@ -45,6 +46,7 @@ export function generateSalesImportTemplate(format: 'csv' | 'xlsx' = 'xlsx') {
     taxa_embarque_total: '320,00',
     valor_total: '1.850,00',
     forma_pagamento: 'pix',
+    status_pagamento: 'paid',
     localizador: 'ABC123',
     observacoes: 'Cliente preferencial',
     custo_mil_milhas_balcao: '',
@@ -71,6 +73,7 @@ export function generateSalesImportTemplate(format: 'csv' | 'xlsx' = 'xlsx') {
     taxa_embarque_total: '',
     valor_total: '',
     forma_pagamento: '',
+    status_pagamento: '',
     localizador: '',
     observacoes: '',
     custo_mil_milhas_balcao: '',
@@ -102,6 +105,7 @@ export function generateSalesImportTemplate(format: 'csv' | 'xlsx' = 'xlsx') {
       { wch: 18 }, // taxa_embarque_total
       { wch: 15 }, // valor_total
       { wch: 18 }, // forma_pagamento
+      { wch: 18 }, // status_pagamento
       { wch: 15 }, // localizador
       { wch: 30 }, // observacoes
       { wch: 22 }, // custo_mil_milhas_balcao

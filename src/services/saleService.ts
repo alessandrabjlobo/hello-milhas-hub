@@ -67,10 +67,16 @@ export async function createSaleWithSegments(
     const channel = (formData as any).channel as
       | "internal"
       | "counter"
+      | "legacy"
       | undefined;
 
     if (!channel) {
       throw new Error("Canal da venda (channel) não informado.");
+    }
+
+    // Log para vendas legadas (modo simplificado)
+    if (channel === "legacy") {
+      console.log("[createSaleWithSegments] Importação legada (modo simplificado)");
     }
 
     if (channel === "internal") {
@@ -112,6 +118,8 @@ export async function createSaleWithSegments(
         ? "internal"
         : channel === "counter"
         ? "balcao"
+        : channel === "legacy"
+        ? "internal" // Usar "internal" mas marcar como legacy no sale_source
         : channel;
 
     console.log("[createSaleWithSegments] channel (form):", channel);
@@ -207,6 +215,11 @@ export async function createSaleWithSegments(
       salePayload.program_id = (formData as any).programId;
       salePayload.mileage_account_id = (formData as any).accountId;
       salePayload.sale_source = "internal_account";
+    } else if (channel === "legacy") {
+      // Importação legada (modo simplificado)
+      salePayload.sale_source = "legacy_import";
+      salePayload.mileage_account_id = null;
+      salePayload.program_id = null;
     } else if (channel === "counter") {
       salePayload.seller_name = (formData as any).sellerName;
       salePayload.seller_contact = (formData as any).sellerContact;
@@ -251,7 +264,7 @@ export async function createSaleWithSegments(
     }
 
     // -------------------------------------------------
-    // 7) Abater milhas da conta (apenas para vendas internas)
+    // 7) Abater milhas da conta (apenas para vendas internas, NÃO legacy)
     // -------------------------------------------------
     if (channel === "internal") {
       const accountId = (formData as any).accountId;
@@ -278,7 +291,7 @@ export async function createSaleWithSegments(
     }
 
     // -------------------------------------------------
-    // 8) Registrar CPFs dos passageiros no cpf_registry (só conta interna)
+    // 8) Registrar CPFs dos passageiros no cpf_registry (só conta interna, NÃO legacy)
     // -------------------------------------------------
     if (channel === "internal") {
       const accountId = (formData as any).accountId;

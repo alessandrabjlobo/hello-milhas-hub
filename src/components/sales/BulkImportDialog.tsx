@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -8,11 +8,16 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import { FileUp, FileSpreadsheet, AlertCircle } from 'lucide-react';
 import { useBulkImport } from '@/hooks/useBulkImport';
 import { generateSalesImportTemplate } from '@/lib/bulk-import-generator';
 import { BulkImportUpload } from './BulkImportUpload';
 import { BulkImportReview } from './BulkImportReview';
+import { BulkImportInstructions } from './BulkImportInstructions';
 
 interface BulkImportDialogProps {
   open: boolean;
@@ -27,6 +32,12 @@ export function BulkImportDialog({
 }: BulkImportDialogProps) {
   const [step, setStep] = useState<'download' | 'upload' | 'review'>('download');
   const bulkImport = useBulkImport();
+  const [localMode, setLocalMode] = useState<"simple" | "full">("simple");
+
+  // Sincronizar modo local com o hook
+  useEffect(() => {
+    bulkImport.setMode(localMode);
+  }, [localMode, bulkImport.setMode]);
 
   const handleDownloadTemplate = () => {
     generateSalesImportTemplate('xlsx');
@@ -47,6 +58,7 @@ export function BulkImportDialog({
   const handleClose = (isOpen: boolean) => {
     if (!isOpen) {
       setStep('download');
+      setLocalMode('simple');
     }
     onOpenChange(isOpen);
   };
@@ -86,8 +98,46 @@ export function BulkImportDialog({
 
         {/* Step: Download */}
         {step === 'download' && (
-          <div className="space-y-6 py-6">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <Tabs defaultValue="intro" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="intro">Como Funciona</TabsTrigger>
+              <TabsTrigger value="instructions">📖 Instruções dos Campos</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="intro" className="space-y-6 py-6">
+              {/* Seletor de Modo */}
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                <h3 className="font-semibold mb-3">Escolha o modo de importação:</h3>
+                
+                <RadioGroup value={localMode} onValueChange={(v) => setLocalMode(v as "simple" | "full")}>
+                  <div className="flex items-start space-x-3 mb-3">
+                    <RadioGroupItem value="simple" id="mode-simple" />
+                    <Label htmlFor="mode-simple" className="cursor-pointer flex-1">
+                      <div className="font-semibold flex items-center gap-2">
+                        📊 Importação Simplificada (apenas financeiro)
+                        <Badge variant="secondary">Recomendado</Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Ideal para migração de planilhas antigas. Apenas data, cliente, valor e pagamento são obrigatórios.
+                      </p>
+                    </Label>
+                  </div>
+                  
+                  <div className="flex items-start space-x-3">
+                    <RadioGroupItem value="full" id="mode-full" />
+                    <Label htmlFor="mode-full" className="cursor-pointer flex-1">
+                      <div className="font-semibold">
+                        ✈️ Importação Completa (detalhada)
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Vendas completas com milhas, rotas, contas. Todos os campos obrigatórios serão validados.
+                      </p>
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <FileSpreadsheet className="h-5 w-5 text-blue-600 mt-0.5" />
                 <div className="space-y-2">
@@ -105,41 +155,56 @@ export function BulkImportDialog({
               </div>
             </div>
 
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
-                <div className="space-y-2">
-                  <h3 className="font-semibold text-amber-900">
-                    Campos obrigatórios
-                  </h3>
-                  <ul className="text-sm text-amber-800 space-y-1 list-disc list-inside">
-                    <li>Data da venda, nome e CPF do cliente</li>
-                    <li>Programa de milhas, origem e destino</li>
-                    <li>Milhas, passageiros e valores</li>
-                    <li>Forma de pagamento</li>
-                  </ul>
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
+                  <div className="space-y-2">
+                    <h3 className="font-semibold text-amber-900">
+                      Campos obrigatórios
+                    </h3>
+                    <ul className="text-sm text-amber-800 space-y-1 list-disc list-inside">
+                      {localMode === "simple" ? (
+                        <>
+                          <li>Data da venda, nome do cliente</li>
+                          <li>Valor total, forma e status de pagamento</li>
+                          <li>Demais campos são opcionais</li>
+                        </>
+                      ) : (
+                        <>
+                          <li>Data da venda, nome e CPF do cliente</li>
+                          <li>Programa de milhas, origem e destino</li>
+                          <li>Milhas, passageiros e valores</li>
+                          <li>Forma e status de pagamento</li>
+                        </>
+                      )}
+                    </ul>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="flex gap-3">
-              <Button
-                onClick={handleDownloadTemplate}
-                className="flex-1"
-                size="lg"
-              >
-                <FileSpreadsheet className="h-5 w-5 mr-2" />
-                Baixar Modelo Excel
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setStep('upload')}
-                size="lg"
-              >
-                Já tenho o arquivo →
-              </Button>
-            </div>
-          </div>
+              <div className="flex gap-3">
+                <Button
+                  onClick={handleDownloadTemplate}
+                  className="flex-1"
+                  size="lg"
+                >
+                  <FileSpreadsheet className="h-5 w-5 mr-2" />
+                  Baixar Modelo Excel
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setStep('upload')}
+                  size="lg"
+                >
+                  Já tenho o arquivo →
+                </Button>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="instructions">
+              <BulkImportInstructions mode={localMode} />
+            </TabsContent>
+          </Tabs>
         )}
 
         {/* Step: Upload */}
