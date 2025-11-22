@@ -7,6 +7,7 @@ import { useSupplierAirlines } from './useSupplierAirlines';
 import { useUserRole } from './useUserRole';
 import { useToast } from './use-toast';
 import { parseBRNumber, parseBRDate, formatDateToISO } from '@/lib/bulk-import-helpers';
+import { supabase } from '@/integrations/supabase/client';
 import type { SaleFormData } from '@/schemas/saleSchema';
 
 export interface ProcessedSaleRow extends ParsedSaleRow {
@@ -109,6 +110,54 @@ export function useBulkImport() {
     );
   };
 
+  // Função auxiliar para garantir que companhia aérea existe
+  const ensureAirlineExists = async (airlineCode: string, supplierId: string): Promise<string | null> => {
+    if (!airlineCode) return null;
+
+    const code = airlineCode.trim().toUpperCase();
+    
+    // Tentar buscar existente
+    const { data: existing } = await supabase
+      .from('airline_companies')
+      .select('id')
+      .eq('code', code)
+      .eq('supplier_id', supplierId)
+      .maybeSingle();
+
+    if (existing) return existing.id;
+
+    // Criar nova companhia
+    const { data: newAirline, error } = await supabase
+      .from('airline_companies')
+      .insert({
+        supplier_id: supplierId,
+        user_id: (await supabase.auth.getUser()).data.user?.id,
+        code: code,
+        name: code, // usar código como nome temporário
+        cpf_limit: 25, // padrão
+        renewal_type: 'annual', // padrão
+        cost_per_mile: 0.029, // padrão
+      })
+      .select('id')
+      .single();
+
+    if (error) {
+      console.error(`Erro ao criar companhia ${code}:`, error);
+      return null;
+    }
+
+    // Vincular ao supplier na tabela suppliers_airlines
+    await supabase
+      .from('suppliers_airlines')
+      .insert({
+        supplier_id: supplierId,
+        airline_company_id: newAirline.id,
+      });
+
+    console.log(`✅ Companhia ${code} cadastrada automaticamente`);
+    return newAirline.id;
+  };
+
   const importValidRows = async () => {
     const validRows = rows.filter((r) => r.status === 'valid');
     
@@ -133,9 +182,22 @@ export function useBulkImport() {
     setImporting(true);
     let successCount = 0;
     let errorCount = 0;
+    const newAirlines = new Set<string>();
+    const salesWithLocalizador: Array<{ saleId: string; customerName: string; localizador: string }> = [];
 
     for (const row of validRows) {
       try {
+        // Garantir que companhia aérea existe
+        if (row.data.programa_milhas) {
+          const airlineId = await ensureAirlineExists(row.data.programa_milhas, supplierId);
+          
+          if (airlineId && !row.validation.resolvedData.airlineCompanyId) {
+            row.validation.resolvedData.airlineCompanyId = airlineId;
+            row.validation.resolvedData.airlineName = row.data.programa_milhas;
+            newAirlines.add(row.data.programa_milhas);
+          }
+        }
+        
         // Converter dados da planilha para formato do saleService
         const saleData = convertRowToSaleData(row);
         
@@ -151,6 +213,15 @@ export function useBulkImport() {
         } else {
           updateRow(row.rowNumber, { status: 'imported' });
           successCount++;
+          
+          // Coletar vendas com localizador para perguntar se quer criar tickets
+          if (row.data.localizador && result.saleId) {
+            salesWithLocalizador.push({
+              saleId: result.saleId,
+              customerName: row.data.nome_cliente,
+              localizador: row.data.localizador,
+            });
+          }
         }
       } catch (error: any) {
         updateRow(row.rowNumber, {
@@ -162,6 +233,22 @@ export function useBulkImport() {
     }
 
     setImporting(false);
+    
+    // Avisar sobre novas companhias cadastradas
+    if (newAirlines.size > 0) {
+      toast({
+        title: "Companhias cadastradas automaticamente",
+        description: `${Array.from(newAirlines).join(', ')}. Configure limites e regras em "Minhas Companhias".`,
+      });
+    }
+    
+    // Avisar sobre vendas com localizador
+    if (salesWithLocalizador.length > 0) {
+      toast({
+        title: `${salesWithLocalizador.length} venda(s) com localizador`,
+        description: "Você pode criar as passagens automaticamente. Confira na tela de revisão.",
+      });
+    }
     
     toast({
       title: 'Importação concluída',
@@ -209,17 +296,19 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
     // Fórmulas da calculadora
     const custoMilhas = (qtdMilhas / 1000) * custoMilheiro;
     const custoTotal = custoMilhas + taxa;
-      const lucro = valorTotal - custoTotal;
-      let margem = valorTotal > 0 ? (lucro / valorTotal) * 100 : 0;
-
-      // Limitar margem a valores razoáveis (-999% a +999%) para evitar overflow
-      if (margem > 999) {
-        console.warn(`[Importação] Margem muito alta: ${margem}%. Limitando a 999%`);
-        margem = 999;
-      } else if (margem < -999) {
-        console.warn(`[Importação] Margem muito baixa: ${margem}%. Limitando a -999%`);
-        margem = -999;
+    const lucro = valorTotal - custoTotal;
+    
+    // Calcular margem apenas se valorTotal for válido (> 0)
+    let margem: number | null = null;
+    if (valorTotal > 0 && !isNaN(valorTotal) && !isNaN(custoTotal)) {
+      margem = (lucro / valorTotal) * 100;
+      
+      // Se margem for absurda (fora do range -100% a +500%), marcar como null
+      if (margem < -100 || margem > 500 || !isFinite(margem)) {
+        console.warn(`[Importação] Margem inválida: ${margem?.toFixed(2)}%. Definindo como null.`);
+        margem = null;
       }
+    }
     
     console.log('[Importação Simples] Cálculo financeiro:', {
       quantidade_milhas: qtdMilhas,
@@ -247,8 +336,9 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
       totalMilesUsed: qtdMilhas,
       costPerThousand: custoMilheiro,
       totalCost: custoTotal,
-      profit: lucro, // Usar 'profit' em vez de 'profitValue'
-      profitMargin: margem,
+      profit: lucro,
+      profitMargin: margem, // pode ser null
+      saleDate: data.data_venda ? formatDateToISO(parseBRDate(data.data_venda)!) : undefined,
       
       paymentMethod: data.forma_pagamento,
       paymentStatus: data.status_pagamento,

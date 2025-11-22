@@ -1,6 +1,7 @@
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import type { SalesImportTemplate } from './bulk-import-generator';
+import { parseBRNumber } from './bulk-import-helpers';
 
 export interface ParsedSaleRow {
   rowNumber: number;
@@ -125,14 +126,14 @@ function normalizeRowData(row: any): SalesImportTemplate {
   const isSimpleTemplate = 'quantidade_milhas' in row && 'custo_milheiro' in row;
   
   if (isSimpleTemplate) {
-    // PLANILHA SIMPLES (Faturamento)
+    // PLANILHA SIMPLES (Faturamento) - Normalizar valores BR antes de salvar
     return {
       data_venda: String(row.data_venda || '').trim(),
       nome_cliente: String(row.nome_cliente || '').trim(),
-      quantidade_milhas: String(row.quantidade_milhas || '').trim(),
-      custo_milheiro: String(row.custo_milheiro || '').trim(),
-      taxa_embarque_total: String(row.taxa_embarque_total || '').trim(),
-      valor_total: String(row.valor_total || '').trim(),
+      quantidade_milhas: String(parseBRNumber(row.quantidade_milhas || '0')),
+      custo_milheiro: String(parseBRNumber(row.custo_milheiro || '0')),
+      taxa_embarque_total: String(parseBRNumber(row.taxa_embarque_total || '0')),
+      valor_total: String(parseBRNumber(row.valor_total || '0')),
       forma_pagamento: String(row.forma_pagamento || '').trim().toLowerCase(),
       status_pagamento: String(row.status_pagamento || '').trim().toLowerCase(),
       programa_milhas: String(row.programa_milhas || '').trim().toUpperCase(),
@@ -161,14 +162,18 @@ function normalizeRowData(row: any): SalesImportTemplate {
   // Compatibilidade: se não tiver quantidade_milhas mas tiver milhas_ida/volta
   let quantidadeMilhas = String(row.quantidade_milhas || '').trim();
   if (!quantidadeMilhas && (row.milhas_ida || row.milhas_volta)) {
-    const ida = parseFloat(String(row.milhas_ida || '0').replace(/\./g, '').replace(',', '.')) || 0;
-    const volta = parseFloat(String(row.milhas_volta || '0').replace(/\./g, '').replace(',', '.')) || 0;
+    const ida = parseBRNumber(row.milhas_ida || '0');
+    const volta = parseBRNumber(row.milhas_volta || '0');
     quantidadeMilhas = String(ida + volta);
+  } else if (quantidadeMilhas) {
+    quantidadeMilhas = String(parseBRNumber(quantidadeMilhas));
   }
   
   let custoMilheiro = String(row.custo_milheiro || '').trim();
   if (!custoMilheiro && row.custo_mil_milhas_balcao) {
-    custoMilheiro = String(row.custo_mil_milhas_balcao).trim();
+    custoMilheiro = String(parseBRNumber(row.custo_mil_milhas_balcao));
+  } else if (custoMilheiro) {
+    custoMilheiro = String(parseBRNumber(custoMilheiro));
   }
   
   return {
@@ -183,16 +188,16 @@ function normalizeRowData(row: any): SalesImportTemplate {
     destino: String(row.destino || '').trim().toUpperCase(),
     data_ida: String(row.data_ida || '').trim(),
     data_volta: String(row.data_volta || '').trim(),
-    milhas_ida: String(row.milhas_ida || '').trim(),
-    milhas_volta: String(row.milhas_volta || '').trim(),
+    milhas_ida: String(parseBRNumber(row.milhas_ida || '0')),
+    milhas_volta: String(parseBRNumber(row.milhas_volta || '0')),
     numero_passageiros: String(row.numero_passageiros || '').trim(),
-    taxa_embarque_total: String(row.taxa_embarque_total || '').trim(),
-    valor_total: String(row.valor_total || '').trim(),
+    taxa_embarque_total: String(parseBRNumber(row.taxa_embarque_total || '0')),
+    valor_total: String(parseBRNumber(row.valor_total || '0')),
     forma_pagamento: String(row.forma_pagamento || '').trim().toLowerCase(),
     status_pagamento: String(row.status_pagamento || '').trim().toLowerCase(),
     localizador: String(row.localizador || '').trim().toUpperCase(),
     observacoes: String(row.observacoes || '').trim(),
-    custo_mil_milhas_balcao: String(row.custo_mil_milhas_balcao || '').trim(),
+    custo_mil_milhas_balcao: String(parseBRNumber(row.custo_mil_milhas_balcao || '0')),
     vendedor_balcao: String(row.vendedor_balcao || '').trim(),
     contato_vendedor_balcao: String(row.contato_vendedor_balcao || '').trim(),
     
