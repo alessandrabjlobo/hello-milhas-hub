@@ -26,6 +26,54 @@ export interface SalesImportTemplate {
   contato_vendedor_balcao: string;
 }
 
+// 🔹 Campos obrigatórios no modo simplificado
+const REQUIRED_FIELDS_SIMPLE: (keyof SalesImportTemplate)[] = [
+  "data_venda",
+  "nome_cliente",
+  "valor_total",
+  "forma_pagamento",
+  "status_pagamento",
+];
+
+// 🔹 Ordem das colunas (deve bater com a interface e com o JSON gerado)
+const HEADER_KEYS: (keyof SalesImportTemplate)[] = [
+  "data_venda",
+  "nome_cliente",
+  "cpf_cliente",
+  "telefone_cliente",
+  "programa_milhas",
+  "numero_conta",
+  "tipo_viagem",
+  "origem",
+  "destino",
+  "data_ida",
+  "data_volta",
+  "milhas_ida",
+  "milhas_volta",
+  "numero_passageiros",
+  "taxa_embarque_total",
+  "valor_total",
+  "forma_pagamento",
+  "status_pagamento",
+  "localizador",
+  "observacoes",
+  "custo_mil_milhas_balcao",
+  "vendedor_balcao",
+  "contato_vendedor_balcao",
+];
+
+// 🔹 Converte índice de coluna (0-based) para letra Excel (A, B, C... AA, AB...)
+function colIndexToLetter(index: number): string {
+  let s = "";
+  let n = index + 1;
+  while (n > 0) {
+    const mod = (n - 1) % 26;
+    s = String.fromCharCode(65 + mod) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+  return s;
+}
+
 export function generateSalesImportTemplate(format: 'csv' | 'xlsx' = 'xlsx') {
   // Exemplo de linha preenchida (para referência)
   const exampleRow: SalesImportTemplate = {
@@ -113,12 +161,43 @@ export function generateSalesImportTemplate(format: 'csv' | 'xlsx' = 'xlsx') {
       { wch: 25 }, // contato_vendedor_balcao
     ];
 
+    // 🔴 Destacar com cor os campos obrigatórios (modo simplificado)
+    HEADER_KEYS.forEach((key, index) => {
+      const colLetter = colIndexToLetter(index);
+      const cellRef = `${colLetter}1`; // linha 1 = cabeçalho
+      const cell = worksheet[cellRef];
+
+      if (!cell) return;
+
+      // Garante que existe o objeto de estilo
+      (cell as any).s = (cell as any).s || {};
+
+      // Header sempre em negrito
+      (cell as any).s.font = {
+        ...(cell as any).s.font,
+        bold: true,
+      };
+
+      // Se for campo obrigatório no modo simplificado, aplica cor de destaque
+      if (REQUIRED_FIELDS_SIMPLE.includes(key)) {
+        (cell as any).s.fill = {
+          patternType: "solid",
+          fgColor: { rgb: "FFFDE9E9" }, // fundo levemente rosado
+        };
+        (cell as any).s.font = {
+          ...(cell as any).s.font,
+          color: { rgb: "FFB00000" }, // texto vermelho escuro
+          bold: true,
+        };
+      }
+    });
+
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Vendas');
 
     XLSX.writeFile(workbook, `modelo-importacao-vendas.xlsx`);
   } else {
-    // CSV
+    // CSV (sem estilos)
     const worksheet = XLSX.utils.json_to_sheet(data);
     const csv = XLSX.utils.sheet_to_csv(worksheet);
     
