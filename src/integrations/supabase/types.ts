@@ -914,6 +914,7 @@ export type Database = {
           client_name: string
           cost_per_mile: number | null
           cost_per_mile_snapshot: number | null
+          cost_per_thousand: number | null
           counter_airline_program: string | null
           counter_cost_per_thousand: number | null
           counter_seller_contact: string | null
@@ -973,6 +974,7 @@ export type Database = {
           client_name: string
           cost_per_mile?: number | null
           cost_per_mile_snapshot?: number | null
+          cost_per_thousand?: number | null
           counter_airline_program?: string | null
           counter_cost_per_thousand?: number | null
           counter_seller_contact?: string | null
@@ -1032,6 +1034,7 @@ export type Database = {
           client_name?: string
           cost_per_mile?: number | null
           cost_per_mile_snapshot?: number | null
+          cost_per_thousand?: number | null
           counter_airline_program?: string | null
           counter_cost_per_thousand?: number | null
           counter_seller_contact?: string | null
