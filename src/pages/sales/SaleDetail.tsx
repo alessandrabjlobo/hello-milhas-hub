@@ -19,6 +19,8 @@ import {
   CreditCard,
   DollarSign,
   MoreVertical,
+  Calendar as CalendarIcon,
+  Ticket as TicketIcon,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PaymentDialog } from "@/components/sales/PaymentDialog";
@@ -28,7 +30,6 @@ import { EditSaleDialog } from "@/components/sales/EditSaleDialog";
 import { DeleteSaleDialog } from "@/components/sales/DeleteSaleDialog";
 import type { Database } from "@/integrations/supabase/types";
 import { formatMiles } from "@/lib/utils";
-import { RegisterTicketDialog } from "@/components/tickets/RegisterTicketDialog"; // ⬅️ NOVO IMPORT
 
 type Sale = Database["public"]["Tables"]["sales"]["Row"] & {
   mileage_accounts?: {
@@ -51,7 +52,6 @@ export default function SaleDetail() {
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [ticketDialogOpen, setTicketDialogOpen] = useState(false); // ⬅️ NOVO STATE
 
   const getFlightStatus = () => {
     if (!sale) return <Badge variant="secondary">Sem Data</Badge>;
@@ -149,6 +149,7 @@ export default function SaleDetail() {
 
   useEffect(() => {
     fetchSaleDetails();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   if (loading) {
@@ -204,10 +205,8 @@ export default function SaleDetail() {
   let costPerThousand: number | null = null;
 
   if ((sale as any).cost_per_thousand && (sale as any).cost_per_thousand > 0) {
-    // Usar o valor gravado
     costPerThousand = (sale as any).cost_per_thousand;
   } else if (milesUsed > 0) {
-    // Calcular retroativamente: (total_cost - taxa_embarque) / (milhas / 1000)
     const milesCost = totalCost - boardingFee;
     costPerThousand = (milesCost / milesUsed) * 1000;
   }
@@ -229,8 +228,14 @@ export default function SaleDetail() {
     (sale as any).localizador ||
     null;
 
+  const formatDate = (date: string | null) => {
+    if (!date) return "-";
+    return new Date(date).toLocaleDateString("pt-BR");
+  };
+
   return (
     <div className="container mx-auto p-6 space-y-6">
+      {/* Cabeçalho */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate("/sales")}>
@@ -270,7 +275,9 @@ export default function SaleDetail() {
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="summary">Resumo</TabsTrigger>
           <TabsTrigger value="payments">Pagamentos</TabsTrigger>
-          <TabsTrigger value="tickets">Passagens</TabsTrigger>
+          <TabsTrigger value="tickets">
+            Passagens {tickets.length > 0 && `(${tickets.length})`}
+          </TabsTrigger>
         </TabsList>
 
         {/* RESUMO */}
@@ -486,46 +493,88 @@ export default function SaleDetail() {
         {/* PASSAGENS */}
         <TabsContent value="tickets" className="space-y-6">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Passagens Emitidas</CardTitle>
-              <Button
-                size="sm"
-                onClick={() => setTicketDialogOpen(true)}
-              >
+            <CardHeader className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <TicketIcon className="h-5 w-5" />
+                <CardTitle>Passagens Emitidas</CardTitle>
+              </div>
+              {/* se quiser, aqui pode colocar um botão para abrir o modal de emissão */}
+              {/* <Button size="sm" onClick={() => navigate("/tickets")}>
                 Emitir passagem
-              </Button>
+              </Button> */}
             </CardHeader>
             <CardContent>
               {tickets.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                  Nenhuma passagem registrada
+                  Nenhuma passagem registrada para esta venda.
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {tickets.map((ticket) => (
-                    <div
-                      key={ticket.id}
-                      className="flex justify-between items-center p-2 border rounded"
-                    >
-                      <div>
-                        <p className="font-medium">{ticket.passenger_name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {ticket.route}
-                        </p>
-                      </div>
-                      <Badge
-                        variant={
-                          ticket.status === "confirmed"
-                            ? "default"
-                            : "secondary"
-                        }
+                  {tickets.map((ticket) => {
+                    const passengerName =
+                      ticket.passenger_name ||
+                      sale.customer_name ||
+                      sale.client_name ||
+                      "-";
+
+                    const route =
+                      ticket.route ||
+                      sale.route_text ||
+                      "-";
+
+                    const departure = ticket.departure_date
+                      ? formatDate(ticket.departure_date)
+                      : null;
+
+                    const statusLabel =
+                      ticket.status === "confirmed"
+                        ? "Confirmado"
+                        : ticket.status === "cancelled"
+                        ? "Cancelado"
+                        : "Pendente";
+
+                    const statusVariant =
+                      ticket.status === "confirmed"
+                        ? "default"
+                        : ticket.status === "cancelled"
+                        ? "destructive"
+                        : "secondary";
+
+                    return (
+                      <div
+                        key={ticket.id}
+                        className="flex justify-between items-center p-3 border rounded-md bg-muted/40"
                       >
-                        {ticket.status === "confirmed"
-                          ? "Confirmado"
-                          : "Pendente"}
-                      </Badge>
-                    </div>
-                  ))}
+                        <div className="space-y-1">
+                          <p className="font-medium">
+                            {passengerName}
+                            {ticket.ticket_code && (
+                              <span className="ml-2 text-xs font-mono text-muted-foreground">
+                                • {ticket.ticket_code}
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {route}
+                            {departure && ` • Voo em ${departure}`}
+                          </p>
+                          {ticket.pnr && (
+                            <p className="text-xs text-muted-foreground">
+                              PNR: <span className="font-mono">{ticket.pnr}</span>
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                          {ticket.ticket_number && (
+                            <span className="text-xs font-mono text-muted-foreground">
+                              Bilhete: {ticket.ticket_number}
+                            </span>
+                          )}
+                          <Badge variant={statusVariant}>{statusLabel}</Badge>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
@@ -555,13 +604,6 @@ export default function SaleDetail() {
         onConfirm={handleDeleteSale}
         customerName={sale.customer_name || sale.client_name || ""}
         hasTickets={tickets.length > 0}
-      />
-
-      {/* 🔽 NOVO: dialog de emissão de passagem amarrado a esta venda */}
-      <RegisterTicketDialog
-        open={ticketDialogOpen}
-        onOpenChange={setTicketDialogOpen}
-        saleId={sale.id}
       />
     </div>
   );
