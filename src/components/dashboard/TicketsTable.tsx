@@ -56,7 +56,7 @@ const getAirlineOrProgram = (ticket: Ticket): string | null => {
   return null;
 };
 
-// Helper para pegar localizador e bilhete
+// Helpers para localizador e bilhete
 const getLocator = (ticket: Ticket): string | null =>
   (ticket as any).locator ||
   (ticket as any).pnr ||
@@ -76,7 +76,11 @@ interface TicketsTableProps {
 
 export const TicketsTable = ({ tickets, loading }: TicketsTableProps) => {
   if (loading) {
-    return <p className="text-sm text-muted-foreground">Carregando passagens...</p>;
+    return (
+      <p className="text-sm text-muted-foreground">
+        Carregando passagens...
+      </p>
+    );
   }
 
   if (!tickets.length) {
@@ -114,9 +118,8 @@ export const TicketsTable = ({ tickets, loading }: TicketsTableProps) => {
           const locator = getLocator(ticket);
           const ticketNumber = getTicketNumber(ticket);
 
-          const statusKey =
-            (ticket.status as keyof typeof statusConfig) || "pending";
-          const status = statusConfig[statusKey] || statusConfig.pending;
+          const rawStatus = (ticket.status || "pending") as keyof typeof statusConfig;
+          const status = statusConfig[rawStatus] || statusConfig.pending;
 
           return (
             <TableRow key={ticket.id}>
