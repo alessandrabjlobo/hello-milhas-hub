@@ -28,9 +28,11 @@ export const useTickets = () => {
   const fetchTickets = async () => {
     try {
       setLoading(true);
+
       const { data, error } = await supabase
         .from("tickets")
-        .select(`
+        .select(
+          `
           *,
           sales (
             customer_name,
@@ -42,11 +44,13 @@ export const useTickets = () => {
               )
             )
           )
-        `)
-        .order("created_at", { ascending: false});
+        `
+        )
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setTickets(data || []);
+
+      setTickets((data || []) as Ticket[]);
     } catch (error: any) {
       toast({
         title: "Erro ao carregar passagens",
