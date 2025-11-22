@@ -188,15 +188,16 @@ export async function createSaleWithSegments(
       miles_used: totalMilesUsed,
       total_cost: totalCost,
 
-      // ✅ Campos de receita e lucro (NOT NULL)
-      sale_price: Number((formData as any).priceTotal ?? 0) || 0,
-      profit: Number((formData as any).profit ?? 0) || 0,
-      profit_margin: Number((formData as any).profitMargin ?? 0) || 0,
+    // ✅ Campos de receita e lucro (NOT NULL)
+    // Aceita tanto profit quanto profitValue, profitMargin para compatibilidade
+    sale_price: Number((formData as any).priceTotal ?? 0) || 0,
+    profit: Number((formData as any).profit ?? (formData as any).profitValue ?? 0) || 0,
+    profit_margin: Number((formData as any).profitMargin ?? 0) || 0,
 
-      // ✅ Campos para compatibilidade com telas existentes
-      price_total: Number((formData as any).priceTotal ?? 0) || 0,
-      margin_value: Number((formData as any).profit ?? 0) || 0,
-      margin_percentage: Number((formData as any).profitMargin ?? 0) || 0,
+    // ✅ Campos para compatibilidade com telas existentes
+    price_total: Number((formData as any).priceTotal ?? 0) || 0,
+    margin_value: Number((formData as any).profit ?? (formData as any).profitValue ?? 0) || 0,
+    margin_percentage: Number((formData as any).profitMargin ?? 0) || 0,
 
       // Campos opcionais relacionados a preço
       price_per_passenger: (formData as any).pricePerPassenger
@@ -216,8 +217,9 @@ export async function createSaleWithSegments(
       salePayload.mileage_account_id = (formData as any).accountId;
       salePayload.sale_source = "internal_account";
     } else if (channel === "legacy") {
-      // Importação legada (modo simplificado)
-      salePayload.sale_source = "legacy_import";
+      // Importação legada (modo simplificado) - usar "internal_account" como sale_source válido
+      // mas não vincular conta real (mileage_account_id = null)
+      salePayload.sale_source = "internal_account";
       salePayload.mileage_account_id = null;
       salePayload.program_id = null;
     } else if (channel === "counter") {

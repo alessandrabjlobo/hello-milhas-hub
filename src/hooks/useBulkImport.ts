@@ -238,7 +238,7 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
       totalMilesUsed: qtdMilhas,
       costPerThousand: custoMilheiro,
       totalCost: custoTotal,
-      profitValue: lucro,
+      profit: lucro, // Usar 'profit' em vez de 'profitValue'
       profitMargin: margem,
       
       paymentMethod: data.forma_pagamento,
