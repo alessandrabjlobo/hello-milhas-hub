@@ -217,9 +217,8 @@ export async function createSaleWithSegments(
       salePayload.mileage_account_id = (formData as any).accountId;
       salePayload.sale_source = "internal_account";
     } else if (channel === "legacy") {
-      // Importação legada (modo simplificado) - usar "internal_account" como sale_source válido
-      // mas não vincular conta real (mileage_account_id = null)
-      salePayload.sale_source = "internal_account";
+      // Importação legada (modo simplificado) - usar "bulk_import" que não exige mileage_account_id
+      salePayload.sale_source = "bulk_import";
       salePayload.mileage_account_id = null;
       salePayload.program_id = null;
     } else if (channel === "counter") {

@@ -209,8 +209,17 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
     // Fórmulas da calculadora
     const custoMilhas = (qtdMilhas / 1000) * custoMilheiro;
     const custoTotal = custoMilhas + taxa;
-    const lucro = valorTotal - custoTotal;
-    const margem = valorTotal > 0 ? (lucro / valorTotal) * 100 : 0;
+      const lucro = valorTotal - custoTotal;
+      let margem = valorTotal > 0 ? (lucro / valorTotal) * 100 : 0;
+
+      // Limitar margem a valores razoáveis (-999% a +999%) para evitar overflow
+      if (margem > 999) {
+        console.warn(`[Importação] Margem muito alta: ${margem}%. Limitando a 999%`);
+        margem = 999;
+      } else if (margem < -999) {
+        console.warn(`[Importação] Margem muito baixa: ${margem}%. Limitando a -999%`);
+        margem = -999;
+      }
     
     console.log('[Importação Simples] Cálculo financeiro:', {
       quantidade_milhas: qtdMilhas,
