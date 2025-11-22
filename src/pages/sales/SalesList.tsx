@@ -27,13 +27,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle, Eye, ShoppingCart, MoreHorizontal, Filter, X } from "lucide-react";
+import { PlusCircle, Eye, ShoppingCart, MoreHorizontal, Filter, X, FileUp } from "lucide-react";
 import { useSales } from "@/hooks/useSales";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { exportToCSV } from "@/lib/csv-export";
 import { PaymentStatusBadge } from "@/components/sales/PaymentStatusBadge";
 import { EditSaleDialog } from "@/components/sales/EditSaleDialog";
 import { DeleteSaleDialog } from "@/components/sales/DeleteSaleDialog";
+import { BulkImportDialog } from "@/components/sales/BulkImportDialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -42,6 +43,7 @@ export default function SalesList() {
   const { toast } = useToast();
   const [editingSale, setEditingSale] = useState<typeof sales[0] | null>(null);
   const [deletingSale, setDeletingSale] = useState<typeof sales[0] | null>(null);
+  const [showBulkImport, setShowBulkImport] = useState(false);
   
   // Filter states
   const [searchTerm, setSearchTerm] = useState(() => 
@@ -196,6 +198,13 @@ export default function SalesList() {
           <div className="flex gap-2">
             <Button variant="outline" onClick={handleExportCSV} disabled={filteredSales.length === 0}>
               Exportar CSV
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => setShowBulkImport(true)}
+            >
+              <FileUp className="h-4 w-4 mr-2" />
+              Importar Vendas
             </Button>
             <Link to="/sales/new">
               <Button>
@@ -386,6 +395,12 @@ export default function SalesList() {
         onConfirm={handleDeleteSale}
         customerName={deletingSale?.customer_name || deletingSale?.client_name || ""}
         hasTickets={false}
+      />
+
+      <BulkImportDialog
+        open={showBulkImport}
+        onOpenChange={setShowBulkImport}
+        onSuccess={fetchSales}
       />
     </div>
   );
