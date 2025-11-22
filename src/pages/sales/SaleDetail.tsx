@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowLeft, Plane, User, CreditCard, DollarSign, MoreVertical } from "lucide-react";
+import {
+  ArrowLeft,
+  Plane,
+  User,
+  CreditCard,
+  DollarSign,
+  MoreVertical,
+} from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PaymentDialog } from "@/components/sales/PaymentDialog";
 import { PaymentStatusBadge } from "@/components/sales/PaymentStatusBadge";
@@ -46,10 +53,14 @@ export default function SaleDetail() {
 
   const getFlightStatus = () => {
     if (!sale) return <Badge variant="secondary">Sem Data</Badge>;
-    
+
     let departureDate: Date | null = null;
-    
-    if (sale.flight_segments && Array.isArray(sale.flight_segments) && sale.flight_segments.length > 0) {
+
+    if (
+      sale.flight_segments &&
+      Array.isArray(sale.flight_segments) &&
+      sale.flight_segments.length > 0
+    ) {
       const firstSegment = sale.flight_segments[0] as { date?: string };
       if (firstSegment.date) {
         departureDate = new Date(firstSegment.date);
@@ -57,23 +68,35 @@ export default function SaleDetail() {
     } else if (sale.travel_dates) {
       departureDate = new Date(String(sale.travel_dates));
     }
-    
+
     if (!departureDate || isNaN(departureDate.getTime())) {
       return <Badge variant="secondary">Sem Data</Badge>;
     }
-    
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     const flightDate = new Date(departureDate);
     flightDate.setHours(0, 0, 0, 0);
-    
+
     if (flightDate < today) {
-      return <Badge className="bg-green-500 text-white hover:bg-green-600">✓ Já Voado</Badge>;
+      return (
+        <Badge className="bg-green-500 text-white hover:bg-green-600">
+          ✓ Já Voado
+        </Badge>
+      );
     } else if (flightDate.getTime() === today.getTime()) {
-      return <Badge className="bg-blue-500 text-white hover:bg-blue-600">✈️ Voa Hoje</Badge>;
+      return (
+        <Badge className="bg-blue-500 text-white hover:bg-blue-600">
+          ✈️ Voa Hoje
+        </Badge>
+      );
     } else {
-      return <Badge className="bg-yellow-500 text-black hover:bg-yellow-600">📅 Próximo Voo</Badge>;
+      return (
+        <Badge className="bg-yellow-500 text-black hover:bg-yellow-600">
+          📅 Próximo Voo
+        </Badge>
+      );
     }
   };
 
@@ -85,7 +108,8 @@ export default function SaleDetail() {
 
       const { data: saleData, error: saleError } = await supabase
         .from("sales")
-        .select(`
+        .select(
+          `
           *,
           mileage_accounts (
             airline_companies (
@@ -93,12 +117,13 @@ export default function SaleDetail() {
               code
             )
           )
-        `)
+        `
+        )
         .eq("id", id)
         .single();
 
       if (saleError) throw saleError;
-      setSale(saleData);
+      setSale(saleData as Sale);
 
       const { data: ticketsData, error: ticketsError } = await supabase
         .from("tickets")
@@ -122,6 +147,7 @@ export default function SaleDetail() {
 
   useEffect(() => {
     fetchSaleDetails();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   if (loading) {
@@ -138,6 +164,19 @@ export default function SaleDetail() {
   if (!sale) {
     return null;
   }
+
+  // 👉 helpers de exibição de margem
+  const profitMargin =
+    sale.profit_margin !== null && sale.profit_margin !== undefined
+      ? sale.profit_margin
+      : null;
+
+  const profitMarginClass =
+    profitMargin === null
+      ? "font-medium"
+      : profitMargin >= 0
+      ? "font-medium text-green-600"
+      : "font-medium text-red-600";
 
   const handleDeleteSale = async () => {
     if (!sale) return;
@@ -208,6 +247,7 @@ export default function SaleDetail() {
 
         <TabsContent value="summary" className="space-y-6">
           <div className="grid gap-6 md:grid-cols-2">
+            {/* CLIENTE */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -218,7 +258,9 @@ export default function SaleDetail() {
               <CardContent className="space-y-2">
                 <div>
                   <p className="text-sm text-muted-foreground">Nome</p>
-                  <p className="font-medium">{sale.customer_name || sale.client_name}</p>
+                  <p className="font-medium">
+                    {sale.customer_name || sale.client_name}
+                  </p>
                 </div>
                 {sale.customer_phone && (
                   <div>
@@ -235,6 +277,7 @@ export default function SaleDetail() {
               </CardContent>
             </Card>
 
+            {/* VIAGEM */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -260,6 +303,7 @@ export default function SaleDetail() {
               </CardContent>
             </Card>
 
+            {/* FINANCEIRO */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 justify-between">
@@ -275,9 +319,14 @@ export default function SaleDetail() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
+                {/* Resumo de valores */}
                 <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Valor Total</span>
-                  <span className="font-medium">R$ {sale.sale_price?.toFixed(2) || "0.00"}</span>
+                  <span className="text-sm text-muted-foreground">
+                    Valor Total (cliente)
+                  </span>
+                  <span className="font-medium">
+                    R$ {sale.sale_price?.toFixed(2) || "0.00"}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">Já Pago</span>
@@ -288,18 +337,64 @@ export default function SaleDetail() {
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">Restante</span>
                   <span className="font-medium text-orange-600">
-                    R$ {((sale.sale_price || 0) - (sale.paid_amount || 0)).toFixed(2)}
+                    R${" "}
+                    {(
+                      (sale.sale_price || 0) - (sale.paid_amount || 0)
+                    ).toFixed(2)}
                   </span>
                 </div>
                 <Separator className="my-2" />
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">Custo</span>
-                  <span className="font-medium">R$ {sale.total_cost?.toFixed(2) || "0.00"}</span>
+                  <span className="font-medium">
+                    R$ {sale.total_cost?.toFixed(2) || "0.00"}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">Lucro</span>
                   <span className="font-medium text-green-600">
                     R$ {sale.profit?.toFixed(2) || "0.00"}
+                  </span>
+                </div>
+
+                {/* 🔽 Detalhamento: milhas, taxa, custo por milheiro, margem */}
+                <Separator className="my-2" />
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">
+                    Milhas utilizadas
+                  </span>
+                  <span className="font-medium">
+                    {sale.total_miles_used
+                      ? formatMiles(sale.total_miles_used)
+                      : "-"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">
+                    Custo por milheiro
+                  </span>
+                  <span className="font-medium">
+                    {sale.cost_per_thousand
+                      ? `R$ ${sale.cost_per_thousand.toFixed(2)} / 1.000`
+                      : "-"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">
+                    Taxa de embarque
+                  </span>
+                  <span className="font-medium">
+                    R$ {sale.boarding_fee?.toFixed(2) || "0.00"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">
+                    Margem de lucro
+                  </span>
+                  <span className={profitMarginClass}>
+                    {profitMargin !== null
+                      ? `${profitMargin.toFixed(1)}%`
+                      : "-"}
                   </span>
                 </div>
               </CardContent>
@@ -317,7 +412,10 @@ export default function SaleDetail() {
               Registrar Pagamento
             </Button>
           </div>
-          <PaymentTimeline saleId={sale.id} totalAmount={sale.sale_price || 0} />
+          <PaymentTimeline
+            saleId={sale.id}
+            totalAmount={sale.sale_price || 0}
+          />
         </TabsContent>
 
         <TabsContent value="tickets" className="space-y-6">
@@ -327,17 +425,30 @@ export default function SaleDetail() {
             </CardHeader>
             <CardContent>
               {tickets.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Nenhuma passagem registrada</p>
+                <p className="text-sm text-muted-foreground">
+                  Nenhuma passagem registrada
+                </p>
               ) : (
                 <div className="space-y-2">
                   {tickets.map((ticket) => (
-                    <div key={ticket.id} className="flex justify-between items-center p-2 border rounded">
+                    <div
+                      key={ticket.id}
+                      className="flex justify-between items-center p-2 border rounded"
+                    >
                       <div>
                         <p className="font-medium">{ticket.passenger_name}</p>
-                        <p className="text-sm text-muted-foreground">{ticket.route}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {ticket.route}
+                        </p>
                       </div>
-                      <Badge variant={ticket.status === "confirmed" ? "default" : "secondary"}>
-                        {ticket.status === "confirmed" ? "Confirmado" : "Pendente"}
+                      <Badge
+                        variant={
+                          ticket.status === "confirmed" ? "default" : "secondary"
+                        }
+                      >
+                        {ticket.status === "confirmed"
+                          ? "Confirmado"
+                          : "Pendente"}
                       </Badge>
                     </div>
                   ))}
