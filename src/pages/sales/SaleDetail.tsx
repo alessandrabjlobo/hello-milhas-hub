@@ -28,6 +28,7 @@ import { EditSaleDialog } from "@/components/sales/EditSaleDialog";
 import { DeleteSaleDialog } from "@/components/sales/DeleteSaleDialog";
 import type { Database } from "@/integrations/supabase/types";
 import { formatMiles } from "@/lib/utils";
+import { RegisterTicketDialog } from "@/components/tickets/RegisterTicketDialog"; // ⬅️ NOVO IMPORT
 
 type Sale = Database["public"]["Tables"]["sales"]["Row"] & {
   mileage_accounts?: {
@@ -50,6 +51,7 @@ export default function SaleDetail() {
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [ticketDialogOpen, setTicketDialogOpen] = useState(false); // ⬅️ NOVO STATE
 
   const getFlightStatus = () => {
     if (!sale) return <Badge variant="secondary">Sem Data</Badge>;
@@ -200,7 +202,7 @@ export default function SaleDetail() {
 
   // Custo por milheiro: usar o gravado ou calcular retroativamente
   let costPerThousand: number | null = null;
-  
+
   if ((sale as any).cost_per_thousand && (sale as any).cost_per_thousand > 0) {
     // Usar o valor gravado
     costPerThousand = (sale as any).cost_per_thousand;
@@ -484,8 +486,14 @@ export default function SaleDetail() {
         {/* PASSAGENS */}
         <TabsContent value="tickets" className="space-y-6">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Passagens Emitidas</CardTitle>
+              <Button
+                size="sm"
+                onClick={() => setTicketDialogOpen(true)}
+              >
+                Emitir passagem
+              </Button>
             </CardHeader>
             <CardContent>
               {tickets.length === 0 ? (
@@ -547,6 +555,13 @@ export default function SaleDetail() {
         onConfirm={handleDeleteSale}
         customerName={sale.customer_name || sale.client_name || ""}
         hasTickets={tickets.length > 0}
+      />
+
+      {/* 🔽 NOVO: dialog de emissão de passagem amarrado a esta venda */}
+      <RegisterTicketDialog
+        open={ticketDialogOpen}
+        onOpenChange={setTicketDialogOpen}
+        saleId={sale.id}
       />
     </div>
   );
