@@ -187,7 +187,7 @@ export default function SaleDetail() {
     }
   };
 
-  // 🧮 Dados auxiliares para os cards
+  // 🧮 Dados auxiliares para os cards (usar sempre os valores gravados)
   const totalPaid = sale.paid_amount || 0;
   const totalPrice = sale.sale_price || sale.price_total || 0;
   const remaining = totalPrice - totalPaid;
@@ -198,8 +198,17 @@ export default function SaleDetail() {
   const profit = sale.profit || sale.margin_value || 0;
   const profitMargin = sale.profit_margin ?? sale.margin_percentage ?? null;
 
-  const costPerThousand =
-    milesUsed > 0 ? (totalCost / milesUsed) * 1000 : null;
+  // Custo por milheiro: usar o gravado ou calcular retroativamente
+  let costPerThousand: number | null = null;
+  
+  if ((sale as any).cost_per_thousand && (sale as any).cost_per_thousand > 0) {
+    // Usar o valor gravado
+    costPerThousand = (sale as any).cost_per_thousand;
+  } else if (milesUsed > 0) {
+    // Calcular retroativamente: (total_cost - taxa_embarque) / (milhas / 1000)
+    const milesCost = totalCost - boardingFee;
+    costPerThousand = (milesCost / milesUsed) * 1000;
+  }
 
   // Companhia / programa
   let programName = "Balcão";
