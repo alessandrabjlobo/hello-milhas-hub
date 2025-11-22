@@ -61,8 +61,7 @@ export async function createSaleWithSegments(
     console.log("[createSaleWithSegments] formData recebido:", formData);
 
     // -------------------------------------------------
-    // 1) Normalizar e validar canal (internal vs counter)
-    //    👉 usado apenas na lógica do serviço, NÃO vai para o banco direto
+    // 1) Normalizar e validar canal (internal vs counter vs legacy)
     // -------------------------------------------------
     const channel = (formData as any).channel as
       | "internal"
@@ -74,7 +73,6 @@ export async function createSaleWithSegments(
       throw new Error("Canal da venda (channel) não informado.");
     }
 
-    // Log para vendas legadas (modo simplificado)
     if (channel === "legacy") {
       console.log("[createSaleWithSegments] Importação legada (modo simplificado)");
     }
@@ -110,8 +108,6 @@ export async function createSaleWithSegments(
 
     // -------------------------------------------------
     // 2) Mapear channel para os valores aceitos pelo banco
-    //    - "internal" → "internal"
-    //    - "counter"  → "balcao"
     // -------------------------------------------------
     const dbChannel =
       channel === "internal"
@@ -142,8 +138,14 @@ export async function createSaleWithSegments(
       );
     }
 
-    // ✅ Total de milhas usadas
-    const totalMilesUsed =
+    // 🔹 Milhas vindas do formulário (importação simples) OU calculadas dos trechos
+    const formMilesRaw =
+      (formData as any).totalMilesUsed ??
+      (formData as any).total_miles_used ??
+      (formData as any).totalMiles ??
+      null;
+
+    const milesFromSegments =
       flightSegments.length > 0
         ? flightSegments.reduce(
             (sum: number, s: any) => sum + (Number(s.miles) || 0),
@@ -151,12 +153,16 @@ export async function createSaleWithSegments(
           )
         : 0;
 
+    const totalMilesUsed =
+      formMilesRaw !== null && formMilesRaw !== undefined
+        ? Number(formMilesRaw) || 0
+        : milesFromSegments;
+
     if (flightSegments.length === 0) {
       console.warn(
         "[createSaleWithSegments] Nenhum trecho recebido em flightSegments. " +
           "A venda será criada sem registros em sale_segments."
       );
-      // não damos erro, só deixamos miles_used = 0
     }
 
     // -------------------------------------------------
@@ -164,16 +170,60 @@ export async function createSaleWithSegments(
     // -------------------------------------------------
     // CUSTO TOTAL (obrigatório p/ coluna total_cost NOT NULL)
     const totalCostRaw =
-      (formData as any).totalCost ?? (formData as any).total_cost ?? 0;
+      (formData as any).totalCost ??
+      (formData as any).total_cost ??
+      0;
 
     const totalCost = Number(totalCostRaw) || 0;
+
+    // Preço total (valor do cliente)
+    const priceTotalRaw =
+      (formData as any).priceTotal ??
+      (formData as any).sale_price ??
+      (formData as any).price_total ??
+      0;
+    const priceTotal = Number(priceTotalRaw) || 0;
+
+    // Lucro e margem
+    const profitRaw =
+      (formData as any).profit ??
+      (formData as any).margin_value ??
+      null;
+
+    const marginRaw =
+      (formData as any).profitMargin ??
+      (formData as any).margin_percentage ??
+      null;
+
+    const profit =
+      profitRaw !== null && profitRaw !== undefined
+        ? Number(profitRaw)
+        : priceTotal - totalCost;
+
+    const profitMargin =
+      marginRaw !== null && marginRaw !== undefined
+        ? Number(marginRaw)
+        : priceTotal > 0
+        ? (profit / priceTotal) * 100
+        : 0;
+
+    // Custo por milheiro (se vier na importação simples)
+    const costPerThousandRaw =
+      (formData as any).costPerThousand ??
+      (formData as any).cost_per_thousand ??
+      null;
+
+    const costPerThousand =
+      costPerThousandRaw !== null && costPerThousandRaw !== undefined
+        ? Number(costPerThousandRaw)
+        : null;
 
     // -------------------------------------------------
     // 5) Montar payload da venda (tabela sales)
     // -------------------------------------------------
     const salePayload: any = {
       supplier_id: supplierId,
-      channel: dbChannel, // ✅ usando valor aceito pelo banco
+      channel: dbChannel,
       client_name: formData.customerName,
       client_cpf_encrypted: formData.customerCpf,
       client_contact: formData.customerPhone || null,
@@ -184,32 +234,21 @@ export async function createSaleWithSegments(
       created_by: user.id,
       user_id: user.id,
 
-      // 🔹 Campos exigidos pelo banco (NOT NULL)
+      // 🔹 Campos de milhagem / custo
       miles_used: totalMilesUsed,
       total_cost: totalCost,
 
-    // ✅ Campos de receita e lucro (NOT NULL)
-    // Aceita tanto profit quanto profitValue, profitMargin para compatibilidade
-    sale_price: Number((formData as any).priceTotal ?? 0) || 0,
-    
-    // Profit e margin podem ser null se inválidos
-    profit: (formData as any).profit !== null && (formData as any).profit !== undefined
-      ? Number((formData as any).profit)
-      : 0,
-    profit_margin: (formData as any).profitMargin !== null && (formData as any).profitMargin !== undefined
-      ? Number((formData as any).profitMargin)
-      : null,
+      // 🔹 Receita / lucro (NOT NULL no banco)
+      sale_price: priceTotal,
+      profit,
+      profit_margin: profitMargin ?? 0,
 
-    // ✅ Campos para compatibilidade com telas existentes
-    price_total: Number((formData as any).priceTotal ?? 0) || 0,
-    margin_value: (formData as any).profit !== null && (formData as any).profit !== undefined
-      ? Number((formData as any).profit)
-      : 0,
-    margin_percentage: (formData as any).profitMargin !== null && (formData as any).profitMargin !== undefined
-      ? Number((formData as any).profitMargin)
-      : null,
+      // 🔹 Compatibilidade com campos antigos
+      price_total: priceTotal,
+      margin_value: profit,
+      margin_percentage: profitMargin ?? 0,
 
-      // Campos opcionais relacionados a preço
+      // 🔹 Campos opcionais relacionados a preço
       price_per_passenger: (formData as any).pricePerPassenger
         ? Number((formData as any).pricePerPassenger)
         : null,
@@ -217,7 +256,20 @@ export async function createSaleWithSegments(
         ? Number((formData as any).boardingFee)
         : null,
 
-      // ✅ CPFs dos passageiros (vai como JSONB na venda)
+      // 🔹 Campos novos/financeiros adicionais
+      cost_per_thousand: costPerThousand,
+
+      // 🔹 Info de programa / localizador (para telas de detalhes)
+      airline_program:
+        (formData as any).airlineProgram ??
+        (formData as any).programa_milhas ??
+        null,
+      locator_code:
+        (formData as any).localizador ??
+        (formData as any).locator ??
+        null,
+
+      // 🔹 CPFs dos passageiros (JSONB)
       passenger_cpfs: (formData as any).passengerCpfs || [],
     };
 
@@ -232,7 +284,7 @@ export async function createSaleWithSegments(
       salePayload.mileage_account_id = (formData as any).accountId;
       salePayload.sale_source = "internal_account";
     } else if (channel === "legacy") {
-      // Importação legada (modo simplificado) - usar "bulk_import" que não exige mileage_account_id
+      // Importação legada (modo simplificado)
       salePayload.sale_source = "bulk_import";
       salePayload.mileage_account_id = null;
       salePayload.program_id = null;
@@ -299,7 +351,6 @@ export async function createSaleWithSegments(
 
         if (balanceError) {
           console.error("Erro ao abater milhas:", balanceError);
-          // Não falha a venda, apenas registra o erro
         } else {
           console.log("[createSaleWithSegments] Milhas abatidas com sucesso");
         }
@@ -385,7 +436,7 @@ export async function createSaleWithSegments(
           const { error: countError } = await supabase.rpc(
             "update_account_cpf_count",
             {
-              p_account_id: accountId, // ✅ ajuste conforme nome do parâmetro da function
+              p_account_id: accountId,
             }
           );
 
