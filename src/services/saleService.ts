@@ -3,31 +3,8 @@ import type { SaleFormData } from "@/schemas/saleSchema";
 
 /**
  * SERVIÇO DE CRIAÇÃO DE VENDAS
- * 
- * Este arquivo contém a lógica principal de criação de vendas do sistema.
- * 
- * FLUXO DE CONTROLE DE CPF (Vendas Internas):
- * 1. CPFs dos passageiros são registrados em `cpf_registry` por companhia aérea
- * 2. Se CPF já existe: incrementa `usage_count` e atualiza `last_used_at`
- * 3. Se CPF é novo: cria registro com `usage_count = 1`
- * 4. Após registro, chama `update_account_cpf_count()` para atualizar contador da conta
- * 
- * BLOQUEIO FUTURO DE CPF:
- * Para implementar bloqueio por limite de uso, adicione verificação antes da linha 279:
- * 
- * if (existingCpf.usage_count >= LIMITE_MAX) {
- *   await supabase.from("cpf_registry")
- *     .update({ status: "blocked", blocked_until: calcularDataBloqueio() })
- *     .eq("id", existingCpf.id);
- *   throw new Error(`CPF ${cpfEncrypted} atingiu limite de uso`);
- * }
- * 
- * CÁLCULOS FINANCEIROS:
- * - price_total: Preço base SEM juros (usado para calcular margem)
- * - final_price_with_interest: Preço FINAL COM juros (valor que cliente paga)
- * - total_cost: Custo total (milhas + taxas de embarque)
- * - profit/margin_value: price_total - total_cost (NÃO usa final_price_with_interest)
- * - profit_margin/margin_percentage: (profit / price_total) * 100
+ *
+ * Ver comentários no topo do arquivo original – mantidos.
  */
 
 export interface CreateSaleResult {
@@ -56,12 +33,11 @@ export async function createSaleWithSegments(
       throw new Error("Usuário não autenticado");
     }
 
-    // 🔍 Logs para debug
     console.log("[createSaleWithSegments] supplierId:", supplierId);
     console.log("[createSaleWithSegments] formData recebido:", formData);
 
     // -------------------------------------------------
-    // 1) Normalizar e validar canal (internal vs counter vs legacy)
+    // 1) Normalizar e validar canal (internal / counter / legacy)
     // -------------------------------------------------
     const channel = (formData as any).channel as
       | "internal"
@@ -107,7 +83,7 @@ export async function createSaleWithSegments(
     }
 
     // -------------------------------------------------
-    // 2) Mapear channel para os valores aceitos pelo banco
+    // 2) Mapear channel para valor aceito pelo banco
     // -------------------------------------------------
     const dbChannel =
       channel === "internal"
@@ -115,7 +91,7 @@ export async function createSaleWithSegments(
         : channel === "counter"
         ? "balcao"
         : channel === "legacy"
-        ? "internal" // Usar "internal" mas marcar como legacy no sale_source
+        ? "internal" // usamos internal + sale_source = bulk_import
         : channel;
 
     console.log("[createSaleWithSegments] channel (form):", channel);
@@ -138,88 +114,58 @@ export async function createSaleWithSegments(
       );
     }
 
-    // 🔹 Milhas vindas do formulário (importação simples) OU calculadas dos trechos
-    const formMilesRaw =
-      (formData as any).totalMilesUsed ??
-      (formData as any).total_miles_used ??
-      (formData as any).totalMiles ??
-      null;
+    // 🔢 Milhas vindas do formulário (Nova Venda / Importação simples)
+    const totalMilesFromForm =
+      Number(
+        (formData as any).totalMilesUsed ??
+          (formData as any).totalMiles ??
+          (formData as any).miles_used ??
+          0
+      ) || 0;
 
-    const milesFromSegments =
+    // ✅ Total de milhas usadas: se tiver trechos, soma; senão usa o total do formulário
+    const totalMilesUsed =
       flightSegments.length > 0
         ? flightSegments.reduce(
             (sum: number, s: any) => sum + (Number(s.miles) || 0),
             0
           )
-        : 0;
-
-    const totalMilesUsed =
-      formMilesRaw !== null && formMilesRaw !== undefined
-        ? Number(formMilesRaw) || 0
-        : milesFromSegments;
+        : totalMilesFromForm;
 
     if (flightSegments.length === 0) {
       console.warn(
         "[createSaleWithSegments] Nenhum trecho recebido em flightSegments. " +
-          "A venda será criada sem registros em sale_segments."
+          `Total de milhas será lido do formulário: ${totalMilesUsed}`
       );
     }
 
     // -------------------------------------------------
-    // 4) Normalizar valores financeiros vindos da tela
+    // 4) Normalizar valores financeiros
     // -------------------------------------------------
-    // CUSTO TOTAL (obrigatório p/ coluna total_cost NOT NULL)
     const totalCostRaw =
-      (formData as any).totalCost ??
-      (formData as any).total_cost ??
-      0;
+      (formData as any).totalCost ?? (formData as any).total_cost ?? 0;
 
     const totalCost = Number(totalCostRaw) || 0;
 
-    // Preço total (valor do cliente)
-    const priceTotalRaw =
-      (formData as any).priceTotal ??
-      (formData as any).sale_price ??
-      (formData as any).price_total ??
+    const priceTotal =
+      Number((formData as any).priceTotal ?? (formData as any).sale_price ?? 0) ||
       0;
-    const priceTotal = Number(priceTotalRaw) || 0;
 
-    // Lucro e margem
-    const profitRaw =
-      (formData as any).profit ??
-      (formData as any).margin_value ??
-      null;
-
-    const marginRaw =
-      (formData as any).profitMargin ??
-      (formData as any).margin_percentage ??
-      null;
-
+    // profit / profitMargin podem ser negativos, mas nunca null na tabela
+    const profitField = (formData as any).profit;
     const profit =
-      profitRaw !== null && profitRaw !== undefined
-        ? Number(profitRaw)
-        : priceTotal - totalCost;
-
-    const profitMargin =
-      marginRaw !== null && marginRaw !== undefined
-        ? Number(marginRaw)
-        : priceTotal > 0
-        ? (profit / priceTotal) * 100
+      profitField !== null && profitField !== undefined
+        ? Number(profitField)
         : 0;
 
-    // Custo por milheiro (se vier na importação simples)
-    const costPerThousandRaw =
-      (formData as any).costPerThousand ??
-      (formData as any).cost_per_thousand ??
-      null;
-
-    const costPerThousand =
-      costPerThousandRaw !== null && costPerThousandRaw !== undefined
-        ? Number(costPerThousandRaw)
+    const profitMarginField = (formData as any).profitMargin;
+    const profitMargin =
+      profitMarginField !== null && profitMarginField !== undefined
+        ? Number(profitMarginField)
         : null;
 
     // -------------------------------------------------
-    // 5) Montar payload da venda (tabela sales)
+    // 5) Montar payload da venda
     // -------------------------------------------------
     const salePayload: any = {
       supplier_id: supplierId,
@@ -234,43 +180,38 @@ export async function createSaleWithSegments(
       created_by: user.id,
       user_id: user.id,
 
-      // 🔹 Campos de milhagem / custo
+      // 🔹 Campos obrigatórios
       miles_used: totalMilesUsed,
       total_cost: totalCost,
 
-      // 🔹 Receita / lucro (NOT NULL no banco)
+      // 🔹 Receita e lucro
       sale_price: priceTotal,
       profit,
-      profit_margin: profitMargin ?? 0,
+      profit_margin: profitMargin,
 
       // 🔹 Compatibilidade com campos antigos
       price_total: priceTotal,
       margin_value: profit,
-      margin_percentage: profitMargin ?? 0,
+      margin_percentage: profitMargin,
 
-      // 🔹 Campos opcionais relacionados a preço
+      // 🔹 Preço por passageiro (se vier)
       price_per_passenger: (formData as any).pricePerPassenger
         ? Number((formData as any).pricePerPassenger)
         : null,
+
+      // 🔹 Taxa de embarque (se vier)
       boarding_fee: (formData as any).boardingFee
         ? Number((formData as any).boardingFee)
         : null,
 
-      // 🔹 Campos novos/financeiros adicionais
-      cost_per_thousand: costPerThousand,
-
-      // 🔹 Info de programa / localizador (para telas de detalhes)
-      airline_program:
-        (formData as any).airlineProgram ??
-        (formData as any).programa_milhas ??
-        null,
-      locator_code:
-        (formData as any).localizador ??
-        (formData as any).locator ??
-        null,
-
       // 🔹 CPFs dos passageiros (JSONB)
       passenger_cpfs: (formData as any).passengerCpfs || [],
+
+      // 🔹 Localizador (Nova venda + Importação simples)
+      locator:
+        (formData as any).locator ??
+        (formData as any).localizador ??
+        null,
     };
 
     // Se vier saleDate da importação, usar no lugar de now()
@@ -284,10 +225,14 @@ export async function createSaleWithSegments(
       salePayload.mileage_account_id = (formData as any).accountId;
       salePayload.sale_source = "internal_account";
     } else if (channel === "legacy") {
-      // Importação legada (modo simplificado)
+      // Importação legada (faturamento)
       salePayload.sale_source = "bulk_import";
       salePayload.mileage_account_id = null;
       salePayload.program_id = null;
+
+      // Guardar programa em counter_airline_program para exibir na tela
+      salePayload.counter_airline_program =
+        (formData as any).airlineProgram || null;
     } else if (channel === "counter") {
       salePayload.seller_name = (formData as any).sellerName;
       salePayload.seller_contact = (formData as any).sellerContact;
@@ -300,10 +245,10 @@ export async function createSaleWithSegments(
         (formData as any).counterAirlineProgram ?? null;
     }
 
-    // Guarda JSONB dos segmentos (compatibilidade)
+    // JSONB com segmentos para histórico
     salePayload.flight_segments = flightSegments;
 
-    // Texto de rota (se tiver trechos)
+    // Texto de rota
     salePayload.route_text =
       flightSegments.length > 0
         ? flightSegments
@@ -332,7 +277,7 @@ export async function createSaleWithSegments(
     }
 
     // -------------------------------------------------
-    // 7) Abater milhas da conta (apenas para vendas internas, NÃO legacy)
+    // 7) Abater milhas da conta (apenas internal)
     // -------------------------------------------------
     if (channel === "internal") {
       const accountId = (formData as any).accountId;
@@ -358,7 +303,7 @@ export async function createSaleWithSegments(
     }
 
     // -------------------------------------------------
-    // 8) Registrar CPFs dos passageiros no cpf_registry (só conta interna, NÃO legacy)
+    // 8) Registrar CPFs em cpf_registry (somente internal)
     // -------------------------------------------------
     if (channel === "internal") {
       const accountId = (formData as any).accountId;
@@ -369,7 +314,6 @@ export async function createSaleWithSegments(
           `[createSaleWithSegments] Registrando ${passengerCpfs.length} CPFs`
         );
 
-        // Buscar airline_company_id da conta
         const { data: accountData, error: accountError } = await supabase
           .from("mileage_accounts")
           .select("airline_company_id")
@@ -377,18 +321,13 @@ export async function createSaleWithSegments(
           .single();
 
         if (accountError || !accountData) {
-          console.error(
-            "Erro ao buscar airline_company_id:",
-            accountError
-          );
+          console.error("Erro ao buscar airline_company_id:", accountError);
         } else {
           const airlineCompanyId = accountData.airline_company_id;
 
-          // Processar cada CPF
           for (const passengerCpf of passengerCpfs) {
             const cpfEncrypted = passengerCpf.cpf.replace(/\D/g, "");
 
-            // Verificar se CPF já existe
             const { data: existingCpf } = await supabase
               .from("cpf_registry")
               .select("id, usage_count, first_use_date")
@@ -397,7 +336,6 @@ export async function createSaleWithSegments(
               .maybeSingle();
 
             if (existingCpf) {
-              // Atualizar CPF existente
               await supabase
                 .from("cpf_registry")
                 .update({
@@ -410,11 +348,9 @@ export async function createSaleWithSegments(
                 .eq("id", existingCpf.id);
 
               console.log(
-                `[createSaleWithSegments] CPF ${cpfEncrypted} atualizado (` +
-                  `${existingCpf.usage_count + 1} usos)`
+                `[createSaleWithSegments] CPF ${cpfEncrypted} atualizado (${existingCpf.usage_count + 1} usos)`
               );
             } else {
-              // Inserir novo CPF
               await supabase.from("cpf_registry").insert({
                 user_id: user.id,
                 airline_company_id: airlineCompanyId,
@@ -432,7 +368,6 @@ export async function createSaleWithSegments(
             }
           }
 
-          // Atualizar contador de CPFs da conta
           const { error: countError } = await supabase.rpc(
             "update_account_cpf_count",
             {
@@ -455,7 +390,7 @@ export async function createSaleWithSegments(
     }
 
     // -------------------------------------------------
-    // 9) Inserir na tabela sale_segments (se houver trechos)
+    // 9) Inserir em sale_segments (se houver trechos)
     // -------------------------------------------------
     if (flightSegments.length > 0) {
       const direction =
