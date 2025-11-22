@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ import { PaymentTimeline } from "@/components/sales/PaymentTimeline";
 import { EditSaleDialog } from "@/components/sales/EditSaleDialog";
 import { DeleteSaleDialog } from "@/components/sales/DeleteSaleDialog";
 import type { Database } from "@/integrations/supabase/types";
+import { formatMiles } from "@/lib/utils";
 
 type Sale = Database["public"]["Tables"]["sales"]["Row"] & {
   mileage_accounts?: {
@@ -64,8 +65,8 @@ export default function SaleDetail() {
       if (firstSegment.date) {
         departureDate = new Date(firstSegment.date);
       }
-    } else if (sale.travel_dates) {
-      departureDate = new Date(String(sale.travel_dates));
+    } else if ((sale as any).travel_dates) {
+      departureDate = new Date(String((sale as any).travel_dates));
     }
 
     if (!departureDate || isNaN(departureDate.getTime())) {
@@ -122,7 +123,7 @@ export default function SaleDetail() {
         .single();
 
       if (saleError) throw saleError;
-      setSale(saleData);
+      setSale(saleData as Sale);
 
       const { data: ticketsData, error: ticketsError } = await supabase
         .from("tickets")
@@ -186,32 +187,36 @@ export default function SaleDetail() {
     }
   };
 
-  // Helpers de formatação
-  const formatCurrency = (value?: number | null) =>
-    (value ?? 0).toLocaleString("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    });
+  // 🧮 Dados auxiliares para os cards
+  const totalPaid = sale.paid_amount || 0;
+  const totalPrice = sale.sale_price || sale.price_total || 0;
+  const remaining = totalPrice - totalPaid;
 
-  const remainingAmount =
-    (sale.sale_price || 0) - (sale.paid_amount || 0);
+  const milesUsed = sale.miles_used || 0;
+  const totalCost = sale.total_cost || 0;
+  const boardingFee = (sale as any).boarding_fee || 0;
+  const profit = sale.profit || sale.margin_value || 0;
+  const profitMargin = sale.profit_margin ?? sale.margin_percentage ?? null;
 
-  const airlineProgramName =
-    sale.mileage_accounts?.airline_companies?.name ||
-    (sale as any).airline_program ||
-    (sale as any).airlineProgram ||
-    "Balcão";
+  const costPerThousand =
+    milesUsed > 0 ? (totalCost / milesUsed) * 1000 : null;
 
-  const locatorCode =
-    (sale as any).locator_code ||
-    (sale as any).localizador ||
+  // Companhia / programa
+  let programName = "Balcão";
+  if (sale.mileage_accounts?.airline_companies) {
+    const ac = sale.mileage_accounts.airline_companies;
+    programName = ac.name || ac.code || "Conta interna";
+  } else if ((sale as any).counter_airline_program) {
+    programName = (sale as any).counter_airline_program as string;
+  } else if (sale.sale_source === "bulk_import") {
+    programName = "Importação (sem conta)";
+  }
+
+  const locator =
     (sale as any).locator ||
-    "";
-
-  const hasRegisteredTicket =
-    tickets.length > 0 ||
-    (Array.isArray(sale.flight_segments) &&
-      sale.flight_segments.length > 0);
+    (sale as any).booking_code ||
+    (sale as any).localizador ||
+    null;
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -257,10 +262,10 @@ export default function SaleDetail() {
           <TabsTrigger value="tickets">Passagens</TabsTrigger>
         </TabsList>
 
-        {/* ======================= RESUMO ======================= */}
+        {/* RESUMO */}
         <TabsContent value="summary" className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-2">
-            {/* CLIENTE */}
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2">
+            {/* Cliente */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -290,7 +295,7 @@ export default function SaleDetail() {
               </CardContent>
             </Card>
 
-            {/* VIAGEM */}
+            {/* Viagem */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -311,26 +316,26 @@ export default function SaleDetail() {
                   <p className="text-sm text-muted-foreground">
                     Companhia / Programa
                   </p>
-                  <p className="font-medium">{airlineProgramName}</p>
+                  <p className="font-medium">{programName}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Localizador</p>
                   <p className="font-medium">
-                    {locatorCode || "Não informado"}
+                    {locator || "Não informado"}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Passagem</p>
                   <p className="font-medium">
-                    {hasRegisteredTicket
+                    {tickets.length > 0
                       ? "Passagem registrada"
-                      : "Não foi registrada passagem"}
+                      : "Nenhuma passagem registrada"}
                   </p>
                 </div>
               </CardContent>
             </Card>
 
-            {/* FINANCEIRO (CUSTO / LUCRO / MILHAS) */}
+            {/* Financeiro */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -344,13 +349,13 @@ export default function SaleDetail() {
                     Custo total
                   </span>
                   <span className="font-medium">
-                    {formatCurrency(sale.total_cost)}
+                    R$ {totalCost.toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">Lucro</span>
                   <span className="font-medium text-green-600">
-                    {formatCurrency(sale.profit)}
+                    R$ {profit.toFixed(2)}
                   </span>
                 </div>
                 <Separator className="my-2" />
@@ -359,9 +364,7 @@ export default function SaleDetail() {
                     Milhas utilizadas
                   </span>
                   <span className="font-medium">
-                    {sale.total_miles_used
-                      ? sale.total_miles_used.toLocaleString("pt-BR")
-                      : "-"}
+                    {milesUsed > 0 ? formatMiles(milesUsed) : "-"}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -369,8 +372,8 @@ export default function SaleDetail() {
                     Custo por milheiro
                   </span>
                   <span className="font-medium">
-                    {sale.cost_per_thousand
-                      ? formatCurrency(sale.cost_per_thousand)
+                    {costPerThousand
+                      ? `R$ ${costPerThousand.toFixed(2)}`
                       : "-"}
                   </span>
                 </div>
@@ -379,35 +382,34 @@ export default function SaleDetail() {
                     Taxa de embarque
                   </span>
                   <span className="font-medium">
-                    {formatCurrency(sale.boarding_fee)}
+                    R$ {boardingFee.toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">
                     Margem de lucro
                   </span>
-                  <span className="font-medium text-green-600">
-                    {sale.profit_margin !== null &&
-                    sale.profit_margin !== undefined
-                      ? `${sale.profit_margin.toFixed(1)}%`
+                  <span className="font-medium text-blue-600">
+                    {profitMargin !== null
+                      ? `${profitMargin.toFixed(1)}%`
                       : "-"}
                   </span>
                 </div>
               </CardContent>
             </Card>
 
-            {/* PAGAMENTO (CARD SEPARADO) */}
+            {/* Pagamento */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center justify-between gap-2">
+                <CardTitle className="flex items-center gap-2 justify-between">
                   <div className="flex items-center gap-2">
                     <CreditCard className="h-5 w-5" />
                     Pagamento
                   </div>
                   <PaymentStatusBadge
                     status={sale.payment_status || "pending"}
-                    paidAmount={sale.paid_amount || 0}
-                    totalAmount={sale.sale_price || 0}
+                    paidAmount={totalPaid}
+                    totalAmount={totalPrice}
                   />
                 </CardTitle>
               </CardHeader>
@@ -417,13 +419,13 @@ export default function SaleDetail() {
                     Valor total (cliente)
                   </span>
                   <span className="font-medium">
-                    {formatCurrency(sale.sale_price)}
+                    R$ {totalPrice.toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">Já pago</span>
                   <span className="font-medium text-green-600">
-                    {formatCurrency(sale.paid_amount)}
+                    R$ {totalPaid.toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -431,7 +433,7 @@ export default function SaleDetail() {
                     Restante
                   </span>
                   <span className="font-medium text-orange-600">
-                    {formatCurrency(remainingAmount)}
+                    R$ {remaining.toFixed(2)}
                   </span>
                 </div>
                 <Separator className="my-2" />
@@ -440,17 +442,13 @@ export default function SaleDetail() {
                     Forma de pagamento
                   </span>
                   <span className="font-medium">
-                    {sale.payment_method || "Não informado"}
+                    {sale.payment_method || "-"}
                   </span>
                 </div>
-                <div className="flex justify-between items-center pt-2">
-                  <span className="text-sm text-muted-foreground">
-                    Detalhar pagamentos
-                  </span>
+                <div className="flex justify-end pt-2">
                   <Button
-                    size="sm"
-                    variant="outline"
                     onClick={() => setPaymentDialogOpen(true)}
+                    disabled={sale.payment_status === "paid"}
                   >
                     Registrar / Ver pagamentos
                   </Button>
@@ -460,7 +458,7 @@ export default function SaleDetail() {
           </div>
         </TabsContent>
 
-        {/* ======================= PAGAMENTOS ======================= */}
+        {/* PAGAMENTOS */}
         <TabsContent value="payments" className="space-y-6">
           <div className="flex justify-end mb-4">
             <Button
@@ -471,13 +469,10 @@ export default function SaleDetail() {
               Registrar Pagamento
             </Button>
           </div>
-          <PaymentTimeline
-            saleId={sale.id}
-            totalAmount={sale.sale_price || 0}
-          />
+          <PaymentTimeline saleId={sale.id} totalAmount={totalPrice} />
         </TabsContent>
 
-        {/* ======================= PASSAGENS ======================= */}
+        {/* PASSAGENS */}
         <TabsContent value="tickets" className="space-y-6">
           <Card>
             <CardHeader>
@@ -503,7 +498,9 @@ export default function SaleDetail() {
                       </div>
                       <Badge
                         variant={
-                          ticket.status === "confirmed" ? "default" : "secondary"
+                          ticket.status === "confirmed"
+                            ? "default"
+                            : "secondary"
                         }
                       >
                         {ticket.status === "confirmed"
@@ -523,8 +520,8 @@ export default function SaleDetail() {
         open={paymentDialogOpen}
         onOpenChange={setPaymentDialogOpen}
         saleId={sale.id}
-        totalAmount={sale.sale_price || 0}
-        currentPaidAmount={sale.paid_amount || 0}
+        totalAmount={totalPrice}
+        currentPaidAmount={totalPaid}
         onSuccess={fetchSaleDetails}
       />
 
