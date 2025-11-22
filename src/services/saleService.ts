@@ -150,14 +150,10 @@ export async function createSaleWithSegments(
     }
 
     // -------------------------------------------------
-    // 3) Valores financeiros (custo, preço, lucro, margem)
+    // 3) Valores financeiros unificados (custo, preço, lucro, margem)
     // -------------------------------------------------
-    const totalCostRaw =
-      (formData as any).totalCost ??
-      (formData as any).total_cost ??
-      0;
-    const totalCost = Number(totalCostRaw) || 0;
-
+    
+    // Preço total (valor cobrado do cliente)
     const priceTotalRaw =
       (formData as any).priceTotal ??
       (formData as any).sale_price ??
@@ -165,37 +161,50 @@ export async function createSaleWithSegments(
       0;
     const priceTotal = Number(priceTotalRaw) || 0;
 
-    const profitRaw =
-      (formData as any).profit ??
-      (formData as any).margin_value ??
-      null;
+    // Taxa de embarque
+    const boardingFeeRaw = (formData as any).boardingFee ?? 0;
+    const boardingFee = Number(boardingFeeRaw) || 0;
 
-    const marginRaw =
-      (formData as any).profitMargin ??
-      (formData as any).margin_percentage ??
-      null;
+    // Custo por milheiro - determinar de acordo com o canal
+    let costPerThousand = 0;
+    
+    if (channel === "internal") {
+      // Conta interna: buscar cost_per_mile da conta e multiplicar por 1000
+      const accountId = (formData as any).accountId;
+      if (accountId) {
+        const { data: accountData } = await supabase
+          .from("mileage_accounts")
+          .select("cost_per_mile")
+          .eq("id", accountId)
+          .single();
+        
+        if (accountData?.cost_per_mile) {
+          costPerThousand = Number(accountData.cost_per_mile) * 1000;
+        }
+      }
+    } else if (channel === "counter") {
+      // Balcão: usar o valor informado
+      const counterCostRaw = (formData as any).counterCostPerThousand ?? 0;
+      costPerThousand = Number(counterCostRaw) || 0;
+    } else if (channel === "legacy") {
+      // Legado: usar o valor já calculado que vem do formulário
+      const legacyCostRaw = 
+        (formData as any).costPerThousand ??
+        (formData as any).cost_per_thousand ??
+        0;
+      costPerThousand = Number(legacyCostRaw) || 0;
+    }
 
-    const profit =
-      profitRaw !== null && profitRaw !== undefined
-        ? Number(profitRaw)
-        : priceTotal - totalCost;
+    // Calcular custo de milhas e custo total
+    const milesCost = totalMilesUsed > 0 
+      ? (totalMilesUsed / 1000) * costPerThousand 
+      : 0;
+    
+    const totalCost = milesCost + boardingFee;
 
-    const profitMargin =
-      marginRaw !== null && marginRaw !== undefined
-        ? Number(marginRaw)
-        : priceTotal > 0
-        ? (profit / priceTotal) * 100
-        : 0;
-
-    const costPerThousandRaw =
-      (formData as any).costPerThousand ??
-      (formData as any).cost_per_thousand ??
-      null;
-
-    const costPerThousand =
-      costPerThousandRaw !== null && costPerThousandRaw !== undefined
-        ? Number(costPerThousandRaw)
-        : null;
+    // Calcular lucro e margem
+    const profit = priceTotal - totalCost;
+    const profitMargin = priceTotal > 0 ? (profit / priceTotal) * 100 : 0;
 
     // -------------------------------------------------
     // 4) Montar payload para tabela sales
@@ -231,12 +240,10 @@ export async function createSaleWithSegments(
       price_per_passenger: (formData as any).pricePerPassenger
         ? Number((formData as any).pricePerPassenger)
         : null,
-      boarding_fee: (formData as any).boardingFee
-        ? Number((formData as any).boardingFee)
-        : null,
+      boarding_fee: boardingFee,
 
       // Financeiro adicional
-      cost_per_thousand: costPerThousand,
+      cost_per_thousand: costPerThousand > 0 ? costPerThousand : null,
 
       // Programa / localizador para tela de detalhes
       airline_program:

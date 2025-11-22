@@ -358,7 +358,9 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
   }
 
   // Importação completa (detalhada)
-  const isCounter = resolved.isCounter;
+  // Detectar se é balcão quando vier custo_mil_milhas_balcao
+  const hasCounterData = !!(data.custo_mil_milhas_balcao || data.vendedor_balcao);
+  const isCounter = hasCounterData || resolved.isCounter;
   const isLegacy = resolved.isLegacyImport;
 
   const channel: 'internal' | 'counter' | 'legacy' = isCounter
@@ -411,6 +413,8 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
     paymentMethod: data.forma_pagamento,
     paymentStatus: data.status_pagamento,
     notes: data.observacoes || '',
+    airlineProgram: data.programa_milhas || '',
+    localizador: data.localizador || '',
   };
 
   if (channel === 'legacy') {
@@ -429,12 +433,13 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
     };
   }
 
+  // Balcão (counter)
   return {
     ...baseData,
     channel: 'counter',
-    sellerName: data.vendedor_balcao,
-    sellerContact: data.contato_vendedor_balcao,
+    sellerName: data.vendedor_balcao || 'Vendedor Externo',
+    sellerContact: data.contato_vendedor_balcao || '',
     counterCostPerThousand: parseBRNumber(data.custo_mil_milhas_balcao || '0'),
-    counterAirlineProgram: data.programa_milhas,
+    counterAirlineProgram: data.programa_milhas || '',
   };
 }
