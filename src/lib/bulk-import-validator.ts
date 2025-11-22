@@ -99,7 +99,7 @@ export async function validateSaleRow(
     if (!row.programa_milhas) errors.push('Programa de milhas é obrigatório');
     if (!row.tipo_viagem) errors.push('Tipo de viagem é obrigatório');
     if (!row.origem) errors.push('Origem é obrigatória');
-    if (!row.destino) errors.push('Destino é obrigatório');
+    if (!row.destino) errors.push('Destino é obrigatória');
     if (!row.data_ida) errors.push('Data de ida é obrigatória');
     if (!row.milhas_ida) errors.push('Milhas de ida é obrigatório');
     if (!row.numero_passageiros) errors.push('Número de passageiros é obrigatório');
@@ -158,21 +158,26 @@ export async function validateSaleRow(
 
   // 7. Resolver programa de milhas
   if (row.programa_milhas) {
+    const programName = row.programa_milhas.trim();
+    const upper = programName.toUpperCase();
+
     const airline = airlines.find(
       (a) =>
-        a.code.toUpperCase() === row.programa_milhas.toUpperCase() ||
-        a.name.toUpperCase().includes(row.programa_milhas.toUpperCase())
+        a.code.toUpperCase() === upper ||
+        a.name.toUpperCase() === upper ||
+        a.name.toUpperCase().includes(upper)
     );
 
     if (airline) {
       resolvedData.airlineCompanyId = airline.id;
       resolvedData.airlineName = airline.name;
     } else {
-      if (mode === "full") {
-        errors.push(`Programa "${row.programa_milhas}" não encontrado`);
-      } else {
-        warnings.push(`⚠️ Programa "${row.programa_milhas}" não encontrado`);
-      }
+      // ❗ NÃO BLOQUEAR MAIS NO MODO FULL
+      warnings.push(
+        `⚠️ Programa "${programName}" não encontrado. Ele será criado automaticamente na importação.`
+      );
+      resolvedData.airlineCompanyId = undefined;
+      resolvedData.airlineName = programName;
     }
   }
 
@@ -259,9 +264,7 @@ export async function validateSaleRow(
   }
 
   // 13. Verificar duplicidade (se tiver localizador)
-  // 13. Verificar duplicidade (se tiver localizador)
   const cpfClean = row.cpf_cliente ? row.cpf_cliente.replace(/\D/g, '') : '';
-  // 13. Verificar duplicidade (se tiver localizador)
   if (row.localizador && row.cpf_cliente && row.data_venda && isValidBRDate(row.data_venda)) {
     const cpfForDupe = row.cpf_cliente.replace(/\D/g, '');
     try {
