@@ -3,7 +3,12 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { HashRouter as BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import {
+  HashRouter as BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import AppSidebar from "@/components/shared/AppSidebar";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -38,7 +43,10 @@ import NotFound from "./pages/NotFound";
 import Demo from "./pages/Demo";
 import FinancialReports from "./pages/FinancialReports";
 import UserProfile from "./pages/settings/UserProfile";
-import CustomerDetail from "./pages/CustomerDetail"; // ✅ detalhe do cliente
+import CustomerDetail from "./pages/CustomerDetail";
+
+// ✅ NOVO: página de emissão de passagem
+import NewTicketPage from "./pages/tickets/NewTicketPage";
 
 // Lazy load para páginas pesadas
 const NewSaleWizard = lazy(() => import("./pages/sales/NewSaleWizard"));
@@ -78,6 +86,7 @@ const App = () => (
                         <Route path="/dashboard" element={<DashboardKPIs />} />
                         <Route path="/onboarding" element={<Onboarding />} />
                         <Route path="/admin/users" element={<AdminUsers />} />
+
                         <Route
                           path="/sales/new"
                           element={
@@ -94,24 +103,64 @@ const App = () => (
                         />
                         <Route path="/sales/:id" element={<SaleDetail />} />
                         <Route path="/sales" element={<SalesList />} />
+
                         <Route path="/accounts/:id" element={<AccountDetail />} />
                         <Route path="/accounts" element={<Accounts />} />
+
                         <Route path="/suppliers" element={<Suppliers />} />
+
+                        {/* ✅ LISTA DE PASSAGENS */}
                         <Route path="/tickets" element={<Tickets />} />
-                        <Route path="/reports/financial" element={<FinancialReports />} />
+
+                        {/* ✅ NOVA ROTA: EMISSÃO VINCULADA À VENDA */}
+                        <Route path="/tickets/new" element={<NewTicketPage />} />
+
+                        <Route
+                          path="/reports/financial"
+                          element={<FinancialReports />}
+                        />
                         <Route path="/calculator" element={<Calculator />} />
+
                         <Route path="/quotes/new" element={<QuoteGenerator />} />
-                        <Route path="/quotes/:quoteId" element={<QuoteGenerator />} />
+                        <Route
+                          path="/quotes/:quoteId"
+                          element={<QuoteGenerator />}
+                        />
                         <Route path="/quotes" element={<QuoteHistory />} />
+
                         <Route path="/customers" element={<Customers />} />
-                        <Route path="/customers/:id" element={<CustomerDetail />} /> {/* ✅ nova rota */}
+                        <Route
+                          path="/customers/:id"
+                          element={<CustomerDetail />}
+                        />
+
                         <Route path="/profile" element={<UserProfile />} />
-                        <Route path="/settings/my-airlines" element={<MyAirlines />} />
-                        <Route path="/settings/programs" element={<ProgramRules />} />
-                        <Route path="/settings/billing" element={<Billing />} />
-                        <Route path="/settings/credit" element={<PaymentInterestSettings />} />
-                        <Route path="/settings/payment-interest" element={<PaymentInterestSettings />} />
-                        <Route path="/settings/payment-methods" element={<PaymentSettings />} />
+
+                        <Route
+                          path="/settings/my-airlines"
+                          element={<MyAirlines />}
+                        />
+                        <Route
+                          path="/settings/programs"
+                          element={<ProgramRules />}
+                        />
+                        <Route
+                          path="/settings/billing"
+                          element={<Billing />}
+                        />
+                        <Route
+                          path="/settings/credit"
+                          element={<PaymentInterestSettings />}
+                        />
+                        <Route
+                          path="/settings/payment-interest"
+                          element={<PaymentInterestSettings />}
+                        />
+                        <Route
+                          path="/settings/payment-methods"
+                          element={<PaymentSettings />}
+                        />
+
                         <Route
                           path="/settings/agency"
                           element={
@@ -127,14 +176,26 @@ const App = () => (
                             </Suspense>
                           }
                         />
+
                         <Route
                           path="/my-airlines"
-                          element={<Navigate to="/settings/my-airlines" replace />}
+                          element={
+                            <Navigate
+                              to="/settings/my-airlines"
+                              replace
+                            />
+                          }
                         />
                         <Route
                           path="/program-rules"
-                          element={<Navigate to="/settings/programs" replace />}
+                          element={
+                            <Navigate
+                              to="/settings/programs"
+                              replace
+                            />
+                          }
                         />
+
                         <Route path="*" element={<NotFound />} />
                       </Routes>
                     </main>
