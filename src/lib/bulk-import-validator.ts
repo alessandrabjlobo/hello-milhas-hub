@@ -55,6 +55,43 @@ export async function validateSaleRow(
   if (!row.status_pagamento) errors.push('Status de pagamento é obrigatório');
 
   // ==========================================
+  // VALIDAÇÃO DE SANIDADE PARA MODO SIMPLE
+  // ==========================================
+  if (mode === "simple") {
+    // Validar quantidade de milhas
+    if (row.quantidade_milhas) {
+      const qtdMilhas = parseBRNumber(row.quantidade_milhas);
+      if (qtdMilhas <= 0) {
+        errors.push('Quantidade de milhas deve ser maior que zero');
+      } else if (qtdMilhas > 10000000) {
+        errors.push('Quantidade de milhas muito alta (máximo: 10 milhões)');
+      }
+    } else {
+      errors.push('Quantidade de milhas é obrigatória no modo simplificado');
+    }
+
+    // Validar custo do milheiro
+    if (row.custo_milheiro) {
+      const custoMilheiro = parseBRNumber(row.custo_milheiro);
+      if (custoMilheiro <= 0) {
+        errors.push('Custo do milheiro deve ser maior que zero');
+      } else if (custoMilheiro > 10000) {
+        errors.push('Custo do milheiro muito alto (máximo: R$ 10.000)');
+      }
+    } else {
+      errors.push('Custo do milheiro é obrigatório no modo simplificado');
+    }
+
+    // Validar valor total
+    const valorTotal = parseBRNumber(row.valor_total || '0');
+    if (valorTotal <= 0) {
+      errors.push('Valor total deve ser maior que zero');
+    } else if (valorTotal > 1000000) {
+      errors.push('Valor total muito alto (máximo: R$ 1.000.000)');
+    }
+  }
+
+  // ==========================================
   // CAMPOS OBRIGATÓRIOS APENAS NO MODO FULL
   // ==========================================
   if (mode === "full") {
