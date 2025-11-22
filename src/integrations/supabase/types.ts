@@ -905,6 +905,7 @@ export type Database = {
       }
       sales: {
         Row: {
+          airline_program: string | null
           boarding_fee: number | null
           channel: string
           client_contact: string | null
@@ -928,6 +929,7 @@ export type Database = {
           id: string
           installments: number | null
           interest_rate: number | null
+          locator_code: string | null
           margin_percentage: number | null
           margin_value: number | null
           mileage_account_id: string | null
@@ -962,6 +964,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          airline_program?: string | null
           boarding_fee?: number | null
           channel: string
           client_contact?: string | null
@@ -985,6 +988,7 @@ export type Database = {
           id?: string
           installments?: number | null
           interest_rate?: number | null
+          locator_code?: string | null
           margin_percentage?: number | null
           margin_value?: number | null
           mileage_account_id?: string | null
@@ -1019,6 +1023,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          airline_program?: string | null
           boarding_fee?: number | null
           channel?: string
           client_contact?: string | null
@@ -1042,6 +1047,7 @@ export type Database = {
           id?: string
           installments?: number | null
           interest_rate?: number | null
+          locator_code?: string | null
           margin_percentage?: number | null
           margin_value?: number | null
           mileage_account_id?: string | null
