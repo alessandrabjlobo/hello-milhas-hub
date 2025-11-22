@@ -293,7 +293,7 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
     const taxa = data.taxa_embarque_total ? parseBRNumber(data.taxa_embarque_total) : 0;
     const valorTotal = parseBRNumber(data.valor_total || '0');
     
-    // Fórmulas da calculadora
+    // Fórmulas da calculadora (já usadas no sistema)
     const custoMilhas = (qtdMilhas / 1000) * custoMilheiro;
     const custoTotal = custoMilhas + taxa;
     const lucro = valorTotal - custoTotal;
@@ -318,7 +318,7 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
       custo_total: custoTotal.toFixed(2),
       valor_total: valorTotal.toFixed(2),
       lucro: lucro.toFixed(2),
-      margem: margem.toFixed(2) + '%'
+      margem: margem !== null ? `${margem.toFixed(2)}%` : 'n/a',
     });
     
     return {
@@ -343,7 +343,10 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
       paymentMethod: data.forma_pagamento,
       paymentStatus: data.status_pagamento,
       notes: data.observacoes || '',
+      
+      // Programa de milhas
       airlineProgram: data.programa_milhas || '',
+      programId: resolved.airlineCompanyId || '',
       localizador: data.localizador || '',
     };
   }
