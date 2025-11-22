@@ -27,7 +27,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle, Eye, ShoppingCart, MoreHorizontal, Filter, X, FileUp } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { PlusCircle, Eye, ShoppingCart, MoreHorizontal, Filter, X, FileUp, Trash2 } from "lucide-react";
 import { useSales } from "@/hooks/useSales";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { exportToCSV } from "@/lib/csv-export";
@@ -35,6 +36,7 @@ import { PaymentStatusBadge } from "@/components/sales/PaymentStatusBadge";
 import { EditSaleDialog } from "@/components/sales/EditSaleDialog";
 import { DeleteSaleDialog } from "@/components/sales/DeleteSaleDialog";
 import { BulkImportDialog } from "@/components/sales/BulkImportDialog";
+import { BulkDeleteDialog } from "@/components/sales/BulkDeleteDialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -44,6 +46,8 @@ export default function SalesList() {
   const [editingSale, setEditingSale] = useState<typeof sales[0] | null>(null);
   const [deletingSale, setDeletingSale] = useState<typeof sales[0] | null>(null);
   const [showBulkImport, setShowBulkImport] = useState(false);
+  const [selectedSales, setSelectedSales] = useState<Set<string>>(new Set());
+  const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   
   // Filter states
   const [searchTerm, setSearchTerm] = useState(() => 
@@ -151,6 +155,52 @@ export default function SalesList() {
     }
   };
 
+  const toggleSaleSelection = (saleId: string) => {
+    setSelectedSales(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(saleId)) {
+        newSet.delete(saleId);
+      } else {
+        newSet.add(saleId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedSales.size === filteredSales.length && filteredSales.length > 0) {
+      setSelectedSales(new Set());
+    } else {
+      setSelectedSales(new Set(filteredSales.map(s => s.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    try {
+      const { error } = await supabase
+        .from("sales")
+        .delete()
+        .in("id", Array.from(selectedSales));
+
+      if (error) throw error;
+
+      toast({
+        title: "Vendas excluídas",
+        description: `${selectedSales.size} venda(s) removida(s) com sucesso.`,
+      });
+
+      setSelectedSales(new Set());
+      setShowBulkDeleteDialog(false);
+      fetchSales();
+    } catch (error: any) {
+      toast({
+        title: "Erro ao excluir",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleExportCSV = () => {
     const data = filteredSales.map((sale) => ({
       Data: new Date(sale.created_at).toLocaleDateString("pt-BR"),
@@ -196,6 +246,15 @@ export default function SalesList() {
             </p>
           </div>
           <div className="flex gap-2">
+            {selectedSales.size > 0 && (
+              <Button
+                variant="destructive"
+                onClick={() => setShowBulkDeleteDialog(true)}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Excluir {selectedSales.size} selecionada(s)
+              </Button>
+            )}
             <Button variant="outline" onClick={handleExportCSV} disabled={filteredSales.length === 0}>
               Exportar CSV
             </Button>
@@ -297,6 +356,12 @@ export default function SalesList() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12">
+                    <Checkbox
+                      checked={selectedSales.size === filteredSales.length && filteredSales.length > 0}
+                      onCheckedChange={toggleSelectAll}
+                    />
+                  </TableHead>
                   <TableHead>Data</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Passageiros</TableHead>
@@ -313,6 +378,12 @@ export default function SalesList() {
                 {filteredSales.map((sale) => (
                   <TableRow key={sale.id}>
                     <TableCell>
+                      <Checkbox
+                        checked={selectedSales.has(sale.id)}
+                        onCheckedChange={() => toggleSaleSelection(sale.id)}
+                      />
+                    </TableCell>
+                    <TableCell>
                       {new Date(sale.created_at).toLocaleDateString("pt-BR")}
                     </TableCell>
                     <TableCell>{sale.customer_name || sale.client_name}</TableCell>
@@ -325,12 +396,16 @@ export default function SalesList() {
                       R$ {(sale.price_total || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={
-                        (sale.margin_percentage || 0) >= 20 ? "default" : 
-                        (sale.margin_percentage || 0) >= 10 ? "secondary" : "destructive"
-                      }>
-                        {(sale.margin_percentage || 0).toFixed(1)}%
-                      </Badge>
+                      {sale.margin_percentage !== null ? (
+                        <Badge variant={
+                          sale.margin_percentage >= 20 ? "default" : 
+                          sale.margin_percentage >= 10 ? "secondary" : "destructive"
+                        }>
+                          {sale.margin_percentage.toFixed(1)}%
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline">N/A</Badge>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">
@@ -401,6 +476,13 @@ export default function SalesList() {
         open={showBulkImport}
         onOpenChange={setShowBulkImport}
         onSuccess={fetchSales}
+      />
+
+      <BulkDeleteDialog
+        open={showBulkDeleteDialog}
+        onOpenChange={setShowBulkDeleteDialog}
+        onConfirm={handleBulkDelete}
+        selectedCount={selectedSales.size}
       />
     </div>
   );

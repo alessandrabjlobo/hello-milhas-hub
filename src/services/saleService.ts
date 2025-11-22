@@ -191,13 +191,23 @@ export async function createSaleWithSegments(
     // ✅ Campos de receita e lucro (NOT NULL)
     // Aceita tanto profit quanto profitValue, profitMargin para compatibilidade
     sale_price: Number((formData as any).priceTotal ?? 0) || 0,
-    profit: Number((formData as any).profit ?? (formData as any).profitValue ?? 0) || 0,
-    profit_margin: Number((formData as any).profitMargin ?? 0) || 0,
+    
+    // Profit e margin podem ser null se inválidos
+    profit: (formData as any).profit !== null && (formData as any).profit !== undefined
+      ? Number((formData as any).profit)
+      : 0,
+    profit_margin: (formData as any).profitMargin !== null && (formData as any).profitMargin !== undefined
+      ? Number((formData as any).profitMargin)
+      : null,
 
     // ✅ Campos para compatibilidade com telas existentes
     price_total: Number((formData as any).priceTotal ?? 0) || 0,
-    margin_value: Number((formData as any).profit ?? (formData as any).profitValue ?? 0) || 0,
-    margin_percentage: Number((formData as any).profitMargin ?? 0) || 0,
+    margin_value: (formData as any).profit !== null && (formData as any).profit !== undefined
+      ? Number((formData as any).profit)
+      : 0,
+    margin_percentage: (formData as any).profitMargin !== null && (formData as any).profitMargin !== undefined
+      ? Number((formData as any).profitMargin)
+      : null,
 
       // Campos opcionais relacionados a preço
       price_per_passenger: (formData as any).pricePerPassenger
@@ -210,6 +220,11 @@ export async function createSaleWithSegments(
       // ✅ CPFs dos passageiros (vai como JSONB na venda)
       passenger_cpfs: (formData as any).passengerCpfs || [],
     };
+
+    // Se vier saleDate da importação, usar no lugar de now()
+    if ((formData as any).saleDate) {
+      salePayload.created_at = (formData as any).saleDate;
+    }
 
     // Campos específicos por canal
     if (channel === "internal") {
