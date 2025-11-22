@@ -1,6 +1,26 @@
 import * as XLSX from 'xlsx';
 
-export interface SalesImportTemplate {
+// ============================================
+// Interface SIMPLIFICADA (Faturamento)
+// ============================================
+export interface SalesImportSimple {
+  data_venda: string;
+  nome_cliente: string;
+  quantidade_milhas: string;     // ✨ Total de milhas
+  custo_milheiro: string;         // ✨ Custo por 1.000
+  taxa_embarque_total: string;
+  valor_total: string;
+  forma_pagamento: string;
+  status_pagamento: string;
+  programa_milhas: string;
+  localizador: string;
+  observacoes: string;
+}
+
+// ============================================
+// Interface COMPLETA (Detalhada)
+// ============================================
+export interface SalesImportComplete {
   data_venda: string;
   nome_cliente: string;
   cpf_cliente: string;
@@ -26,17 +46,43 @@ export interface SalesImportTemplate {
   contato_vendedor_balcao: string;
 }
 
-// 🔹 Campos obrigatórios no modo simplificado
-const REQUIRED_FIELDS_SIMPLE: (keyof SalesImportTemplate)[] = [
+// Type unificado para compatibilidade com parser/validator
+export type SalesImportTemplate = SalesImportSimple & Partial<SalesImportComplete>;
+
+// ============================================
+// CAMPOS OBRIGATÓRIOS - MODO SIMPLES
+// ============================================
+const REQUIRED_FIELDS_SIMPLE: (keyof SalesImportSimple)[] = [
   "data_venda",
   "nome_cliente",
+  "quantidade_milhas",
+  "custo_milheiro",
   "valor_total",
   "forma_pagamento",
   "status_pagamento",
 ];
 
-// 🔹 Ordem das colunas (garante consistência)
-const HEADER_KEYS: (keyof SalesImportTemplate)[] = [
+// ============================================
+// ORDEM DAS COLUNAS - MODO SIMPLES
+// ============================================
+const HEADER_KEYS_SIMPLE: (keyof SalesImportSimple)[] = [
+  "data_venda",
+  "nome_cliente",
+  "quantidade_milhas",
+  "custo_milheiro",
+  "taxa_embarque_total",
+  "valor_total",
+  "forma_pagamento",
+  "status_pagamento",
+  "programa_milhas",
+  "localizador",
+  "observacoes",
+];
+
+// ============================================
+// ORDEM DAS COLUNAS - MODO COMPLETO
+// ============================================
+const HEADER_KEYS_COMPLETE: (keyof SalesImportComplete)[] = [
   "data_venda",
   "nome_cliente",
   "cpf_cliente",
@@ -62,9 +108,97 @@ const HEADER_KEYS: (keyof SalesImportTemplate)[] = [
   "contato_vendedor_balcao",
 ];
 
-export function generateSalesImportTemplate(format: 'csv' | 'xlsx' = 'xlsx') {
-  // Exemplo de linha preenchida (para referência)
-  const exampleRow: SalesImportTemplate = {
+// ============================================
+// GERADOR DE TEMPLATE SIMPLIFICADO
+// ============================================
+export function generateSimpleTemplate(format: 'csv' | 'xlsx' = 'xlsx') {
+  const exampleRow: SalesImportSimple = {
+    data_venda: new Date().toLocaleDateString('pt-BR'),
+    nome_cliente: 'João da Silva',
+    quantidade_milhas: '25.000',
+    custo_milheiro: '18,50',
+    taxa_embarque_total: '320,00',
+    valor_total: '1.850,00',
+    forma_pagamento: 'pix',
+    status_pagamento: 'paid',
+    programa_milhas: 'LATAM',
+    localizador: 'ABC123',
+    observacoes: 'Cliente preferencial',
+  };
+
+  const instructionsRow = {} as SalesImportSimple;
+  HEADER_KEYS_SIMPLE.forEach((key) => {
+    (instructionsRow as any)[key] = REQUIRED_FIELDS_SIMPLE.includes(key)
+      ? "OBRIGATÓRIO"
+      : "Opcional";
+  });
+
+  const emptyRow: SalesImportSimple = {
+    data_venda: '',
+    nome_cliente: '',
+    quantidade_milhas: '',
+    custo_milheiro: '',
+    taxa_embarque_total: '',
+    valor_total: '',
+    forma_pagamento: '',
+    status_pagamento: '',
+    programa_milhas: '',
+    localizador: '',
+    observacoes: '',
+  };
+
+  const data: SalesImportSimple[] = [
+    instructionsRow,
+    exampleRow,
+    emptyRow,
+    emptyRow,
+  ];
+
+  if (format === 'xlsx') {
+    const worksheet = XLSX.utils.json_to_sheet(data, { header: HEADER_KEYS_SIMPLE as string[] });
+    
+    worksheet['!cols'] = [
+      { wch: 15 }, // data_venda
+      { wch: 25 }, // nome_cliente
+      { wch: 18 }, // quantidade_milhas
+      { wch: 15 }, // custo_milheiro
+      { wch: 18 }, // taxa_embarque_total
+      { wch: 15 }, // valor_total
+      { wch: 18 }, // forma_pagamento
+      { wch: 18 }, // status_pagamento
+      { wch: 20 }, // programa_milhas
+      { wch: 15 }, // localizador
+      { wch: 30 }, // observacoes
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Vendas');
+
+    XLSX.writeFile(workbook, `modelo-importacao-faturamento.xlsx`);
+  } else {
+    const worksheet = XLSX.utils.json_to_sheet(data, { header: HEADER_KEYS_SIMPLE as string[] });
+    const csv = XLSX.utils.sheet_to_csv(worksheet);
+    
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'modelo-importacao-faturamento.csv');
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+}
+
+// ============================================
+// GERADOR DE TEMPLATE COMPLETO
+// ============================================
+export function generateCompleteTemplate(format: 'csv' | 'xlsx' = 'xlsx') {
+  const exampleRow: SalesImportComplete = {
     data_venda: new Date().toLocaleDateString('pt-BR'),
     nome_cliente: 'João da Silva',
     cpf_cliente: '123.456.789-00',
@@ -90,16 +224,29 @@ export function generateSalesImportTemplate(format: 'csv' | 'xlsx' = 'xlsx') {
     contato_vendedor_balcao: '',
   };
 
-  // Linha de instruções: OB RIGATÓRIO / Opcional
-  const instructionsRow = {} as SalesImportTemplate;
-  HEADER_KEYS.forEach((key) => {
-    (instructionsRow as any)[key] = REQUIRED_FIELDS_SIMPLE.includes(key)
-      ? "OBRIGATÓRIO"
-      : "Opcional";
+  const instructionsRow = {} as SalesImportComplete;
+  HEADER_KEYS_COMPLETE.forEach((key) => {
+    // No modo completo, mais campos são obrigatórios
+    const isRequired = [
+      "data_venda",
+      "nome_cliente",
+      "cpf_cliente",
+      "programa_milhas",
+      "tipo_viagem",
+      "origem",
+      "destino",
+      "data_ida",
+      "milhas_ida",
+      "numero_passageiros",
+      "valor_total",
+      "forma_pagamento",
+      "status_pagamento",
+    ].includes(key);
+    
+    (instructionsRow as any)[key] = isRequired ? "OBRIGATÓRIO" : "Opcional";
   });
 
-  // Linhas vazias para preenchimento
-  const emptyRow: SalesImportTemplate = {
+  const emptyRow: SalesImportComplete = {
     data_venda: '',
     nome_cliente: '',
     cpf_cliente: '',
@@ -125,12 +272,7 @@ export function generateSalesImportTemplate(format: 'csv' | 'xlsx' = 'xlsx') {
     contato_vendedor_balcao: '',
   };
 
-  // Ordem das linhas na planilha:
-  // Row1: cabeçalho (gerado pelo json_to_sheet a partir das keys)
-  // Row2: instruções (OBRIGATÓRIO/Opcional)
-  // Row3: exemplo
-  // Row4+: vazias
-  const data: SalesImportTemplate[] = [
+  const data: SalesImportComplete[] = [
     instructionsRow,
     exampleRow,
     emptyRow,
@@ -138,42 +280,23 @@ export function generateSalesImportTemplate(format: 'csv' | 'xlsx' = 'xlsx') {
   ];
 
   if (format === 'xlsx') {
-    const worksheet = XLSX.utils.json_to_sheet(data, { header: HEADER_KEYS as string[] });
+    const worksheet = XLSX.utils.json_to_sheet(data, { header: HEADER_KEYS_COMPLETE as string[] });
     
-    // Configurar larguras das colunas
     worksheet['!cols'] = [
-      { wch: 15 }, // data_venda
-      { wch: 25 }, // nome_cliente
-      { wch: 20 }, // cpf_cliente
-      { wch: 20 }, // telefone_cliente
-      { wch: 20 }, // programa_milhas
-      { wch: 15 }, // numero_conta
-      { wch: 15 }, // tipo_viagem
-      { wch: 10 }, // origem
-      { wch: 10 }, // destino
-      { wch: 15 }, // data_ida
-      { wch: 15 }, // data_volta
-      { wch: 12 }, // milhas_ida
-      { wch: 12 }, // milhas_volta
-      { wch: 15 }, // numero_passageiros
-      { wch: 18 }, // taxa_embarque_total
-      { wch: 15 }, // valor_total
-      { wch: 18 }, // forma_pagamento
-      { wch: 18 }, // status_pagamento
-      { wch: 15 }, // localizador
-      { wch: 30 }, // observacoes
-      { wch: 22 }, // custo_mil_milhas_balcao
-      { wch: 20 }, // vendedor_balcao
-      { wch: 25 }, // contato_vendedor_balcao
+      { wch: 15 }, { wch: 25 }, { wch: 20 }, { wch: 20 },
+      { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 10 },
+      { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 12 },
+      { wch: 12 }, { wch: 15 }, { wch: 18 }, { wch: 15 },
+      { wch: 18 }, { wch: 18 }, { wch: 15 }, { wch: 30 },
+      { wch: 22 }, { wch: 20 }, { wch: 25 },
     ];
 
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Vendas');
 
-    XLSX.writeFile(workbook, `modelo-importacao-vendas.xlsx`);
+    XLSX.writeFile(workbook, `modelo-importacao-completa.xlsx`);
   } else {
-    // CSV (sem estilos, mas com a mesma estrutura)
-    const worksheet = XLSX.utils.json_to_sheet(data, { header: HEADER_KEYS as string[] });
+    const worksheet = XLSX.utils.json_to_sheet(data, { header: HEADER_KEYS_COMPLETE as string[] });
     const csv = XLSX.utils.sheet_to_csv(worksheet);
     
     const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -181,7 +304,7 @@ export function generateSalesImportTemplate(format: 'csv' | 'xlsx' = 'xlsx') {
     const url = URL.createObjectURL(blob);
     
     link.setAttribute('href', url);
-    link.setAttribute('download', 'modelo-importacao-vendas.csv');
+    link.setAttribute('download', 'modelo-importacao-completa.csv');
     link.style.visibility = 'hidden';
     
     document.body.appendChild(link);

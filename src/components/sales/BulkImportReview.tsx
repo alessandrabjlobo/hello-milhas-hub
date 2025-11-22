@@ -120,14 +120,15 @@ export function BulkImportReview({
                   {row.data.nome_cliente}
                 </TableCell>
                 <TableCell>
-                  {row.validation.resolvedData.airlineName || row.data.programa_milhas}
+                  {row.validation.resolvedData.airlineName || row.data.programa_milhas || '-'}
                 </TableCell>
                 <TableCell className="font-mono text-sm">
-                  {row.data.origem} → {row.data.destino}
+                  {row.data.origem && row.data.destino ? `${row.data.origem} → ${row.data.destino}` : '-'}
                 </TableCell>
                 <TableCell>
-                  {row.data.milhas_ida}
-                  {row.data.milhas_volta && ` + ${row.data.milhas_volta}`}
+                  {row.data.quantidade_milhas || 
+                   (row.data.milhas_ida && row.data.milhas_volta ? `${row.data.milhas_ida} + ${row.data.milhas_volta}` : 
+                    row.data.milhas_ida || '-')}
                 </TableCell>
                 <TableCell>
                   R$ {row.data.valor_total}
