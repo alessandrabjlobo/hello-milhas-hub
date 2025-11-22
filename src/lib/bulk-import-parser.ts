@@ -33,8 +33,18 @@ async function parseCSV(file: File): Promise<ParseResult> {
       header: true,
       skipEmptyLines: true,
       complete: (results) => {
-        const rows: ParsedSaleRow[] = results.data.map((row: any, index: number) => ({
-          rowNumber: index + 2, // +2 porque Excel começa em 1 e tem header
+        const rawRows = results.data as any[];
+
+        // 🔹 Filtra fora a linha de instruções, caso exista em CSV
+        const filtered = rawRows.filter((row) => {
+          const dv = String(row.data_venda || '').toUpperCase();
+          return dv !== 'OBRIGATÓRIO';
+        });
+
+        const rows: ParsedSaleRow[] = filtered.map((row: any, index: number) => ({
+          // CSV geralmente tem: linha 1 = cabeçalho
+          // então primeira linha de dados é linha 2
+          rowNumber: index + 2,
           data: normalizeRowData(row),
           rawData: row,
         }));
@@ -71,11 +81,21 @@ async function parseXLSX(file: File): Promise<ParseResult> {
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         
-        // Converter para JSON
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false });
-        
-        const rows: ParsedSaleRow[] = jsonData.map((row: any, index: number) => ({
-          rowNumber: index + 2,
+        // Converter para JSON (cada objeto = uma linha após o cabeçalho)
+        const jsonData = XLSX.utils.sheet_to_json<any>(worksheet, { raw: false });
+
+        // 🔹 Remove a linha de instruções (onde data_venda = "OBRIGATÓRIO")
+        const filtered = jsonData.filter((row) => {
+          const dv = String(row.data_venda || '').toUpperCase();
+          return dv !== 'OBRIGATÓRIO';
+        });
+
+        const rows: ParsedSaleRow[] = filtered.map((row: any, index: number) => ({
+          // Excel:
+          // 1 = cabeçalho
+          // 2 = instruções ("OBRIGATÓRIO"/"Opcional")
+          // 3 = primeira linha de exemplo/dados
+          rowNumber: index + 3,
           data: normalizeRowData(row),
           rawData: row,
         }));
