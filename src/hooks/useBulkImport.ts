@@ -39,14 +39,13 @@ export function useBulkImport() {
       setParsing(true);
       setFile(uploadedFile);
 
-      // Parse file
       const parseResult = await parseSalesFile(uploadedFile);
 
       if (!parseResult.success) {
         toast({
           title: 'Erro ao processar arquivo',
           description:
-            parseResult.errors[0]?.message || 'Erro desconhecido ao ler o arquivo',
+            parseResult.errors[0]?.message || 'Erro desconhecido ao ler arquivo',
           variant: 'destructive',
         });
         return;
@@ -70,7 +69,7 @@ export function useBulkImport() {
         return;
       }
 
-      // Validar cada linha
+      // Validação linha a linha
       const processedRows: ProcessedSaleRow[] = await Promise.all(
         parseResult.rows.map(async (row) => {
           const validation = await validateSaleRow(
@@ -78,7 +77,7 @@ export function useBulkImport() {
             linkedAirlines,
             accounts,
             supplierId || '',
-            mode,
+            mode
           );
 
           return {
@@ -86,15 +85,13 @@ export function useBulkImport() {
             validation,
             status: validation.isValid ? 'valid' : 'invalid',
           };
-        }),
+        })
       );
 
       setRows(processedRows);
 
-      const validCount = processedRows.filter((r) => r.status === 'valid')
-        .length;
-      const invalidCount = processedRows.filter((r) => r.status === 'invalid')
-        .length;
+      const validCount = processedRows.filter((r) => r.status === 'valid').length;
+      const invalidCount = processedRows.filter((r) => r.status === 'invalid').length;
 
       toast({
         title: 'Arquivo processado',
@@ -114,21 +111,21 @@ export function useBulkImport() {
   const updateRow = (rowNumber: number, updates: Partial<ProcessedSaleRow>) => {
     setRows((prev) =>
       prev.map((row) =>
-        row.rowNumber === rowNumber ? { ...row, ...updates } : row,
-      ),
+        row.rowNumber === rowNumber ? { ...row, ...updates } : row
+      )
     );
   };
 
-  // Garante que a companhia aérea exista
+  // Garante que a companhia aérea existe (ou cria se não existir)
   const ensureAirlineExists = async (
     airlineCode: string,
-    supplierId: string,
+    supplierId: string
   ): Promise<string | null> => {
     if (!airlineCode) return null;
 
     const code = airlineCode.trim().toUpperCase();
 
-    // Buscar existente
+    // tenta buscar existente
     const { data: existing } = await supabase
       .from('airline_companies')
       .select('id')
@@ -138,14 +135,14 @@ export function useBulkImport() {
 
     if (existing) return existing.id;
 
-    // Criar nova companhia
+    // cria nova
     const { data: newAirline, error } = await supabase
       .from('airline_companies')
       .insert({
         supplier_id: supplierId,
         user_id: (await supabase.auth.getUser()).data.user?.id,
         code,
-        name: code, // temporário = próprio código
+        name: code,
         cpf_limit: 25,
         renewal_type: 'annual',
         cost_per_mile: 0.029,
@@ -158,7 +155,6 @@ export function useBulkImport() {
       return null;
     }
 
-    // Vincular ao supplier
     await supabase.from('suppliers_airlines').insert({
       supplier_id: supplierId,
       airline_company_id: newAirline.id,
@@ -201,11 +197,11 @@ export function useBulkImport() {
 
     for (const row of validRows) {
       try {
-        // Garante que a cia exista
+        // garante companhia aérea
         if (row.data.programa_milhas) {
           const airlineId = await ensureAirlineExists(
             row.data.programa_milhas,
-            supplierId,
+            supplierId
           );
 
           if (airlineId && !row.validation.resolvedData.airlineCompanyId) {
@@ -215,10 +211,9 @@ export function useBulkImport() {
           }
         }
 
-        // Converter linha em SaleFormData
+        // converte linha da planilha para o formato do saleService
         const saleData = convertRowToSaleData(row);
 
-        // Cria venda usando serviço existente
         const result = await createSaleWithSegments(saleData, supplierId);
 
         if (result.error) {
@@ -254,7 +249,7 @@ export function useBulkImport() {
       toast({
         title: 'Companhias cadastradas automaticamente',
         description: `${Array.from(
-          newAirlines,
+          newAirlines
         ).join(', ')}. Configure limites e regras em "Minhas Companhias".`,
       });
     }
@@ -294,6 +289,10 @@ export function useBulkImport() {
   };
 }
 
+// ==========================================================
+// Conversão da linha da planilha para o formato do saleService
+// ==========================================================
+
 function convertRowToSaleData(row: ProcessedSaleRow): any {
   const data = row.data;
   const resolved = row.validation.resolvedData;
@@ -302,9 +301,6 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
   const isSimpleImport = !!(data.quantidade_milhas && data.custo_milheiro);
 
   if (isSimpleImport) {
-    // ============================================
-    // IMPORTAÇÃO SIMPLIFICADA (FATURAMENTO)
-    // ============================================
     const qtdMilhas = parseBRNumber(data.quantidade_milhas || '0');
     const custoMilheiro = parseBRNumber(data.custo_milheiro || '0');
     const taxa = data.taxa_embarque_total
@@ -312,20 +308,17 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
       : 0;
     const valorTotal = parseBRNumber(data.valor_total || '0');
 
-    // Fórmula da calculadora
     const custoMilhas = (qtdMilhas / 1000) * custoMilheiro;
     const custoTotal = custoMilhas + taxa;
     const lucro = valorTotal - custoTotal;
 
-    // Margem SEM virar null (pode ser negativa)
+    // margem sempre número (pode ser negativa)
     let margem = 0;
     if (valorTotal > 0 && isFinite(lucro)) {
       margem = (lucro / valorTotal) * 100;
     }
 
-    const vendaDate = data.data_venda
-      ? parseBRDate(data.data_venda)
-      : null;
+    const vendaDate = data.data_venda ? parseBRDate(data.data_venda) : null;
 
     console.log('[Importação Simples] Cálculo financeiro:', {
       quantidade_milhas: qtdMilhas,
@@ -347,14 +340,13 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
       tripType: 'one_way' as const,
       flightSegments: [],
 
-      // Valores financeiros calculados
       priceTotal: valorTotal,
       boardingFee: taxa,
       totalMilesUsed: qtdMilhas,
       costPerThousand: custoMilheiro,
       totalCost: custoTotal,
       profit: lucro,
-      profitMargin: margem, // nunca null
+      profitMargin: margem,
       saleDate: vendaDate ? formatDateToISO(vendaDate) : undefined,
 
       paymentMethod: data.forma_pagamento,
@@ -365,9 +357,7 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
     };
   }
 
-  // ============================================
-  // IMPORTAÇÃO COMPLETA (DETALHADA)
-  // ============================================
+  // Importação completa (detalhada)
   const isCounter = resolved.isCounter;
   const isLegacy = resolved.isLegacyImport;
 
@@ -379,7 +369,6 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
 
   const flightSegments: any[] = [];
 
-  // Ida
   if (data.origem && data.destino && data.data_ida && data.milhas_ida) {
     const dataIdaDate = parseBRDate(data.data_ida);
     flightSegments.push({
@@ -390,7 +379,6 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
     });
   }
 
-  // Volta
   if (
     data.tipo_viagem === 'round_trip' &&
     data.destino &&
@@ -441,15 +429,12 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
     };
   }
 
-  // counter
   return {
     ...baseData,
     channel: 'counter',
     sellerName: data.vendedor_balcao,
     sellerContact: data.contato_vendedor_balcao,
-    counterCostPerThousand: parseBRNumber(
-      data.custo_mil_milhas_balcao || '0',
-    ),
+    counterCostPerThousand: parseBRNumber(data.custo_mil_milhas_balcao || '0'),
     counterAirlineProgram: data.programa_milhas,
   };
 }
