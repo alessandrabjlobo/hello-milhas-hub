@@ -35,7 +35,7 @@ const REQUIRED_FIELDS_SIMPLE: (keyof SalesImportTemplate)[] = [
   "status_pagamento",
 ];
 
-// 🔹 Ordem das colunas (deve bater com a interface e com o JSON gerado)
+// 🔹 Ordem das colunas (garante consistência)
 const HEADER_KEYS: (keyof SalesImportTemplate)[] = [
   "data_venda",
   "nome_cliente",
@@ -61,18 +61,6 @@ const HEADER_KEYS: (keyof SalesImportTemplate)[] = [
   "vendedor_balcao",
   "contato_vendedor_balcao",
 ];
-
-// 🔹 Converte índice de coluna (0-based) para letra Excel (A, B, C... AA, AB...)
-function colIndexToLetter(index: number): string {
-  let s = "";
-  let n = index + 1;
-  while (n > 0) {
-    const mod = (n - 1) % 26;
-    s = String.fromCharCode(65 + mod) + s;
-    n = Math.floor((n - 1) / 26);
-  }
-  return s;
-}
 
 export function generateSalesImportTemplate(format: 'csv' | 'xlsx' = 'xlsx') {
   // Exemplo de linha preenchida (para referência)
@@ -102,6 +90,14 @@ export function generateSalesImportTemplate(format: 'csv' | 'xlsx' = 'xlsx') {
     contato_vendedor_balcao: '',
   };
 
+  // Linha de instruções: OB RIGATÓRIO / Opcional
+  const instructionsRow = {} as SalesImportTemplate;
+  HEADER_KEYS.forEach((key) => {
+    (instructionsRow as any)[key] = REQUIRED_FIELDS_SIMPLE.includes(key)
+      ? "OBRIGATÓRIO"
+      : "Opcional";
+  });
+
   // Linhas vazias para preenchimento
   const emptyRow: SalesImportTemplate = {
     data_venda: '',
@@ -129,10 +125,20 @@ export function generateSalesImportTemplate(format: 'csv' | 'xlsx' = 'xlsx') {
     contato_vendedor_balcao: '',
   };
 
-  const data = [exampleRow, emptyRow, emptyRow, emptyRow];
+  // Ordem das linhas na planilha:
+  // Row1: cabeçalho (gerado pelo json_to_sheet a partir das keys)
+  // Row2: instruções (OBRIGATÓRIO/Opcional)
+  // Row3: exemplo
+  // Row4+: vazias
+  const data: SalesImportTemplate[] = [
+    instructionsRow,
+    exampleRow,
+    emptyRow,
+    emptyRow,
+  ];
 
   if (format === 'xlsx') {
-    const worksheet = XLSX.utils.json_to_sheet(data);
+    const worksheet = XLSX.utils.json_to_sheet(data, { header: HEADER_KEYS as string[] });
     
     // Configurar larguras das colunas
     worksheet['!cols'] = [
@@ -161,44 +167,13 @@ export function generateSalesImportTemplate(format: 'csv' | 'xlsx' = 'xlsx') {
       { wch: 25 }, // contato_vendedor_balcao
     ];
 
-    // 🔴 Destacar com cor os campos obrigatórios (modo simplificado)
-    HEADER_KEYS.forEach((key, index) => {
-      const colLetter = colIndexToLetter(index);
-      const cellRef = `${colLetter}1`; // linha 1 = cabeçalho
-      const cell = worksheet[cellRef];
-
-      if (!cell) return;
-
-      // Garante que existe o objeto de estilo
-      (cell as any).s = (cell as any).s || {};
-
-      // Header sempre em negrito
-      (cell as any).s.font = {
-        ...(cell as any).s.font,
-        bold: true,
-      };
-
-      // Se for campo obrigatório no modo simplificado, aplica cor de destaque
-      if (REQUIRED_FIELDS_SIMPLE.includes(key)) {
-        (cell as any).s.fill = {
-          patternType: "solid",
-          fgColor: { rgb: "FFFDE9E9" }, // fundo levemente rosado
-        };
-        (cell as any).s.font = {
-          ...(cell as any).s.font,
-          color: { rgb: "FFB00000" }, // texto vermelho escuro
-          bold: true,
-        };
-      }
-    });
-
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Vendas');
 
     XLSX.writeFile(workbook, `modelo-importacao-vendas.xlsx`);
   } else {
-    // CSV (sem estilos)
-    const worksheet = XLSX.utils.json_to_sheet(data);
+    // CSV (sem estilos, mas com a mesma estrutura)
+    const worksheet = XLSX.utils.json_to_sheet(data, { header: HEADER_KEYS as string[] });
     const csv = XLSX.utils.sheet_to_csv(worksheet);
     
     const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
