@@ -119,6 +119,7 @@ function normalizeRowData(row: any): SalesImportTemplate {
     taxa_embarque_total: String(row.taxa_embarque_total || '').trim(),
     valor_total: String(row.valor_total || '').trim(),
     forma_pagamento: String(row.forma_pagamento || '').trim().toLowerCase(),
+    status_pagamento: String(row.status_pagamento || '').trim().toLowerCase(),
     localizador: String(row.localizador || '').trim().toUpperCase(),
     observacoes: String(row.observacoes || '').trim(),
     custo_mil_milhas_balcao: String(row.custo_mil_milhas_balcao || '').trim(),
