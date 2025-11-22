@@ -4,7 +4,15 @@ import type { SaleFormData } from "@/schemas/saleSchema";
 /**
  * SERVIÇO DE CRIAÇÃO DE VENDAS
  *
- * Ver comentários no topo do arquivo original – mantidos.
+ * FLUXO DE CPF (vendas internas):
+ *  - Registra CPFs em `cpf_registry` por companhia aérea
+ *  - Atualiza uso / datas e depois chama `update_account_cpf_count`
+ *
+ * CÁLCULOS FINANCEIROS:
+ *  - price_total / sale_price: preço base (sem juros) que será usado para margem
+ *  - total_cost: custo total (milhas + taxa de embarque)
+ *  - profit / margin_value: price_total - total_cost
+ *  - profit_margin / margin_percentage: (profit / price_total) * 100
  */
 
 export interface CreateSaleResult {
@@ -17,7 +25,9 @@ export async function createSaleWithSegments(
   supplierId: string
 ): Promise<CreateSaleResult> {
   try {
-    // ✅ 0) Validação explícita do supplierId
+    // -------------------------------------------------
+    // 0) Validação básica
+    // -------------------------------------------------
     if (!supplierId || supplierId.trim() === "") {
       throw new Error(
         "ID do fornecedor (agency_id) não fornecido. Aguarde o carregamento dos dados da agência antes de salvar."
@@ -37,7 +47,7 @@ export async function createSaleWithSegments(
     console.log("[createSaleWithSegments] formData recebido:", formData);
 
     // -------------------------------------------------
-    // 1) Normalizar e validar canal (internal / counter / legacy)
+    // 1) Canal (internal / counter / legacy)
     // -------------------------------------------------
     const channel = (formData as any).channel as
       | "internal"
@@ -82,23 +92,21 @@ export async function createSaleWithSegments(
       }
     }
 
-    // -------------------------------------------------
-    // 2) Mapear channel para valor aceito pelo banco
-    // -------------------------------------------------
+    // Mapeia para valor aceito no banco
     const dbChannel =
       channel === "internal"
         ? "internal"
         : channel === "counter"
         ? "balcao"
         : channel === "legacy"
-        ? "internal" // usamos internal + sale_source = bulk_import
+        ? "internal" // usa "internal" mas marca sale_source = bulk_import
         : channel;
 
     console.log("[createSaleWithSegments] channel (form):", channel);
     console.log("[createSaleWithSegments] channel (db):", dbChannel);
 
     // -------------------------------------------------
-    // 3) Normalizar segmentos de voo
+    // 2) Segments de voo (JSONB) + milhas usadas
     // -------------------------------------------------
     const rawSegments: any =
       (formData as any).flightSegments ??
@@ -114,58 +122,83 @@ export async function createSaleWithSegments(
       );
     }
 
-    // 🔢 Milhas vindas do formulário (Nova Venda / Importação simples)
-    const totalMilesFromForm =
-      Number(
-        (formData as any).totalMilesUsed ??
-          (formData as any).totalMiles ??
-          (formData as any).miles_used ??
-          0
-      ) || 0;
+    // Milhas vindas direto do formulário (simples) OU calculadas dos trechos
+    const formMilesRaw =
+      (formData as any).totalMilesUsed ??
+      (formData as any).total_miles_used ??
+      (formData as any).totalMiles ??
+      null;
 
-    // ✅ Total de milhas usadas: se tiver trechos, soma; senão usa o total do formulário
-    const totalMilesUsed =
+    const milesFromSegments =
       flightSegments.length > 0
         ? flightSegments.reduce(
             (sum: number, s: any) => sum + (Number(s.miles) || 0),
             0
           )
-        : totalMilesFromForm;
+        : 0;
+
+    const totalMilesUsed =
+      formMilesRaw !== null && formMilesRaw !== undefined
+        ? Number(formMilesRaw) || 0
+        : milesFromSegments;
 
     if (flightSegments.length === 0) {
       console.warn(
         "[createSaleWithSegments] Nenhum trecho recebido em flightSegments. " +
-          `Total de milhas será lido do formulário: ${totalMilesUsed}`
+          "A venda será criada sem registros em sale_segments."
       );
     }
 
     // -------------------------------------------------
-    // 4) Normalizar valores financeiros
+    // 3) Valores financeiros (custo, preço, lucro, margem)
     // -------------------------------------------------
     const totalCostRaw =
-      (formData as any).totalCost ?? (formData as any).total_cost ?? 0;
-
+      (formData as any).totalCost ??
+      (formData as any).total_cost ??
+      0;
     const totalCost = Number(totalCostRaw) || 0;
 
-    const priceTotal =
-      Number((formData as any).priceTotal ?? (formData as any).sale_price ?? 0) ||
+    const priceTotalRaw =
+      (formData as any).priceTotal ??
+      (formData as any).sale_price ??
+      (formData as any).price_total ??
       0;
+    const priceTotal = Number(priceTotalRaw) || 0;
 
-    // profit / profitMargin podem ser negativos, mas nunca null na tabela
-    const profitField = (formData as any).profit;
+    const profitRaw =
+      (formData as any).profit ??
+      (formData as any).margin_value ??
+      null;
+
+    const marginRaw =
+      (formData as any).profitMargin ??
+      (formData as any).margin_percentage ??
+      null;
+
     const profit =
-      profitField !== null && profitField !== undefined
-        ? Number(profitField)
+      profitRaw !== null && profitRaw !== undefined
+        ? Number(profitRaw)
+        : priceTotal - totalCost;
+
+    const profitMargin =
+      marginRaw !== null && marginRaw !== undefined
+        ? Number(marginRaw)
+        : priceTotal > 0
+        ? (profit / priceTotal) * 100
         : 0;
 
-    const profitMarginField = (formData as any).profitMargin;
-    const profitMargin =
-      profitMarginField !== null && profitMarginField !== undefined
-        ? Number(profitMarginField)
+    const costPerThousandRaw =
+      (formData as any).costPerThousand ??
+      (formData as any).cost_per_thousand ??
+      null;
+
+    const costPerThousand =
+      costPerThousandRaw !== null && costPerThousandRaw !== undefined
+        ? Number(costPerThousandRaw)
         : null;
 
     // -------------------------------------------------
-    // 5) Montar payload da venda
+    // 4) Montar payload para tabela sales
     // -------------------------------------------------
     const salePayload: any = {
       supplier_id: supplierId,
@@ -180,41 +213,46 @@ export async function createSaleWithSegments(
       created_by: user.id,
       user_id: user.id,
 
-      // 🔹 Campos obrigatórios
+      // Milhas / custo
       miles_used: totalMilesUsed,
       total_cost: totalCost,
 
-      // 🔹 Receita e lucro
+      // Receita / lucro (colunas novas)
       sale_price: priceTotal,
       profit,
-      profit_margin: profitMargin,
+      profit_margin: profitMargin ?? 0,
 
-      // 🔹 Compatibilidade com campos antigos
+      // Compatibilidade com colunas antigas
       price_total: priceTotal,
       margin_value: profit,
-      margin_percentage: profitMargin,
+      margin_percentage: profitMargin ?? 0,
 
-      // 🔹 Preço por passageiro (se vier)
+      // Extras de preço
       price_per_passenger: (formData as any).pricePerPassenger
         ? Number((formData as any).pricePerPassenger)
         : null,
-
-      // 🔹 Taxa de embarque (se vier)
       boarding_fee: (formData as any).boardingFee
         ? Number((formData as any).boardingFee)
         : null,
 
-      // 🔹 CPFs dos passageiros (JSONB)
-      passenger_cpfs: (formData as any).passengerCpfs || [],
+      // Financeiro adicional
+      cost_per_thousand: costPerThousand,
 
-      // 🔹 Localizador (Nova venda + Importação simples)
-      locator:
-        (formData as any).locator ??
-        (formData as any).localizador ??
+      // Programa / localizador para tela de detalhes
+      airline_program:
+        (formData as any).airlineProgram ??
+        (formData as any).programa_milhas ??
         null,
+      locator_code:
+        (formData as any).localizador ??
+        (formData as any).locator ??
+        null,
+
+      // CPFs de passageiros (JSONB)
+      passenger_cpfs: (formData as any).passengerCpfs || [],
     };
 
-    // Se vier saleDate da importação, usar no lugar de now()
+    // Se vier saleDate (importação), usar no created_at
     if ((formData as any).saleDate) {
       salePayload.created_at = (formData as any).saleDate;
     }
@@ -225,14 +263,10 @@ export async function createSaleWithSegments(
       salePayload.mileage_account_id = (formData as any).accountId;
       salePayload.sale_source = "internal_account";
     } else if (channel === "legacy") {
-      // Importação legada (faturamento)
+      // Importação simples
       salePayload.sale_source = "bulk_import";
       salePayload.mileage_account_id = null;
       salePayload.program_id = null;
-
-      // Guardar programa em counter_airline_program para exibir na tela
-      salePayload.counter_airline_program =
-        (formData as any).airlineProgram || null;
     } else if (channel === "counter") {
       salePayload.seller_name = (formData as any).sellerName;
       salePayload.seller_contact = (formData as any).sellerContact;
@@ -245,10 +279,10 @@ export async function createSaleWithSegments(
         (formData as any).counterAirlineProgram ?? null;
     }
 
-    // JSONB com segmentos para histórico
+    // JSONB de segmentos
     salePayload.flight_segments = flightSegments;
 
-    // Texto de rota
+    // Texto de rota (ex: FOR–GRU, GRU–GIG)
     salePayload.route_text =
       flightSegments.length > 0
         ? flightSegments
@@ -259,7 +293,7 @@ export async function createSaleWithSegments(
     console.log("[createSaleWithSegments] Payload para sales:", salePayload);
 
     // -------------------------------------------------
-    // 6) Inserir na tabela sales
+    // 5) Inserir na tabela sales
     // -------------------------------------------------
     const { data: saleData, error: saleError } = await supabase
       .from("sales")
@@ -277,7 +311,7 @@ export async function createSaleWithSegments(
     }
 
     // -------------------------------------------------
-    // 7) Abater milhas da conta (apenas internal)
+    // 6) Abater milhas da conta (somente internal)
     // -------------------------------------------------
     if (channel === "internal") {
       const accountId = (formData as any).accountId;
@@ -303,7 +337,7 @@ export async function createSaleWithSegments(
     }
 
     // -------------------------------------------------
-    // 8) Registrar CPFs em cpf_registry (somente internal)
+    // 7) Registrar CPFs (somente internal)
     // -------------------------------------------------
     if (channel === "internal") {
       const accountId = (formData as any).accountId;
@@ -321,7 +355,10 @@ export async function createSaleWithSegments(
           .single();
 
         if (accountError || !accountData) {
-          console.error("Erro ao buscar airline_company_id:", accountError);
+          console.error(
+            "Erro ao buscar airline_company_id:",
+            accountError
+          );
         } else {
           const airlineCompanyId = accountData.airline_company_id;
 
@@ -390,7 +427,7 @@ export async function createSaleWithSegments(
     }
 
     // -------------------------------------------------
-    // 9) Inserir em sale_segments (se houver trechos)
+    // 8) Inserir em sale_segments (se houver trechos)
     // -------------------------------------------------
     if (flightSegments.length > 0) {
       const direction =
