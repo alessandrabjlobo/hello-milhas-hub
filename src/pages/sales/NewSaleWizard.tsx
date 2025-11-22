@@ -707,6 +707,10 @@ export default function NewSaleWizard() {
         profitMargin: profitMarginPct || 0,
         pricePerPassenger: pricePerPassenger || null,
         boardingFee: boardingFeeTotal || 0,
+
+        // Campos adicionais para sales
+        airlineProgram: airline || "",
+        localizador: pnr || "",
       };
 
       if (channel === "internal") {

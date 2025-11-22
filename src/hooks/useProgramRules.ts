@@ -50,16 +50,18 @@ export function useProgramRules(selectedAirlineId?: string) {
         });
       } else {
         // não existe regra -> cria (ou garante) uma regra padrão no banco
+        const { data: { user } } = await supabase.auth.getUser();
         const defaultRule = {
           supplier_id: supplierId,
           airline_id: selectedAirlineId,
           cpf_limit: 25,
           renewal_type: "annual" as const,
+          updated_by: user?.id || "",
         };
 
         const { data: upserted, error: upsertError } = await supabase
           .from("program_rules")
-          .upsert(defaultRule, {
+          .upsert([defaultRule], {
             // garante unicidade por fornecedor+programa (ajusta se o nome do índice for diferente)
             onConflict: "supplier_id,airline_id",
           })
