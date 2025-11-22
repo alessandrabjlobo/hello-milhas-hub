@@ -31,6 +31,7 @@ import {
   Ticket as TicketIcon,
   Filter,
   X,
+  FileText,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -46,6 +47,15 @@ import { DeleteTicketDialog } from "@/components/tickets/DeleteTicketDialog";
 import { TicketDetailDialog } from "@/components/tickets/TicketDetailDialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+
+// 👇 mesmo formato usado no TicketPDFUpload
+type Attachment = {
+  fileName: string;
+  filePath: string;
+  fileSize: number;
+  uploadedAt: string;
+  url: string;
+};
 
 export default function Tickets() {
   const navigate = useNavigate();
@@ -251,6 +261,41 @@ export default function Tickets() {
         variant: "destructive",
       });
     }
+  };
+
+  // 🔗 Helper pra pegar anexos da linha (coluna JSONB "attachments")
+  const getAttachments = (ticket: (typeof tickets)[0]): Attachment[] => {
+    const raw = (ticket as any).attachments;
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw as Attachment[];
+    return [];
+  };
+
+  // 👀 Abrir primeiro PDF/JPEG anexado ou avisar se não tiver
+  const handleOpenAttachment = (ticket: (typeof tickets)[0]) => {
+    const attachments = getAttachments(ticket);
+
+    if (!attachments.length) {
+      toast({
+        title: "Nenhum bilhete anexado",
+        description:
+          "Anexe o PDF/JPEG do bilhete na tela de registro ou edição da passagem.",
+      });
+      return;
+    }
+
+    const first = attachments[0];
+    if (!first.url) {
+      toast({
+        title: "Arquivo inválido",
+        description:
+          "O anexo não possui URL pública. Tente reenviar o PDF/JPEG na edição da passagem.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    window.open(first.url, "_blank");
   };
 
   if (loading) {
@@ -474,6 +519,14 @@ export default function Tickets() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          {/* 👇 NOVA AÇÃO: VER BILHETE PDF/JPEG */}
+                          <DropdownMenuItem
+                            onClick={() => handleOpenAttachment(ticket)}
+                          >
+                            <FileText className="h-4 w-4 mr-2" />
+                            Ver bilhete (PDF/JPEG)
+                          </DropdownMenuItem>
+
                           <DropdownMenuItem
                             onClick={() =>
                               setDetailTicket(ticket)
