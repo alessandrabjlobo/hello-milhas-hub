@@ -9,7 +9,17 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import type { Ticket } from "@/hooks/useTickets";
+
+// Mesmo formato do TicketPDFUpload
+type Attachment = {
+  fileName: string;
+  filePath: string;
+  fileSize: number;
+  uploadedAt: string;
+  url: string;
+};
 
 // Configuração dos textos de status
 const statusConfig = {
@@ -69,12 +79,22 @@ const getTicketNumber = (ticket: Ticket): string | null =>
   (ticket as any).bilhete ||
   null;
 
+// Helper para anexos
+const getAttachments = (ticket: Ticket): Attachment[] => {
+  const raw = (ticket as any).attachments;
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw as Attachment[];
+  return [];
+};
+
 interface TicketsTableProps {
   tickets: Ticket[];
   loading?: boolean;
 }
 
 export const TicketsTable = ({ tickets, loading }: TicketsTableProps) => {
+  const { toast } = useToast();
+
   if (loading) {
     return (
       <p className="text-sm text-muted-foreground">
@@ -117,9 +137,31 @@ export const TicketsTable = ({ tickets, loading }: TicketsTableProps) => {
           const airline = getAirlineOrProgram(ticket);
           const locator = getLocator(ticket);
           const ticketNumber = getTicketNumber(ticket);
+          const attachments = getAttachments(ticket);
 
           const rawStatus = (ticket.status || "pending") as keyof typeof statusConfig;
           const status = statusConfig[rawStatus] || statusConfig.pending;
+
+          const handleOpenAttachment = () => {
+            if (!attachments.length) {
+              toast({
+                title: "Nenhum arquivo anexado",
+                description:
+                  "Edite a passagem e anexe o PDF/JPEG do bilhete para visualizar aqui.",
+              });
+              return;
+            }
+
+            // Abre o primeiro anexo
+            window.open(attachments[0].url, "_blank");
+
+            if (attachments.length > 1) {
+              toast({
+                title: "Vários anexos encontrados",
+                description: `Foi aberto o primeiro de ${attachments.length} arquivos anexados.`,
+              });
+            }
+          };
 
           return (
             <TableRow key={ticket.id}>
@@ -184,7 +226,16 @@ export const TicketsTable = ({ tickets, loading }: TicketsTableProps) => {
 
               {/* Ações */}
               <TableCell className="text-right">
-                <Button variant="ghost" size="icon" title="Baixar / visualizar">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  title={
+                    attachments.length
+                      ? "Ver bilhete (PDF/JPEG)"
+                      : "Nenhum arquivo anexado"
+                  }
+                  onClick={handleOpenAttachment}
+                >
                   <Download className="h-4 w-4" />
                 </Button>
               </TableCell>
