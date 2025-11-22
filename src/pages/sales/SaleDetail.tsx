@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -27,7 +27,6 @@ import { PaymentTimeline } from "@/components/sales/PaymentTimeline";
 import { EditSaleDialog } from "@/components/sales/EditSaleDialog";
 import { DeleteSaleDialog } from "@/components/sales/DeleteSaleDialog";
 import type { Database } from "@/integrations/supabase/types";
-import { formatMiles } from "@/lib/utils";
 
 type Sale = Database["public"]["Tables"]["sales"]["Row"] & {
   mileage_accounts?: {
@@ -123,7 +122,7 @@ export default function SaleDetail() {
         .single();
 
       if (saleError) throw saleError;
-      setSale(saleData as Sale);
+      setSale(saleData);
 
       const { data: ticketsData, error: ticketsError } = await supabase
         .from("tickets")
@@ -147,7 +146,6 @@ export default function SaleDetail() {
 
   useEffect(() => {
     fetchSaleDetails();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   if (loading) {
@@ -164,19 +162,6 @@ export default function SaleDetail() {
   if (!sale) {
     return null;
   }
-
-  // 👉 helpers de exibição de margem
-  const profitMargin =
-    sale.profit_margin !== null && sale.profit_margin !== undefined
-      ? sale.profit_margin
-      : null;
-
-  const profitMarginClass =
-    profitMargin === null
-      ? "font-medium"
-      : profitMargin >= 0
-      ? "font-medium text-green-600"
-      : "font-medium text-red-600";
 
   const handleDeleteSale = async () => {
     if (!sale) return;
@@ -200,6 +185,33 @@ export default function SaleDetail() {
       });
     }
   };
+
+  // Helpers de formatação
+  const formatCurrency = (value?: number | null) =>
+    (value ?? 0).toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    });
+
+  const remainingAmount =
+    (sale.sale_price || 0) - (sale.paid_amount || 0);
+
+  const airlineProgramName =
+    sale.mileage_accounts?.airline_companies?.name ||
+    (sale as any).airline_program ||
+    (sale as any).airlineProgram ||
+    "Balcão";
+
+  const locatorCode =
+    (sale as any).locator_code ||
+    (sale as any).localizador ||
+    (sale as any).locator ||
+    "";
+
+  const hasRegisteredTicket =
+    tickets.length > 0 ||
+    (Array.isArray(sale.flight_segments) &&
+      sale.flight_segments.length > 0);
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -245,6 +257,7 @@ export default function SaleDetail() {
           <TabsTrigger value="tickets">Passagens</TabsTrigger>
         </TabsList>
 
+        {/* ======================= RESUMO ======================= */}
         <TabsContent value="summary" className="space-y-6">
           <div className="grid gap-6 md:grid-cols-2">
             {/* CLIENTE */}
@@ -295,69 +308,51 @@ export default function SaleDetail() {
                   <p className="font-medium">{sale.passengers}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Programa</p>
+                  <p className="text-sm text-muted-foreground">
+                    Companhia / Programa
+                  </p>
+                  <p className="font-medium">{airlineProgramName}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Localizador</p>
                   <p className="font-medium">
-                    {sale.mileage_accounts?.airline_companies?.name || "Balcão"}
+                    {locatorCode || "Não informado"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Passagem</p>
+                  <p className="font-medium">
+                    {hasRegisteredTicket
+                      ? "Passagem registrada"
+                      : "Não foi registrada passagem"}
                   </p>
                 </div>
               </CardContent>
             </Card>
 
-            {/* FINANCEIRO */}
+            {/* FINANCEIRO (CUSTO / LUCRO / MILHAS) */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 justify-between">
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="h-5 w-5" />
-                    Financeiro
-                  </div>
-                  <PaymentStatusBadge
-                    status={sale.payment_status || "pending"}
-                    paidAmount={sale.paid_amount || 0}
-                    totalAmount={sale.sale_price || 0}
-                  />
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5" />
+                  Financeiro
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                {/* Resumo de valores */}
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">
-                    Valor Total (cliente)
+                    Custo total
                   </span>
                   <span className="font-medium">
-                    R$ {sale.sale_price?.toFixed(2) || "0.00"}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Já Pago</span>
-                  <span className="font-medium text-green-600">
-                    R$ {sale.paid_amount?.toFixed(2) || "0.00"}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Restante</span>
-                  <span className="font-medium text-orange-600">
-                    R${" "}
-                    {(
-                      (sale.sale_price || 0) - (sale.paid_amount || 0)
-                    ).toFixed(2)}
-                  </span>
-                </div>
-                <Separator className="my-2" />
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Custo</span>
-                  <span className="font-medium">
-                    R$ {sale.total_cost?.toFixed(2) || "0.00"}
+                    {formatCurrency(sale.total_cost)}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">Lucro</span>
                   <span className="font-medium text-green-600">
-                    R$ {sale.profit?.toFixed(2) || "0.00"}
+                    {formatCurrency(sale.profit)}
                   </span>
                 </div>
-
-                {/* 🔽 Detalhamento: milhas, taxa, custo por milheiro, margem */}
                 <Separator className="my-2" />
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">
@@ -365,7 +360,7 @@ export default function SaleDetail() {
                   </span>
                   <span className="font-medium">
                     {sale.total_miles_used
-                      ? formatMiles(sale.total_miles_used)
+                      ? sale.total_miles_used.toLocaleString("pt-BR")
                       : "-"}
                   </span>
                 </div>
@@ -375,7 +370,7 @@ export default function SaleDetail() {
                   </span>
                   <span className="font-medium">
                     {sale.cost_per_thousand
-                      ? `R$ ${sale.cost_per_thousand.toFixed(2)} / 1.000`
+                      ? formatCurrency(sale.cost_per_thousand)
                       : "-"}
                   </span>
                 </div>
@@ -384,24 +379,88 @@ export default function SaleDetail() {
                     Taxa de embarque
                   </span>
                   <span className="font-medium">
-                    R$ {sale.boarding_fee?.toFixed(2) || "0.00"}
+                    {formatCurrency(sale.boarding_fee)}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">
                     Margem de lucro
                   </span>
-                  <span className={profitMarginClass}>
-                    {profitMargin !== null
-                      ? `${profitMargin.toFixed(1)}%`
+                  <span className="font-medium text-green-600">
+                    {sale.profit_margin !== null &&
+                    sale.profit_margin !== undefined
+                      ? `${sale.profit_margin.toFixed(1)}%`
                       : "-"}
                   </span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* PAGAMENTO (CARD SEPARADO) */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="h-5 w-5" />
+                    Pagamento
+                  </div>
+                  <PaymentStatusBadge
+                    status={sale.payment_status || "pending"}
+                    paidAmount={sale.paid_amount || 0}
+                    totalAmount={sale.sale_price || 0}
+                  />
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">
+                    Valor total (cliente)
+                  </span>
+                  <span className="font-medium">
+                    {formatCurrency(sale.sale_price)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Já pago</span>
+                  <span className="font-medium text-green-600">
+                    {formatCurrency(sale.paid_amount)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">
+                    Restante
+                  </span>
+                  <span className="font-medium text-orange-600">
+                    {formatCurrency(remainingAmount)}
+                  </span>
+                </div>
+                <Separator className="my-2" />
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">
+                    Forma de pagamento
+                  </span>
+                  <span className="font-medium">
+                    {sale.payment_method || "Não informado"}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center pt-2">
+                  <span className="text-sm text-muted-foreground">
+                    Detalhar pagamentos
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setPaymentDialogOpen(true)}
+                  >
+                    Registrar / Ver pagamentos
+                  </Button>
                 </div>
               </CardContent>
             </Card>
           </div>
         </TabsContent>
 
+        {/* ======================= PAGAMENTOS ======================= */}
         <TabsContent value="payments" className="space-y-6">
           <div className="flex justify-end mb-4">
             <Button
@@ -418,6 +477,7 @@ export default function SaleDetail() {
           />
         </TabsContent>
 
+        {/* ======================= PASSAGENS ======================= */}
         <TabsContent value="tickets" className="space-y-6">
           <Card>
             <CardHeader>
