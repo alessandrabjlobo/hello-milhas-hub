@@ -291,7 +291,7 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
   const data = row.data;
   const resolved = row.validation.resolvedData;
 
-  // 🔹 NOVO: só considera "simples" quando NÃO há dados de rota/segmento
+  // 🔹 Só considera "simples" quando NÃO há dados de rota/segmento
   const hasRouteInfo =
     !!data.origem ||
     !!data.destino ||
@@ -303,6 +303,9 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
   const isSimpleImport =
     !!(data.quantidade_milhas && data.custo_milheiro) && !hasRouteInfo;
 
+  // ============================
+  // MODO SIMPLES (FATURAMENTO)
+  // ============================
   if (isSimpleImport) {
     const qtdMilhas = parseBRNumber(data.quantidade_milhas || '0');
     const custoMilheiro = parseBRNumber(data.custo_milheiro || '0');
@@ -359,16 +362,22 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
     };
   }
 
-  // Importação completa (detalhada)
-  const hasCounterData = !!(data.custo_mil_milhas_balcao || data.vendedor_balcao);
-  const isCounter = hasCounterData || resolved.isCounter;
-  const isLegacy = resolved.isLegacyImport;
+  // ============================
+  // IMPORTAÇÃO COMPLETA
+  // ============================
 
-  const channel: 'internal' | 'counter' | 'legacy' = isCounter
-    ? 'counter'
-    : isLegacy
-    ? 'legacy'
-    : 'internal';
+  // 🔹 Só é BALCÃO se realmente tiver dados de balcão
+  const hasCounterData = !!(
+    data.custo_mil_milhas_balcao ||
+    data.vendedor_balcao ||
+    data.contato_vendedor_balcao
+  );
+
+  const isCounter = hasCounterData; // NÃO usamos mais resolved.isCounter pra planilha
+  const isLegacy = resolved.isLegacyImport || !hasCounterData;
+
+  const channel: 'internal' | 'counter' | 'legacy' =
+    isCounter ? 'counter' : isLegacy ? 'legacy' : 'internal';
 
   const flightSegments: any[] = [];
 
@@ -418,6 +427,7 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
     localizador: data.localizador || '',
   };
 
+  // LEGACY (importação histórica / sem conta / sem balcão)
   if (channel === 'legacy') {
     return {
       ...baseData,
@@ -425,6 +435,7 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
     };
   }
 
+  // INTERNAL (conta de milhas da casa)
   if (channel === 'internal') {
     return {
       ...baseData,
@@ -434,13 +445,32 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
     };
   }
 
-  // Balcão (counter)
+  // BALCÃO (counter) – só entra aqui se realmente tiver dados de balcão
+  if (channel === 'counter') {
+    const counterCost = parseBRNumber(data.custo_mil_milhas_balcao || '0');
+    const sellerName = (data.vendedor_balcao || '').trim();
+
+    // Se faltar dados críticos, volta como legacy pra não quebrar
+    if (!sellerName || !counterCost || !data.programa_milhas) {
+      return {
+        ...baseData,
+        channel: 'legacy',
+      };
+    }
+
+    return {
+      ...baseData,
+      channel: 'counter',
+      sellerName,
+      sellerContact: data.contato_vendedor_balcao || '',
+      counterCostPerThousand: counterCost,
+      counterAirlineProgram: data.programa_milhas || '',
+    };
+  }
+
+  // fallback seguro
   return {
     ...baseData,
-    channel: 'counter',
-    sellerName: data.vendedor_balcao || 'Vendedor Externo',
-    sellerContact: data.contato_vendedor_balcao || '',
-    counterCostPerThousand: parseBRNumber(data.custo_mil_milhas_balcao || '0'),
-    counterAirlineProgram: data.programa_milhas || '',
+    channel: 'legacy',
   };
 }
