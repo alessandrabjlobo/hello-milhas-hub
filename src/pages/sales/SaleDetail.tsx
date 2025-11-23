@@ -40,10 +40,26 @@ type Sale = Database["public"]["Tables"]["sales"]["Row"] & {
 
 type Ticket = Database["public"]["Tables"]["tickets"]["Row"];
 
-// Helper para não ficar mostrando data feia
+// ✅ Helper de data sem bug de fuso
 const formatDate = (date?: string | null) => {
   if (!date) return "Data não informada";
-  const d = new Date(date);
+
+  if (typeof date === "string") {
+    const raw = date.trim();
+    if (!raw) return "Data não informada";
+
+    // Já está em BR
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) return raw;
+
+    // ISO: "YYYY-MM-DD" ou "YYYY-MM-DDTHH:MM:SS..."
+    const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) {
+      const [, y, m, d] = isoMatch;
+      return `${d}/${m}/${y}`;
+    }
+  }
+
+  const d = new Date(date as string);
   if (isNaN(d.getTime())) return String(date);
   return d.toLocaleDateString("pt-BR");
 };
@@ -62,7 +78,7 @@ export default function SaleDetail() {
   const getFlightStatus = () => {
     if (!sale) return <Badge variant="secondary">Sem Data</Badge>;
 
-    let departureDate: Date | null = null;
+    let departureDate: string | null = null;
 
     if (
       sale.flight_segments &&
@@ -71,20 +87,42 @@ export default function SaleDetail() {
     ) {
       const firstSegment = sale.flight_segments[0] as { date?: string };
       if (firstSegment.date) {
-        departureDate = new Date(firstSegment.date);
+        departureDate = firstSegment.date;
       }
     } else if ((sale as any).travel_dates) {
-      departureDate = new Date(String((sale as any).travel_dates));
+      departureDate = String((sale as any).travel_dates);
     }
 
-    if (!departureDate || isNaN(departureDate.getTime())) {
+    if (!departureDate) {
+      return <Badge variant="secondary">Sem Data</Badge>;
+    }
+
+    // Usa o mesmo formatter para padronizar
+    const raw = departureDate;
+    const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    let flightDate: Date;
+
+    if (isoMatch) {
+      const [, y, m, d] = isoMatch;
+      flightDate = new Date(
+        Number(y),
+        Number(m) - 1,
+        Number(d),
+        0,
+        0,
+        0,
+        0
+      );
+    } else {
+      flightDate = new Date(raw);
+    }
+
+    if (isNaN(flightDate.getTime())) {
       return <Badge variant="secondary">Sem Data</Badge>;
     }
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-
-    const flightDate = new Date(departureDate);
     flightDate.setHours(0, 0, 0, 0);
 
     if (flightDate < today) {
@@ -196,7 +234,7 @@ export default function SaleDetail() {
     }
   };
 
-  // 🧮 Dados auxiliares para os cards (usar sempre os valores gravados)
+  // 🧮 Dados auxiliares para os cards
   const totalPaid = sale.paid_amount || 0;
   const totalPrice = sale.sale_price || sale.price_total || 0;
   const remaining = totalPrice - totalPaid;
@@ -207,19 +245,15 @@ export default function SaleDetail() {
   const profit = sale.profit || sale.margin_value || 0;
   const profitMargin = sale.profit_margin ?? sale.margin_percentage ?? null;
 
-  // Custo por milheiro: usar o gravado ou calcular retroativamente
   let costPerThousand: number | null = null;
 
   if ((sale as any).cost_per_thousand && (sale as any).cost_per_thousand > 0) {
-    // Usar o valor gravado
     costPerThousand = (sale as any).cost_per_thousand;
   } else if (milesUsed > 0) {
-    // Calcular retroativamente: (total_cost - taxa_embarque) / (milhas / 1000)
     const milesCost = totalCost - boardingFee;
     costPerThousand = (milesCost / milesUsed) * 1000;
   }
 
-  // Companhia / programa
   let programName = "Balcão";
   if (sale.mileage_accounts?.airline_companies) {
     const ac = sale.mileage_accounts.airline_companies;
@@ -230,31 +264,26 @@ export default function SaleDetail() {
     programName = "Importação (sem conta)";
   }
 
-  // Localizador da venda (fallback se não tiver no ticket)
   const locator =
     (sale as any).locator ||
     (sale as any).booking_code ||
     (sale as any).localizador ||
     null;
 
-  // Segmento/ticket principal para DATA DO VOO
-  const mainSegment =
+  // ✅ Data do primeiro voo para o card de Viagem
+  let firstFlightDate: string | null = null;
+  if (
     sale.flight_segments &&
     Array.isArray(sale.flight_segments) &&
     sale.flight_segments.length > 0
-      ? (sale.flight_segments[0] as any)
-      : null;
-
-  const mainTicket = tickets[0] ?? null;
-
-  const rawFlightDate =
-    mainSegment?.date ||
-    (mainTicket as any)?.flight_date ||
-    (mainTicket as any)?.departure_date ||
-    (sale as any).travel_dates ||
-    null;
-
-  const flightDateText = formatDate(rawFlightDate);
+  ) {
+    const firstSegment = sale.flight_segments[0] as { date?: string };
+    if (firstSegment.date) {
+      firstFlightDate = firstSegment.date;
+    }
+  } else if ((sale as any).travel_dates) {
+    firstFlightDate = String((sale as any).travel_dates);
+  }
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -346,19 +375,16 @@ export default function SaleDetail() {
                   <p className="text-sm text-muted-foreground">Rota</p>
                   <p className="font-medium">{sale.route_text || "N/A"}</p>
                 </div>
-
                 <div>
                   <p className="text-sm text-muted-foreground">Data do voo</p>
                   <p className="font-medium">
-                    {rawFlightDate ? flightDateText : "Data não informada"}
+                    {firstFlightDate ? formatDate(firstFlightDate) : "Data não informada"}
                   </p>
                 </div>
-
                 <div>
                   <p className="text-sm text-muted-foreground">Passageiros</p>
                   <p className="font-medium">{sale.passengers}</p>
                 </div>
-
                 <div>
                   <p className="text-sm text-muted-foreground">
                     Companhia / Programa
@@ -561,7 +587,7 @@ export default function SaleDetail() {
                       (ticket as any).bilhete ||
                       "Não informado";
 
-                    const flightDate =
+                    const flightDateStr =
                       (ticket as any).flight_date ||
                       (ticket as any).travel_date ||
                       (ticket as any).departure_date ||
@@ -590,7 +616,7 @@ export default function SaleDetail() {
                               Data do voo
                             </p>
                             <p className="font-medium">
-                              {formatDate(flightDate)}
+                              {formatDate(flightDateStr)}
                             </p>
                           </div>
                           <div className="flex flex-col gap-1">
