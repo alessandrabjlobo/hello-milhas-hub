@@ -359,6 +359,8 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
       notes: data.observacoes || '',
       airlineProgram: data.programa_milhas || '',
       localizador: data.localizador || '',
+      locator: data.localizador || '',
+      bookingCode: data.localizador || '',
     };
   }
 
@@ -366,14 +368,13 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
   // IMPORTAÇÃO COMPLETA
   // ============================
 
-  // 🔹 Só é BALCÃO se realmente tiver dados de balcão
   const hasCounterData = !!(
     data.custo_mil_milhas_balcao ||
     data.vendedor_balcao ||
     data.contato_vendedor_balcao
   );
 
-  const isCounter = hasCounterData; // NÃO usamos mais resolved.isCounter pra planilha
+  const isCounter = hasCounterData;
   const isLegacy = resolved.isLegacyImport || !hasCounterData;
 
   const channel: 'internal' | 'counter' | 'legacy' =
@@ -425,9 +426,10 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
     notes: data.observacoes || '',
     airlineProgram: data.programa_milhas || '',
     localizador: data.localizador || '',
+    locator: data.localizador || '',
+    bookingCode: data.localizador || '',
   };
 
-  // LEGACY (importação histórica / sem conta / sem balcão)
   if (channel === 'legacy') {
     return {
       ...baseData,
@@ -435,7 +437,6 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
     };
   }
 
-  // INTERNAL (conta de milhas da casa)
   if (channel === 'internal') {
     return {
       ...baseData,
@@ -445,12 +446,10 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
     };
   }
 
-  // BALCÃO (counter) – só entra aqui se realmente tiver dados de balcão
   if (channel === 'counter') {
     const counterCost = parseBRNumber(data.custo_mil_milhas_balcao || '0');
     const sellerName = (data.vendedor_balcao || '').trim();
 
-    // Se faltar dados críticos, volta como legacy pra não quebrar
     if (!sellerName || !counterCost || !data.programa_milhas) {
       return {
         ...baseData,
@@ -468,7 +467,6 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
     };
   }
 
-  // fallback seguro
   return {
     ...baseData,
     channel: 'legacy',
