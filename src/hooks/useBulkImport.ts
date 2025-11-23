@@ -69,7 +69,6 @@ export function useBulkImport() {
         return;
       }
 
-      // Validação linha a linha
       const processedRows: ProcessedSaleRow[] = await Promise.all(
         parseResult.rows.map(async (row) => {
           const validation = await validateSaleRow(
@@ -116,7 +115,6 @@ export function useBulkImport() {
     );
   };
 
-  // Garante que a companhia aérea existe (ou cria se não existir)
   const ensureAirlineExists = async (
     airlineCode: string,
     supplierId: string
@@ -125,7 +123,6 @@ export function useBulkImport() {
 
     const code = airlineCode.trim().toUpperCase();
 
-    // tenta buscar existente
     const { data: existing } = await supabase
       .from('airline_companies')
       .select('id')
@@ -135,7 +132,6 @@ export function useBulkImport() {
 
     if (existing) return existing.id;
 
-    // cria nova
     const { data: newAirline, error } = await supabase
       .from('airline_companies')
       .insert({
@@ -197,7 +193,6 @@ export function useBulkImport() {
 
     for (const row of validRows) {
       try {
-        // garante companhia aérea
         if (row.data.programa_milhas) {
           const airlineId = await ensureAirlineExists(
             row.data.programa_milhas,
@@ -211,7 +206,6 @@ export function useBulkImport() {
           }
         }
 
-        // converte linha da planilha para o formato do saleService
         const saleData = convertRowToSaleData(row);
 
         const result = await createSaleWithSegments(saleData, supplierId);
@@ -297,8 +291,17 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
   const data = row.data;
   const resolved = row.validation.resolvedData;
 
-  // Detectar importação simples (faturamento)
-  const isSimpleImport = !!(data.quantidade_milhas && data.custo_milheiro);
+  // 🔹 NOVO: só considera "simples" quando NÃO há dados de rota/segmento
+  const hasRouteInfo =
+    !!data.origem ||
+    !!data.destino ||
+    !!data.data_ida ||
+    !!data.data_volta ||
+    !!data.milhas_ida ||
+    !!data.milhas_volta;
+
+  const isSimpleImport =
+    !!(data.quantidade_milhas && data.custo_milheiro) && !hasRouteInfo;
 
   if (isSimpleImport) {
     const qtdMilhas = parseBRNumber(data.quantidade_milhas || '0');
@@ -312,7 +315,6 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
     const custoTotal = custoMilhas + taxa;
     const lucro = valorTotal - custoTotal;
 
-    // margem sempre número (pode ser negativa)
     let margem = 0;
     if (valorTotal > 0 && isFinite(lucro)) {
       margem = (lucro / valorTotal) * 100;
@@ -358,7 +360,6 @@ function convertRowToSaleData(row: ProcessedSaleRow): any {
   }
 
   // Importação completa (detalhada)
-  // Detectar se é balcão quando vier custo_mil_milhas_balcao
   const hasCounterData = !!(data.custo_mil_milhas_balcao || data.vendedor_balcao);
   const isCounter = hasCounterData || resolved.isCounter;
   const isLegacy = resolved.isLegacyImport;
