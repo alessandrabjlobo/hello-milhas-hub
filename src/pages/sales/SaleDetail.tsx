@@ -230,11 +230,31 @@ export default function SaleDetail() {
     programName = "Importação (sem conta)";
   }
 
+  // Localizador da venda (fallback se não tiver no ticket)
   const locator =
     (sale as any).locator ||
     (sale as any).booking_code ||
     (sale as any).localizador ||
     null;
+
+  // Segmento/ticket principal para DATA DO VOO
+  const mainSegment =
+    sale.flight_segments &&
+    Array.isArray(sale.flight_segments) &&
+    sale.flight_segments.length > 0
+      ? (sale.flight_segments[0] as any)
+      : null;
+
+  const mainTicket = tickets[0] ?? null;
+
+  const rawFlightDate =
+    mainSegment?.date ||
+    (mainTicket as any)?.flight_date ||
+    (mainTicket as any)?.departure_date ||
+    (sale as any).travel_dates ||
+    null;
+
+  const flightDateText = formatDate(rawFlightDate);
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -326,10 +346,19 @@ export default function SaleDetail() {
                   <p className="text-sm text-muted-foreground">Rota</p>
                   <p className="font-medium">{sale.route_text || "N/A"}</p>
                 </div>
+
+                <div>
+                  <p className="text-sm text-muted-foreground">Data do voo</p>
+                  <p className="font-medium">
+                    {rawFlightDate ? flightDateText : "Data não informada"}
+                  </p>
+                </div>
+
                 <div>
                   <p className="text-sm text-muted-foreground">Passageiros</p>
                   <p className="font-medium">{sale.passengers}</p>
                 </div>
+
                 <div>
                   <p className="text-sm text-muted-foreground">
                     Companhia / Programa
